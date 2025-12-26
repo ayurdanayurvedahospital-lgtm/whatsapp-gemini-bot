@@ -29,9 +29,8 @@ def bot():
         # 3. Generate content
         response = model.generate_content(user_msg)
         msg.body(response.text)
-
+        
     except Exception as e:
-        # Print the exact error to logs if it fails
         print(f"Error: {e}")
         msg.body("Sorry, I had a connection error. Please try again.")
 
