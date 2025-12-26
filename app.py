@@ -1,48 +1,41 @@
 import os
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-from google import genai
+import google.generativeai as genai
 
 app = Flask(__name__)
 
-# Initialize the connection to Gemini
-# We use the API Key stored in the cloud (Render) environment variables
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Configure the stable Google library
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+
+# Setup the model
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    # 1. Get the message user sent on WhatsApp
+    # 1. Get incoming message
     user_msg = request.values.get("Body", "").strip()
-    sender = request.values.get("From", "")
-    print(f"Message from {sender}: {user_msg}")
+    print(f"User: {user_msg}")
 
-    # 2. Prepare the response container
+    # 2. Prepare response
     resp = MessagingResponse()
     msg = resp.message()
 
     if not user_msg:
-        msg.body("I am listening, but I didn't hear anything.")
+        msg.body("I am listening.")
         return str(resp)
 
     try:
-        # 3. Send the user's text to Gemini
-        # We use 'gemini-1.5-flash' because it is fast and cheap
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=user_msg
-        )
-        
-        # 4. Get Gemini's answer
-        bot_reply = response.text
-        
-        # 5. Send the answer back to WhatsApp
-        msg.body(bot_reply)
+        # 3. Generate content
+        response = model.generate_content(user_msg)
+        msg.body(response.text)
 
     except Exception as e:
+        # Print the exact error to logs if it fails
         print(f"Error: {e}")
-        msg.body("Sorry, I encountered an error. Please try again.")
+        msg.body("Sorry, I had a connection error. Please try again.")
 
     return str(resp)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=10000)
