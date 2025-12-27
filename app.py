@@ -1,20 +1,16 @@
 import os
+import requests
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import google.generativeai as genai
 
 app = Flask(__name__)
 
-# 1. Configure the stable Google library
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-
-# 2. Setup the model
-# We use 'gemini-1.5-flash' because it is fast, free, and reliable.
-model = genai.GenerativeModel('gemini-1.5-flash')
+# We use the raw API URL directly (No google library needed)
+API_KEY = os.environ.get("GEMINI_API_KEY")
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    # Get the incoming message
     user_msg = request.values.get("Body", "").strip()
     print(f"User: {user_msg}")
 
@@ -26,14 +22,28 @@ def bot():
         return str(resp)
 
     try:
-        # 3. Generate content
-        response = model.generate_content(user_msg)
-        msg.body(response.text)
+        # Construct the payload exactly like your working CURL command
+        payload = {
+            "contents": [{
+                "parts": [{"text": user_msg}]
+            }]
+        }
+
+        # Send raw request
+        response = requests.post(API_URL, json=payload)
         
+        # Check if it worked
+        if response.status_code == 200:
+            data = response.json()
+            bot_reply = data["candidates"][0]["content"]["parts"][0]["text"]
+            msg.body(bot_reply)
+        else:
+            print(f"Google Error: {response.text}")
+            msg.body("Sorry, my brain is tired (Quota limit or connection error).")
+
     except Exception as e:
-        # Print error to logs
         print(f"Error: {e}")
-        msg.body("Sorry, I am having a connection issue. Please try again.")
+        msg.body("Sorry, I had a connection error.")
 
     return str(resp)
 
