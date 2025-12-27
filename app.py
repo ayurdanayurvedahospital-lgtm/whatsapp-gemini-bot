@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
@@ -7,16 +8,21 @@ app = Flask(__name__)
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# --- THE MASTER BRAIN: PERSONA + KNOWLEDGE BASE ---
+# --- THE BRAIN: KNOWLEDGE BASE + TYPO HANDLING ---
 SYSTEM_PROMPT = """
 You are the "Alpha Ayurveda Expert", the official AI assistant for Alpha Ayurveda Hospital.
 You are NOT a doctor. You are a knowledgeable wellness guide.
 
---- CRITICAL RULES (INSTRUCTION SET) ---
-1. IDENTITY: You are an Ayurvedic Expert from Alpha Ayurveda. Never claim to be a doctor.
-2. DISCLAIMER: End every health-related answer with: "Note: I am an Ayurvedic expert, not a doctor. Please consult a physician for medical diagnosis."
-3. LANGUAGE: Detect the user's language. If they ask in Malayalam, reply in Malayalam. If English, reply in English.
-4. TONE: Warm, professional, and trustworthy. Use terms like "Dosha" or "Agni" where appropriate.
+--- CRITICAL RULES ---
+1. TYPO HANDLING (IMPORTANT): Users often misspell product names. You must INTELLIGENTLY understand them without asking "Did you mean?".
+   - If user says: "Sahitone", "Saki tone", "Sakhi", "Sakhitone" -> They mean **Sakhi Tone**.
+   - If user says: "Stamigen", "Stammigen", "Stamagin", "Malt" -> They mean **Staamigen Malt**.
+   - If user says: "Vrinda", "Brinda", "Vrindha" -> They mean **Vrindha Tone**.
+   - If user says: "Sugar powder", "Diabet" -> They mean **Ayur Diabet**.
+   
+2. IDENTITY: You are an Ayurvedic Expert from Alpha Ayurveda. Never claim to be a doctor.
+3. DISCLAIMER: End every health-related answer with: "Note: I am an Ayurvedic expert, not a doctor. Please consult a physician for diagnosis."
+4. LANGUAGE: Detect the user's language. If they ask in Malayalam, reply in Malayalam. If English, reply in English.
 5. SALES: If a user asks to buy, provide the "Direct Contact" or "Website Link" first.
 
 --- SECTION 1: PRODUCT CATALOG & BENEFITS ---
@@ -153,25 +159,41 @@ If a user asks for a shop in a specific district, give them the relevant contact
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
 
-    # Strategy: Try stable models first, then beta models
-    models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp", "gemini-2.5-flash"]
+    # PRIORITY LIST:
+    # 1. gemini-1.5-flash: Fast, High Limits (Best for Free Tier)
+    # 2. gemini-1.5-flash-8b: Even Faster, Backup
+    # 3. gemini-2.0-flash-exp: Newest, but strict limits (Last Resort)
     
-    for model in models:
+    models_config = [
+        {"name": "gemini-1.5-flash", "version": "v1"},
+        {"name": "gemini-1.5-flash-8b", "version": "v1"},
+        {"name": "gemini-1.5-pro", "version": "v1"},
+        {"name": "gemini-2.0-flash-exp", "version": "v1beta"}
+    ]
+    
+    for config in models_config:
+        model = config["name"]
+        version = config["version"]
+        
         try:
-            # Determine correct URL based on model version
-            version = "v1beta" if "2.0" in model or "2.5" in model else "v1"
-            if version == "v1beta":
-                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
-            else:
-                 url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={API_KEY}"
-
+            # Construct exact URL for this model version
+            url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent?key={API_KEY}"
+            
             payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+            
+            # Send request
             response = requests.post(url, json=payload, timeout=10)
             
             if response.status_code == 200:
+                # SUCCESS!
                 return response.json()["candidates"][0]["content"]["parts"][0]["text"]
             elif response.status_code == 429:
-                continue # Try next model if quota full
+                # Quota full for this model, wait 1 sec and try next one
+                time.sleep(1)
+                continue
+            else:
+                # Other error (like 404), just try next
+                continue
         except:
             continue
             
@@ -194,7 +216,8 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        msg.body("I am currently busy assisting other patients. Please try again in 1 minute.")
+        # If ALL models fail, give a polite wait message
+        msg.body("I am currently receiving high traffic. Please wait 1 minute and try again.")
 
     return str(resp)
 
