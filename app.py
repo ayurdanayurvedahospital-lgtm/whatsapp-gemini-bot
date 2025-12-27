@@ -5,11 +5,11 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# Configure the stable Google library
+# Configure Google Gemini
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
-# Setup the model
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Use the 'gemini-pro' model which is the most stable version
+model = genai.GenerativeModel('gemini-pro')
 
 @app.route("/bot", methods=["POST"])
 def bot():
@@ -32,7 +32,8 @@ def bot():
         
     except Exception as e:
         print(f"Error: {e}")
-        msg.body("Sorry, I had a connection error. Please try again.")
+        # If this fails, we will see the error in the logs
+        msg.body("Sorry, I am having trouble connecting. Please try again.")
 
     return str(resp)
 
