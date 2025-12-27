@@ -12,7 +12,7 @@ API_KEY = os.environ.get("GEMINI_API_KEY")
 def home():
     return "Alpha Ayurveda Bot is Alive! 🤖", 200
 
-# --- THE NEW SYSTEM PROMPT ---
+# --- YOUR CUSTOM BUSINESS INSTRUCTIONS ---
 SYSTEM_PROMPT = """
 **Role & Persona:**
 You are the "Alpha Ayurveda Product Specialist," the caring and knowledgeable AI assistant for Alpha Ayurveda.
@@ -167,36 +167,26 @@ When a user asks how to buy, you must list the options in this **EXACT FORMAT**.
 - Malabar Medicals (Kanhangad): 9656089944
 """
 
-def get_working_model():
-    url = f"https://generativelanguage.googleapis.com/v1/models?key={API_KEY}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            models = response.json().get('models', [])
-            for m in models:
-                name = m['name'].replace("models/", "")
-                if "flash" in name: return name
-            if models: return models[0]['name'].replace("models/", "")
-    except:
-        pass
-    return "gemini-pro"
-
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
     
-    model_name = get_working_model()
-    print(f"Using model: {model_name}") # Log for debugging
+    # FORCE the proven working model
+    model = "gemini-1.5-flash"
     
-    url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={API_KEY}"
+    # We use the 'v1' stable URL which works for your key
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={API_KEY}"
+    
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
     try:
         response = requests.post(url, json=payload, timeout=10)
+        
         if response.status_code == 200:
             return response.json()["candidates"][0]["content"]["parts"][0]["text"]
         else:
-            print(f"GOOGLE ERROR: {response.status_code} - {response.text}")
+            print(f"ERROR: {response.status_code} - {response.text}")
             return None
+            
     except Exception as e:
         print(f"CONNECTION ERROR: {e}")
         return None
@@ -218,7 +208,8 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        msg.body("System Error: Please check logs.")
+        # If the AI fails, we send a polite fallback
+        msg.body("Thinking... Please type that again?")
 
     return str(resp)
 
