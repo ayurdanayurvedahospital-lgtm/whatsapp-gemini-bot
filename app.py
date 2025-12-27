@@ -41,32 +41,25 @@ You are NOT a doctor. You are a knowledgeable wellness guide.
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
 
-    # THE SURVIVAL LIST:
-    # 1. gemini-1.5-flash: New & Fast. (Your key struggles with this)
-    # 2. gemini-pro: The Classic. (This works on 99% of keys)
-    models_to_try = ["gemini-1.5-flash", "gemini-pro"]
-
-    for model in models_to_try:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
-            payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+    # SOLUTION: Use the 'v1' (Stable) URL with the standard Flash model.
+    # This URL is the most compatible with new keys.
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    
+    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+    
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        
+        if response.status_code == 200:
+            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            # If this fails, we print the FULL error message to logs
+            print(f"GOOGLE ERROR: {response.status_code} - {response.text}")
+            return None
             
-            response = requests.post(url, json=payload, timeout=10)
-            
-            if response.status_code == 200:
-                # SUCCESS! We found a working model.
-                print(f"SUCCESS using model: {model}")
-                return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-            else:
-                # Log the error and loop to the next model
-                print(f"Model {model} failed with error {response.status_code}. Trying next...")
-                continue
-                
-        except Exception as e:
-            print(f"Connection error on {model}: {e}")
-            continue
-
-    return None
+    except Exception as e:
+        print(f"CONNECTION ERROR: {e}")
+        return None
 
 @app.route("/bot", methods=["POST"])
 def bot():
@@ -85,8 +78,8 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        # If this shows, your API Key is completely invalid for ALL Google models.
-        msg.body("System Error: API Key is invalid for all models. Please generate a new key in a new Google Cloud Project.")
+        # If this appears, check Render logs for "GOOGLE ERROR"
+        msg.body("System Error: AI Connection Failed. Please check logs.")
 
     return str(resp)
 
