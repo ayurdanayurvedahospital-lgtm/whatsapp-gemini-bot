@@ -1,15 +1,20 @@
 import os
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-from google import genai
+import google.generativeai as genai
 
 app = Flask(__name__)
 
-# Initialize client with your API Key
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# 1. Configure the stable Google library
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+
+# 2. Setup the model
+# We use 'gemini-1.5-flash' because it is fast, free, and reliable.
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 @app.route("/bot", methods=["POST"])
 def bot():
+    # Get the incoming message
     user_msg = request.values.get("Body", "").strip()
     print(f"User: {user_msg}")
 
@@ -21,25 +26,14 @@ def bot():
         return str(resp)
 
     try:
-        # SWITCHING TO GEMINI-PRO (The most stable model)
-        response = client.models.generate_content(
-            model="gemini-2.0-flash", 
-            contents=user_msg
-        )
+        # 3. Generate content
+        response = model.generate_content(user_msg)
         msg.body(response.text)
         
     except Exception as e:
-        # If the first model fails, try the backup model automatically
-        try:
-            print(f"Primary model failed, trying backup. Error: {e}")
-            response = client.models.generate_content(
-                model="gemini-1.5-pro",
-                contents=user_msg
-            )
-            msg.body(response.text)
-        except Exception as e2:
-            print(f"All models failed. Error: {e2}")
-            msg.body("Sorry, I am having trouble connecting to Google. Please try again later.")
+        # Print error to logs
+        print(f"Error: {e}")
+        msg.body("Sorry, I am having a connection issue. Please try again.")
 
     return str(resp)
 
