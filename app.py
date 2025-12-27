@@ -167,14 +167,41 @@ When a user asks how to buy, you must list the options in this **EXACT FORMAT**.
 - Malabar Medicals (Kanhangad): 9656089944
 """
 
+def get_smart_model():
+    # We use v1beta to list models because it is more permissive
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            all_models = [m['name'].replace("models/", "") for m in data.get('models', [])]
+            
+            # CRITICAL: Filter out "experimental" or "exp" models to avoid ghost messages
+            safe_models = [m for m in all_models if "exp" not in m and "experimental" not in m]
+            
+            # Preference Order
+            if "gemini-1.5-flash" in safe_models: return "gemini-1.5-flash"
+            if "gemini-1.5-pro" in safe_models: return "gemini-1.5-pro"
+            if "gemini-1.0-pro" in safe_models: return "gemini-1.0-pro"
+            
+            # Fallback: Just take the first safe one
+            if safe_models: return safe_models[0]
+            
+    except Exception as e:
+        print(f"Model list error: {e}")
+    
+    # Ultimate Fallback (Try standard flash if all else fails)
+    return "gemini-1.5-flash"
+
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
     
-    # FORCE the proven working model
-    model = "gemini-1.5-flash"
+    # 1. Select the best SAFE model dynamically
+    model_name = get_smart_model()
+    print(f"Selected Model: {model_name}")
     
-    # We use the 'v1' stable URL which works for your key
-    url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={API_KEY}"
+    # 2. Use v1beta endpoint (Proven to work for your key)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
     
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
@@ -184,7 +211,7 @@ def try_generate(user_msg):
         if response.status_code == 200:
             return response.json()["candidates"][0]["content"]["parts"][0]["text"]
         else:
-            print(f"ERROR: {response.status_code} - {response.text}")
+            print(f"API ERROR: {response.status_code} - {response.text}")
             return None
             
     except Exception as e:
@@ -208,8 +235,7 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        # If the AI fails, we send a polite fallback
-        msg.body("Thinking... Please type that again?")
+        msg.body("I am having a little trouble connecting. Please type that again?")
 
     return str(resp)
 
