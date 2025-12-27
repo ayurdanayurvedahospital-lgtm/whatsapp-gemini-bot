@@ -5,9 +5,13 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
-# We use the raw API URL directly (No google library needed)
+# We get the API Key from Render
 API_KEY = os.environ.get("GEMINI_API_KEY")
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+
+# ------------------------------------------------------------------
+# CHANGE HERE: We switched from 'v1beta' to 'v1' (The Stable Room)
+# ------------------------------------------------------------------
+API_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
 @app.route("/bot", methods=["POST"])
 def bot():
@@ -22,28 +26,30 @@ def bot():
         return str(resp)
 
     try:
-        # Construct the payload exactly like your working CURL command
+        # Prepare the letter to Google
         payload = {
             "contents": [{
                 "parts": [{"text": user_msg}]
             }]
         }
 
-        # Send raw request
+        # Send it!
         response = requests.post(API_URL, json=payload)
         
-        # Check if it worked
+        # Check if Google replied with success (200 OK)
         if response.status_code == 200:
             data = response.json()
+            # Extract the answer
             bot_reply = data["candidates"][0]["content"]["parts"][0]["text"]
             msg.body(bot_reply)
         else:
+            # If it fails, print the EXACT reason to the logs
             print(f"Google Error: {response.text}")
-            msg.body("Sorry, my brain is tired (Quota limit or connection error).")
+            msg.body("Sorry, I am having a connection issue with Google.")
 
     except Exception as e:
         print(f"Error: {e}")
-        msg.body("Sorry, I had a connection error.")
+        msg.body("Sorry, something went wrong internally.")
 
     return str(resp)
 
