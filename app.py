@@ -1,5 +1,4 @@
 import os
-import time
 import requests
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
@@ -8,12 +7,12 @@ app = Flask(__name__)
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# --- HEALTH CHECK (Keeps UptimeRobot Happy) ---
+# --- 1. HEALTH CHECK (Keeps UptimeRobot Green!) ---
 @app.route("/", methods=["GET"])
 def home():
     return "Alpha Ayurveda Bot is Alive! 🤖", 200
 
-# --- THE BRAIN ---
+# --- 2. THE BRAIN ---
 SYSTEM_PROMPT = """
 You are the "Alpha Ayurveda Expert". 
 You are NOT a doctor. You are a knowledgeable wellness guide.
@@ -42,10 +41,10 @@ You are NOT a doctor. You are a knowledgeable wellness guide.
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
 
-    # STRATEGY: Use ONLY the Standard Stable Model (v1beta)
-    # This model is the most reliable for free accounts.
+    # STRATEGY: Use the 'v1' (Stable) URL. 
+    # This is the most compatible endpoint for new API keys.
     model = "gemini-1.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
     try:
@@ -54,7 +53,7 @@ def try_generate(user_msg):
         if response.status_code == 200:
             return response.json()["candidates"][0]["content"]["parts"][0]["text"]
         else:
-            # If this prints 404, the API Key is invalid for this model
+            # If this fails, the logs will tell us exactly why
             print(f"Error {response.status_code}: {response.text}")
             return None
             
@@ -62,6 +61,7 @@ def try_generate(user_msg):
         print(f"Connection Error: {e}")
         return None
 
+# --- 3. THE WHATSAPP ROUTE ---
 @app.route("/bot", methods=["POST"])
 def bot():
     user_msg = request.values.get("Body", "").strip()
@@ -79,7 +79,7 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        # If this happens, it means the API Key is definitely the issue
+        # If this appears, the New Key is not saved correctly yet
         msg.body("System Error: Please check API Key permissions.")
 
     return str(resp)
