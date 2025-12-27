@@ -26,7 +26,7 @@ You are NOT a doctor. You are a knowledgeable wellness guide.
 --- PRODUCTS ---
 1. Staamigen Malt (Men) - ₹749. Weight gain.
 2. Sakhi Tone (Women) - ₹749. Weight gain.
-3. Junior Malt (Kids) - ₹599. Growth.
+3. Junior Staamigen Malt (Kids) - ₹599. Growth.
 4. Ayur Diabet - ₹690. Sugar control.
 5. Vrindha Tone - ₹440. White discharge.
 6. Muktanjan Oil - ₹295. Pain.
@@ -41,39 +41,32 @@ You are NOT a doctor. You are a knowledgeable wellness guide.
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
 
-    # THE SHOTGUN LIST: Try all these models in order
-    # If one fails (404/429), it instantly tries the next.
-    model_list = [
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",
-        "gemini-pro",        # The Classic Stable Model (v1.0)
-        "gemini-1.0-pro"
-    ]
-
-    for model in model_list:
-        try:
-            # We try the 'v1beta' endpoint as it supports more models
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
-            payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+    # We will use the STANDARD model on the STANDARD endpoint.
+    # This is the most likely to work with a "New Project" key.
+    model = "gemini-1.5-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
+    
+    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+    
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        
+        if response.status_code == 200:
+            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            # This prints the EXACT error to your logs so we can see it
+            print(f"GOOGLE API ERROR: {response.status_code} - {response.text}")
+            return None
             
-            response = requests.post(url, json=payload, timeout=8)
-            
-            if response.status_code == 200:
-                print(f"SUCCESS with model: {model}") # Log which one worked
-                return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-            else:
-                print(f"Failed {model}: {response.status_code}")
-                continue # Try next model
-                
-        except:
-            continue
-
-    return None
+    except Exception as e:
+        print(f"CONNECTION ERROR: {e}")
+        return None
 
 @app.route("/bot", methods=["POST"])
 def bot():
     user_msg = request.values.get("Body", "").strip()
+    print(f"User: {user_msg}")
+    
     resp = MessagingResponse()
     msg = resp.message()
 
@@ -86,8 +79,8 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        # If ALL models fail, then the Key is truly broken
-        msg.body("System Error: No working AI models found. Please check API Key.")
+        # If this shows up, check Render Logs for "GOOGLE API ERROR"
+        msg.body("System Error. Please check the server logs for the specific API error.")
 
     return str(resp)
 
