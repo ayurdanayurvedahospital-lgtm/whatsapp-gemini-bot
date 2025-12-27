@@ -168,7 +168,6 @@ When a user asks how to buy, you must list the options in this **EXACT FORMAT**.
 """
 
 def get_smart_model():
-    # We use v1beta to list models because it is more permissive
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
     try:
         response = requests.get(url)
@@ -176,21 +175,29 @@ def get_smart_model():
             data = response.json()
             all_models = [m['name'].replace("models/", "") for m in data.get('models', [])]
             
-            # CRITICAL: Filter out "experimental" or "exp" models to avoid ghost messages
-            safe_models = [m for m in all_models if "exp" not in m and "experimental" not in m]
+            # CRITICAL FILTERING:
+            # 1. Must contain "gemini" (to be a chat model)
+            # 2. Must NOT contain "embedding" (math model)
+            # 3. Must NOT contain "exp" (experimental/unstable)
             
-            # Preference Order
+            safe_models = [
+                m for m in all_models 
+                if "gemini" in m 
+                and "embedding" not in m 
+                and "exp" not in m
+            ]
+            
+            # Priority: Try Flash first, then Pro
             if "gemini-1.5-flash" in safe_models: return "gemini-1.5-flash"
             if "gemini-1.5-pro" in safe_models: return "gemini-1.5-pro"
-            if "gemini-1.0-pro" in safe_models: return "gemini-1.0-pro"
             
-            # Fallback: Just take the first safe one
+            # If our favorites aren't there, take the first valid chat model
             if safe_models: return safe_models[0]
             
     except Exception as e:
         print(f"Model list error: {e}")
     
-    # Ultimate Fallback (Try standard flash if all else fails)
+    # Ultimate Fallback
     return "gemini-1.5-flash"
 
 def try_generate(user_msg):
@@ -200,7 +207,7 @@ def try_generate(user_msg):
     model_name = get_smart_model()
     print(f"Selected Model: {model_name}")
     
-    # 2. Use v1beta endpoint (Proven to work for your key)
+    # 2. Use v1beta endpoint
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
     
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
