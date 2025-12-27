@@ -8,6 +8,11 @@ app = Flask(__name__)
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
+# --- NEW: HEALTH CHECK ROUTE (For UptimeRobot) ---
+@app.route("/", methods=["GET"])
+def home():
+    return "Alpha Ayurveda Bot is Alive and Running! 🤖", 200
+
 # --- THE BRAIN: CONCISE & CHATTY ---
 SYSTEM_PROMPT = """
 You are the "Alpha Ayurveda Expert", the official AI assistant for Alpha Ayurveda Hospital.
@@ -60,13 +65,12 @@ def send_stubborn_request(model, version, full_prompt):
             
             elif response.status_code == 429:
                 # If busy, wait and try again (Exponential Backoff)
-                wait_time = 2 * (attempt + 1) # Wait 2s, then 4s, then 6s
+                wait_time = 2 * (attempt + 1)
                 print(f"Model {model} busy (429). Retrying in {wait_time}s...")
                 time.sleep(wait_time)
                 continue
             
             else:
-                # If it's a 404 or other error, don't retry, just fail
                 print(f"Model {model} failed with {response.status_code}")
                 return None
                 
@@ -83,11 +87,9 @@ def try_generate(user_msg):
     # 1. Try "gemini-2.0-flash-exp" (The one we know exists for you)
     # 2. If that fails completely, try "gemini-1.5-flash" (Standard)
     
-    # Attempt 1: The Model we know you have (with retries)
     reply = send_stubborn_request("gemini-2.0-flash-exp", "v1beta", full_prompt)
     if reply: return reply
     
-    # Attempt 2: The Backup
     reply = send_stubborn_request("gemini-1.5-flash", "v1", full_prompt)
     if reply: return reply
 
@@ -110,7 +112,6 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        # Only shows if retries failed 3 times
         msg.body("Our server is extremely busy. Please wait 1 minute before asking again.")
 
     return str(resp)
