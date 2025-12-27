@@ -1,23 +1,18 @@
 import os
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import google.generativeai as genai
+from google import genai
 
 app = Flask(__name__)
 
-# Configure Google Gemini
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-
-# Use the 'gemini-pro' model which is the most stable version
-model = genai.GenerativeModel('gemini-pro')
+# Connect to Google using the NEW library
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    # 1. Get incoming message
     user_msg = request.values.get("Body", "").strip()
     print(f"User: {user_msg}")
 
-    # 2. Prepare response
     resp = MessagingResponse()
     msg = resp.message()
 
@@ -26,14 +21,16 @@ def bot():
         return str(resp)
 
     try:
-        # 3. Generate content
-        response = model.generate_content(user_msg)
+        # Using the correct model for the new library
+        response = client.models.generate_content(
+            model="gemini-1.5-flash", 
+            contents=user_msg
+        )
         msg.body(response.text)
-        
+
     except Exception as e:
         print(f"Error: {e}")
-        # If this fails, we will see the error in the logs
-        msg.body("Sorry, I am having trouble connecting. Please try again.")
+        msg.body("Sorry, I had a technical hiccup. Please try again.")
 
     return str(resp)
 
