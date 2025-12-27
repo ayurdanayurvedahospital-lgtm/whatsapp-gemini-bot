@@ -38,12 +38,36 @@ You are NOT a doctor. You are a knowledgeable wellness guide.
 - Website: https://ayuralpha.in/
 """
 
+def get_working_model():
+    # Ask Google which models are available for this Key
+    url = f"https://generativelanguage.googleapis.com/v1/models?key={API_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            models = response.json().get('models', [])
+            # Priority list: Look for Flash, then Pro, then anything else
+            for m in models:
+                name = m['name'].replace("models/", "")
+                if "flash" in name: return name
+            for m in models:
+                name = m['name'].replace("models/", "")
+                if "pro" in name: return name
+            # If no preference found, just take the first one
+            if models: return models[0]['name'].replace("models/", "")
+    except:
+        pass
+    # Fallback if auto-detection fails
+    return "gemini-pro"
+
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
+    
+    # 1. Find a valid model name
+    model_name = get_working_model()
+    print(f"Attempting to use model: {model_name}")
 
-    # SOLUTION: Use the 'v1' (Stable) URL with the standard Flash model.
-    # This URL is the most compatible with new keys.
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    # 2. Construct the URL dynamically
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={API_KEY}"
     
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
@@ -53,8 +77,7 @@ def try_generate(user_msg):
         if response.status_code == 200:
             return response.json()["candidates"][0]["content"]["parts"][0]["text"]
         else:
-            # If this fails, we print the FULL error message to logs
-            print(f"GOOGLE ERROR: {response.status_code} - {response.text}")
+            print(f"GOOGLE ERROR ({model_name}): {response.status_code} - {response.text}")
             return None
             
     except Exception as e:
@@ -78,8 +101,8 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        # If this appears, check Render logs for "GOOGLE ERROR"
-        msg.body("System Error: AI Connection Failed. Please check logs.")
+        # If this happens, check logs to see which model failed
+        msg.body("System Error: Unable to access AI models. Please check logs.")
 
     return str(resp)
 
