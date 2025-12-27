@@ -7,12 +7,12 @@ app = Flask(__name__)
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# --- 1. HEALTH CHECK (Keeps UptimeRobot Green!) ---
+# --- HEALTH CHECK ---
 @app.route("/", methods=["GET"])
 def home():
     return "Alpha Ayurveda Bot is Alive! 🤖", 200
 
-# --- 2. THE BRAIN ---
+# --- THE BRAIN ---
 SYSTEM_PROMPT = """
 You are the "Alpha Ayurveda Expert". 
 You are NOT a doctor. You are a knowledgeable wellness guide.
@@ -41,32 +41,39 @@ You are NOT a doctor. You are a knowledgeable wellness guide.
 def try_generate(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
 
-    # STRATEGY: Use the 'v1' (Stable) URL. 
-    # This is the most compatible endpoint for new API keys.
-    model = "gemini-1.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={API_KEY}"
-    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
-    
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        
-        if response.status_code == 200:
-            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-        else:
-            # If this fails, the logs will tell us exactly why
-            print(f"Error {response.status_code}: {response.text}")
-            return None
-            
-    except Exception as e:
-        print(f"Connection Error: {e}")
-        return None
+    # THE SHOTGUN LIST: Try all these models in order
+    # If one fails (404/429), it instantly tries the next.
+    model_list = [
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro",
+        "gemini-pro",        # The Classic Stable Model (v1.0)
+        "gemini-1.0-pro"
+    ]
 
-# --- 3. THE WHATSAPP ROUTE ---
+    for model in model_list:
+        try:
+            # We try the 'v1beta' endpoint as it supports more models
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={API_KEY}"
+            payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+            
+            response = requests.post(url, json=payload, timeout=8)
+            
+            if response.status_code == 200:
+                print(f"SUCCESS with model: {model}") # Log which one worked
+                return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            else:
+                print(f"Failed {model}: {response.status_code}")
+                continue # Try next model
+                
+        except:
+            continue
+
+    return None
+
 @app.route("/bot", methods=["POST"])
 def bot():
     user_msg = request.values.get("Body", "").strip()
-    print(f"User: {user_msg}")
-    
     resp = MessagingResponse()
     msg = resp.message()
 
@@ -79,8 +86,8 @@ def bot():
     if bot_reply:
         msg.body(bot_reply)
     else:
-        # If this appears, the New Key is not saved correctly yet
-        msg.body("System Error: Please check API Key permissions.")
+        # If ALL models fail, then the Key is truly broken
+        msg.body("System Error: No working AI models found. Please check API Key.")
 
     return str(resp)
 
