@@ -5,7 +5,7 @@ from google import genai
 
 app = Flask(__name__)
 
-# Connect to Google using the NEW library
+# 1. Setup the client (Uses the new library)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 @app.route("/bot", methods=["POST"])
@@ -21,16 +21,17 @@ def bot():
         return str(resp)
 
     try:
-        # Using the correct model for the new library
+        # 2. Generate Content
+        # We use 'gemini-1.5-flash' as it is the most stable for bots right now
         response = client.models.generate_content(
-            model="gemini-1.5-flash", 
+            model="gemini-1.5-flash",
             contents=user_msg
         )
         msg.body(response.text)
 
     except Exception as e:
         print(f"Error: {e}")
-        msg.body("Sorry, I had a technical hiccup. Please try again.")
+        msg.body("Sorry, I had a connection error. Please try again.")
 
     return str(resp)
 
