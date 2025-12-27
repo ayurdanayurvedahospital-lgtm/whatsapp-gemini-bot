@@ -5,7 +5,7 @@ from google import genai
 
 app = Flask(__name__)
 
-# 1. Setup the client (Uses the new library)
+# Initialize client with your API Key
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 @app.route("/bot", methods=["POST"])
@@ -21,17 +21,25 @@ def bot():
         return str(resp)
 
     try:
-        # 2. Generate Content
-        # We use 'gemini-1.5-flash' as it is the most stable for bots right now
+        # SWITCHING TO GEMINI-PRO (The most stable model)
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash", 
             contents=user_msg
         )
         msg.body(response.text)
-
+        
     except Exception as e:
-        print(f"Error: {e}")
-        msg.body("Sorry, I had a connection error. Please try again.")
+        # If the first model fails, try the backup model automatically
+        try:
+            print(f"Primary model failed, trying backup. Error: {e}")
+            response = client.models.generate_content(
+                model="gemini-1.5-pro",
+                contents=user_msg
+            )
+            msg.body(response.text)
+        except Exception as e2:
+            print(f"All models failed. Error: {e2}")
+            msg.body("Sorry, I am having trouble connecting to Google. Please try again later.")
 
     return str(resp)
 
