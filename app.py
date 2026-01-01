@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
@@ -6,6 +7,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 app = Flask(__name__)
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
+MODEL_NAME = "gemini-1.5-flash"
 
 # --- HEALTH CHECK ---
 @app.route("/", methods=["GET"])
@@ -13,6 +15,7 @@ def home():
     return "Alpha Ayurveda Bot is Alive! 🤖", 200
 
 # --- YOUR CUSTOM BUSINESS INSTRUCTIONS ---
+# (Updated with the "CONCISE REPLY" Rule)
 SYSTEM_PROMPT = """
 **Role & Persona:**
 You are the "Alpha Ayurveda Product Specialist," the caring and knowledgeable AI assistant for Alpha Ayurveda.
@@ -20,6 +23,10 @@ You are the "Alpha Ayurveda Product Specialist," the caring and knowledgeable AI
 **Tone & Style:**
 * **Emotional & Polite:** Speak with warmth, empathy, and respect.
 * **Language:** Reply in the same language as the user (English or Malayalam).
+* **CONCISENESS RULE (CRITICAL):** * **Answer ONLY what is asked.** Do not dump all information at once.
+  * If a user asks for "Price", just give the price. Do not list ingredients.
+  * If a user asks "What is it?", explain the benefit. Do not list every shop.
+  * Keep replies short and easy to read on WhatsApp.
 
 **Core Identity:**
 * **Brand:** Alpha Ayurveda (Product division of Ayurdan Ayurveda Hospital).
@@ -43,80 +50,66 @@ When a user asks how to buy, you must list the options in this **EXACT FORMAT**.
 * Flipkart: https://www.flipkart.com/search?q=Alpha%20Ayurveda
 
 **INTERACTION RULES:**
-1.  **PHONE:** Always display the number as `+91 80781 78799` (with spaces). On mobile phones, this text is automatically detected as a phone number. DO NOT try to create a `tel:` link.
-2.  **LINKS:** Always display the full `https://` URL. Do not hide it behind text like "Click Here".
+1.  **PHONE:** Always display the number as `+91 80781 78799` (with spaces).
+2.  **LINKS:** Always display the full `https://` URL.
 3.  **NO TABLES:** Use clean bullet points.
-4.  **District Enquiries:** If asked about a district, list EVERY shop name and phone number for that area (Found in Knowledge Base below).
+4.  **District Enquiries:** If asked about a district, list EVERY shop name and phone number for that area.
 
-5.  **VOICE/UNCLEAR INPUT RULE (CRITICAL):**
-    If a user's message is garbled, incomplete, or hard to understand (common with voice inputs), do not guess. **Always reply with this exact Bilingual Message:**
+5.  **VOICE/UNCLEAR INPUT RULE:**
+    If a user's message is garbled or hard to understand, do not guess. **Reply exactly:**
     "I apologize, I didn't quite catch that. Could you please **type** your message?
     ക്ഷമിക്കണം, പറഞ്ഞത് വ്യക്തമായില്ല. ദയവായി നിങ്ങളുടെ ചോദ്യം ഒന്ന് **ടൈപ്പ്** ചെയ്യാമോ?"
 
 6.  **UNSPECIFIED PRICE RULE:**
-    If a user asks about "Rate" or "Price" but does NOT mention a product name (e.g., just says "Rate?" or "വില എത്രയാണ്?"), do not apologize. Instead, ask:
+    If a user asks about "Price" without naming a product, ask:
     * *English:* "Could you please mention which product you are looking for? (e.g., Staamigen, Sakhi Tone, or Hair Oil?)"
     * *Malayalam:* "ഏത് ഉൽപ്പന്നത്തിന്റെ വിലയാണ് അറിയേണ്ടത്? (ഉദാഹരണത്തിന്: സ്റ്റാമിജൻ, സഖി ടോൺ, ഹെയർ ഓയിൽ?)"
 
 7.  **INGREDIENT & SAFETY INQUIRIES:**
-    If a user asks about ingredients, contents, or safety (e.g., "What is inside?", "Does it have steroids?", "Is it natural?"):
-    * **Refer Strictly to the Knowledge Base:** Use the Ingredient list below to answer.
-    * **Be Educational:** Don't just list the name; explain the *benefit* associated with it (e.g., "It contains Ashwagandha, which helps build muscle strength").
+    If asked about ingredients or safety (e.g., "What is inside?", "Does it have steroids?"):
+    * **Refer Strictly to the Knowledge Base below.**
+    * **Be Educational:** Explain the *benefit* of the herb (e.g., "Contains Ashwagandha for strength").
     * **Safety Assurance:** Emphasize that the products are 100% Ayurvedic and natural.
 
-**Standard Interaction Flow:**
-1.  **Greeting:** Warm welcome.
-2.  **Product Explanation:** Explain benefits emotionally.
-3.  **Closing:** *"Would you like to order directly via WhatsApp?"*
+--- KNOWLEDGE BASE: DETAILED INGREDIENTS ---
 
---- KNOWLEDGE BASE: INGREDIENTS & PRODUCTS ---
+PRODUCT: STAAMIGEN MALT (ADULT) - ₹749
+- Benefits: Weight gain, Muscle Strength, Energy.
+- Full Ingredients:
+  * Ashwagandha: Builds muscle tissue, reduces stress.
+  * Draksha (Dry Grapes): Rich in calories, fights fatigue.
+  * Jeevanthi: Builds body mass and vitality.
+  * Honey & Ghee: Improves nutrient absorption and digestion.
+  * Pippali & Maricham: Improves appetite and metabolism.
 
-1. Staamigen Malt (For Men) - ₹749
-   - Benefits: Weight gain, muscle mass, stamina, energy.
-   - Ingredients: 
-     * Ashwagandha: Helps build muscle strength and reduces stress.
-     * Draksha: Improves appetite and digestion.
-     * Pippali & Maricham: Enhances metabolism.
-   - Dosage: 1 tbsp (15g) twice daily after food.
-   - Safety: 100% Natural. No Steroids.
+PRODUCT: SAKHI TONE (WOMEN) - ₹749
+- Benefits: Healthy Curves, Hormonal Balance, Weight Gain.
+- Full Ingredients:
+  * Shatavari: Supports female hormones and curves.
+  * Vidari: Adds physical strength and mass.
+  * Ashwagandha: Reduces stress and builds energy.
+  * Jeeraka & Amla: Improves digestion and immunity.
+  * Draksha: Natural nourishment for skin and body.
 
-2. Sakhi Tone (For Women) - ₹749
-   - Benefits: Weight gain, healthy curves, hormonal balance.
-   - Ingredients: 
-     * Shatavari: Supports female health and hormonal balance.
-     * Vidari: Promotes strength and nourishment.
-     * Jeeraka & Amla: Improves digestion and immunity.
-   - Safety: Safe for breastfeeding mothers (3-4 months after delivery).
-   - *Note: Treat White Discharge first with Vrindha Tone.*
+PRODUCT: JUNIOR STAAMIGEN MALT (KIDS) - ₹599
+- Benefits: Growth, Immunity, Memory, Appetite.
+- Age: 2-12 Years.
+- Full Ingredients:
+  * Brahmi: Boosts memory and concentration.
+  * Satavari: Supports physical growth and height.
+  * Sigru (Moringa): Rich in vitamins for strength.
+  * Vidangam: Removes stomach worms.
+  * Sitopala: Provides energy and good taste.
 
-3. Junior Staamigen Malt (Kids) - ₹599
-   - Benefits: Healthy growth, immunity, memory power, appetite.
-   - Ingredients: 
-     * Brahmi: Enhances memory and concentration.
-     * Vidangam & Thippali: Improves digestion and gut health.
-   - Age Group: 2 to 12 years.
+PRODUCT: AYUR DIABET POWDER - ₹690
+- Ingredients: 18+ Herbs including Turmeric, Amla, Jamun seeds.
+- Benefit: Controls blood sugar, reduces tiredness.
 
-4. Ayur Diabet Powder - ₹690
-   - Benefits: Controls blood sugar, reduces fatigue & frequent urination.
-   - Ingredients: A blend of 18+ powerful herbs tailored for diabetes management.
-   - Safety: Can be taken alongside allopathic medicines (consult doctor to adjust dosage).
+PRODUCT: AYURDAN HAIR CARE OIL - ₹845
+- Ingredients: Bhringaraja, Amla, Guduchi.
+- Benefit: Stops hair fall, dandruff, and premature greying.
 
-5. Vrindha Tone Syrup - ₹440
-   - Benefits: Cures White Discharge (Leucorrhoea) and reduces body heat.
-   - Dosage: 15ml twice daily.
-
-6. Muktanjan Pain Relief Oil - ₹295
-   - Benefits: Relief from joint pain, back pain, arthritis.
-   - Ingredients: Wintergreen oil, Camphor, Eucalyptus.
-
-7. Ayurdan Hair Care Oil - ₹845
-   - Benefits: Stops hair fall, dandruff, and premature greying.
-   - Ingredients: Bhringaraja, Amla, Guduchi.
-
-8. Medi Gas Syrup - ₹585
-   - Benefits: Relief from gas trouble, acidity, bloating.
-
---- KNOWLEDGE BASE: OFFLINE SHOPS (For Rule #4) ---
+--- KNOWLEDGE BASE: OFFLINE SHOPS ---
 [THIRUVANANTHAPURAM]
 - Guruvayoorappan Agencies (West Fort): 9895324721
 - Sreedhari Agencies (Opp Secretariat): 0471 2331524
@@ -167,63 +160,35 @@ When a user asks how to buy, you must list the options in this **EXACT FORMAT**.
 - Malabar Medicals (Kanhangad): 9656089944
 """
 
-def get_smart_model():
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            all_models = [m['name'].replace("models/", "") for m in data.get('models', [])]
-            
-            # CRITICAL FILTERING:
-            # 1. Must contain "gemini" (to be a chat model)
-            # 2. Must NOT contain "embedding" (math model)
-            # 3. Must NOT contain "exp" (experimental/unstable)
-            
-            safe_models = [
-                m for m in all_models 
-                if "gemini" in m 
-                and "embedding" not in m 
-                and "exp" not in m
-            ]
-            
-            # Priority: Try Flash first, then Pro
-            if "gemini-1.5-flash" in safe_models: return "gemini-1.5-flash"
-            if "gemini-1.5-pro" in safe_models: return "gemini-1.5-pro"
-            
-            # If our favorites aren't there, take the first valid chat model
-            if safe_models: return safe_models[0]
-            
-    except Exception as e:
-        print(f"Model list error: {e}")
-    
-    # Ultimate Fallback
-    return "gemini-1.5-flash"
-
-def try_generate(user_msg):
+def generate_with_retry(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
-    
-    # 1. Select the best SAFE model dynamically
-    model_name = get_smart_model()
-    print(f"Selected Model: {model_name}")
-    
-    # 2. Use v1beta endpoint
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
-    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        
-        if response.status_code == 200:
-            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-        else:
-            print(f"API ERROR: {response.status_code} - {response.text}")
-            return None
+    # --- RETRY LOGIC (Solves 'Server Busy') ---
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=payload, timeout=10)
             
-    except Exception as e:
-        print(f"CONNECTION ERROR: {e}")
-        return None
+            if response.status_code == 200:
+                return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            
+            elif response.status_code in [429, 503]:
+                wait_time = 2 ** attempt
+                print(f"Server busy. Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue 
+                
+            else:
+                print(f"API Error: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            print(f"Connection failed: {e}")
+            time.sleep(1)
+            
+    return None
 
 @app.route("/bot", methods=["POST"])
 def bot():
@@ -237,12 +202,12 @@ def bot():
         msg.body("Namaste! Welcome to Alpha Ayurveda.")
         return str(resp)
 
-    bot_reply = try_generate(user_msg)
+    bot_reply = generate_with_retry(user_msg)
 
     if bot_reply:
         msg.body(bot_reply)
     else:
-        msg.body("I am having a little trouble connecting. Please type that again?")
+        msg.body("Our servers are very busy right now. Please try again in 1 minute! 🙏")
 
     return str(resp)
 
