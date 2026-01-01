@@ -7,7 +7,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 app = Flask(__name__)
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "gemini-1.5-flash-001"
 
 # --- HEALTH CHECK ---
 @app.route("/", methods=["GET"])
@@ -213,3 +213,4 @@ def bot():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
