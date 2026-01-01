@@ -8,81 +8,59 @@ app = Flask(__name__)
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# --- HEALTH CHECK ---
-@app.route("/", methods=["GET"])
-def home():
-    return "Alpha Ayurveda Bot is Alive! 🤖", 200
+# --- 🔴 GOOGLE FORM CONFIGURATION 🔴 ---
+GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
-# --- SYSTEM INSTRUCTIONS ---
+FORM_FIELDS = {
+    "name": "entry.2005620554",
+    "age": "entry.1045781291",
+    "place": "entry.942694214",
+    "phone": "entry.1117261166",
+    "product": "entry.839337160"
+}
+
+# --- MEMORY STORAGE ---
+user_sessions = {}
+
+# --- SYSTEM INSTRUCTIONS (THE FULL BRAIN) ---
 SYSTEM_PROMPT = """
-**Role & Persona:**
-You are the "Alpha Ayurveda Product Specialist," the caring and knowledgeable AI assistant for Alpha Ayurveda.
+**Role:** Alpha Ayurveda Product Specialist.
+**Tone:** Warm, empathetic, polite (English/Malayalam).
+**Rules:**
+1. Answer CONCISELY.
+2. STRICTLY follow the pricing list.
+3. If asked about serious illness (Heart, Liver, Pregnancy), suggest a doctor.
+4. Purchase options: Call +91 80781 78799 or Visit ayuralpha.in
 
-**Tone & Style:**
-* **Emotional & Polite:** Speak with warmth, empathy, and respect.
-* **Language:** Reply in the same language as the user (English or Malayalam).
-* **CONCISENESS RULE:** Answer ONLY what is asked. Keep it short.
+**PRICES:**
+- Ayur Diabet: ₹690
+- Staamigen Malt: ₹749
+- Sakhi Tone: ₹749
+- Junior Malt: ₹599
+- Vrindha Tone: ₹440
+- Hair Oil: ₹845
 
-**Core Identity:**
-* **Brand:** Alpha Ayurveda (Product division of Ayurdan Ayurveda Hospital).
-* **Delivery:** We deliver ANYWHERE in India via courier.
+--- KNOWLEDGE BASE: DETAILED INGREDIENTS ---
 
-**STRICT PURCHASE DISPLAY RULES:**
-When asked "How to buy?", list options EXACTLY like this:
-**Option 1: Direct Purchase (Fastest)**
-* 📞 Call us: +91 80781 78799
-* WhatsApp Chat: https://wa.me/918078178799?text=Hi%20I%20want%20to%20know%20more%20about%20your%20product
-**Option 2: Official Website**
-* Link: https://ayuralpha.in/
-**Option 3: Offline Medical Stores**
-* Store Locator: https://ayuralpha.in/pages/buy-offline
-**Option 4: Marketplaces**
-* Amazon: https://www.amazon.in/stores/AlphaAyurveda/page/SEARCH
-* Flipkart: https://www.flipkart.com/search?q=Alpha%20Ayurveda
+**1. STAAMIGEN MALT (Adult Weight Gain)**
+- Benefits: Weight gain, Muscle Strength, Energy.
+- Ingredients: Ashwagandha (Strength), Draksha (Energy), Pippali (Metabolism), Jeevanthi (Vitality).
 
-**INTERACTION RULES:**
-1.  **Safety First:** If asked about serious conditions (Heart, Liver, Pregnancy, Thyroid), ALWAYS advise consulting a doctor first.
-2.  **Voice/Unclear:** If input is garbled, reply: "I apologize, I didn't quite catch that. Could you please **type** your message? / ക്ഷമിക്കണം, പറഞ്ഞത് വ്യക്തമായില്ല. ദയവായി നിങ്ങളുടെ ചോദ്യം ഒന്ന് **ടൈപ്പ്** ചെയ്യാമോ?"
-3.  **Unspecified Price:** If user just says "Price?", ask WHICH product.
+**2. SAKHI TONE (Women's Weight Gain)**
+- Benefits: Healthy Curves, Hormonal Balance, Weight Gain.
+- Ingredients: Shatavari (Hormones), Vidari (Mass), Jeeraka (Digestion), Draksha (Nourishment).
 
---- KNOWLEDGE BASE: PRICES & INGREDIENTS ---
+**3. JUNIOR STAAMIGEN MALT (Kids 2-12 Years)**
+- Benefits: Appetite, Growth, Immunity, Memory.
+- Ingredients: Brahmi (Memory), Sigru (Vitamins), Vidangam (Gut Health/Worms).
 
-**1. AYUR DIABET POWDER (Diabetes) - PRICE: ₹690**
-* **Benefit:** Controls sugar, reduces fatigue, excessive urination, and numbness.
-* **Ingredients:** 18+ Herbs including Turmeric, Amla, Jamun.
-* **Insulin/Allopathy:** Can be taken along with other medicines (consult doctor).
+**4. AYUR DIABET POWDER (Diabetes)**
+- Benefits: Controls sugar, reduces fatigue & numbness.
+- Ingredients: Turmeric, Amla, Jamun seeds (18+ Herbs).
 
-**2. STAAMIGEN MALT (Adult Weight Gain) - PRICE: ₹749**
-* **Benefits:** Weight gain, Muscle Strength, Energy.
-* **Ingredients:** Ashwagandha (Strength), Draksha (Energy), Pippali (Metabolism).
-
-**3. SAKHI TONE (Women's Weight Gain) - PRICE: ₹749**
-* **Benefits:** Healthy Curves, Hormonal Balance, Weight Gain.
-* **Ingredients:** Shatavari (Hormones), Vidari (Mass), Jeeraka (Digestion).
-
-**4. JUNIOR STAAMIGEN MALT (Kids 2-12 Years) - PRICE: ₹599**
-* **Benefits:** Appetite, Growth, Immunity, Constipation relief, Memory.
-* **Ingredients:** Brahmi (Memory), Sigru (Vitamins), Vidangam (Gut Health).
-
-**5. VRINDHA TONE SYRUP (White Discharge) - PRICE: ₹440**
-* **Usage:** 2-4 bottles for mild cases. Chronic cases need doctor.
-* **Diet:** Avoid spicy/sour foods, pickles, chicken, eggs.
-
-**6. MUKTANJAN PAIN RELIEF OIL - PRICE: ₹295**
-* **Benefit:** Relief from joint pain, back pain, arthritis.
-
-**7. AYURDAN HAIR CARE OIL - PRICE: ₹845**
-* **Benefit:** Stops hair fall, dandruff, and premature greying.
-
-**8. MEDI GAS SYRUP - PRICE: ₹585**
-* **Benefit:** Relief from gas trouble, acidity, bloating.
-
---- KNOWLEDGE BASE: Q&A ---
-* **White Discharge:** Sakhi Tone does NOT cure it. Treat White Discharge first with Vrindha Tone.
-* **Diabetes:** No, weight gain products do not cause diabetes.
-* **Weight Loss after stopping:** No, weight remains if you maintain diet/exercise.
-* **Results Time:** Positive changes in 15 days. Best results in 90 days.
-* **Breastfeeding:** Start 3-4 months after delivery.
+**5. VRINDHA TONE (White Discharge)**
+- Benefits: Cures White Discharge, reduces body heat.
+- Diet: Avoid spicy/sour foods, chicken, eggs.
 
 --- KNOWLEDGE BASE: OFFLINE SHOPS ---
 [THIRUVANANTHAPURAM] Guruvayoorappan Agencies: 9895324721, Sreedhari: 0471 2331524
@@ -99,7 +77,27 @@ When asked "How to buy?", list options EXACTLY like this:
 [WAYANAD] Jeeva: 9562061514, Reena: 9447933863
 [KANNUR] Lakshmi: 0497-2712730, Falcon: 9747624606
 [KASARAGOD] Bio: 9495805099, Malabar: 9656089944
+
+**Q&A KNOWLEDGE:**
+- Diabetes? Safe to use. No side effects.
+- Results? Visible in 15 days. Best in 90 days.
+- Breastfeeding? Start 3-4 months after delivery.
 """
+
+# --- FUNCTION: SAVE TO GOOGLE SHEET ---
+def save_to_google_sheet(user_data):
+    try:
+        form_data = {
+            FORM_FIELDS["name"]: user_data.get("name"),
+            FORM_FIELDS["age"]: user_data.get("age"),
+            FORM_FIELDS["place"]: user_data.get("place"),
+            FORM_FIELDS["phone"]: user_data.get("phone"),
+            FORM_FIELDS["product"]: user_data.get("product")
+        }
+        requests.post(GOOGLE_FORM_URL, data=form_data)
+        print(f"✅ Data Saved for {user_data.get('name')}")
+    except Exception as e:
+        print(f"❌ Error saving to Sheet: {e}")
 
 # --- SMART MODEL DETECTOR ---
 def get_safe_model():
@@ -118,7 +116,7 @@ def get_safe_model():
     return "gemini-1.5-flash"
 
 # --- GENERATE WITH RETRY ---
-def generate_with_retry(user_msg):
+def get_ai_reply(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
     model_name = get_safe_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
@@ -131,26 +129,82 @@ def generate_with_retry(user_msg):
                 return response.json()["candidates"][0]["content"]["parts"][0]["text"]
             elif response.status_code in [429, 503]:
                 time.sleep(2 ** attempt)
-                continue 
+                continue
             else:
                 return None
         except:
             time.sleep(1)
-    return None
+    return "Our servers are busy right now. Please try again in 1 minute."
 
+# --- MAIN BOT ROUTE ---
 @app.route("/bot", methods=["POST"])
 def bot():
-    user_msg = request.values.get("Body", "").strip()
+    incoming_msg = request.values.get("Body", "").strip()
+    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
+    
     resp = MessagingResponse()
     msg = resp.message()
-    if not user_msg:
-        msg.body("Namaste! Welcome to Alpha Ayurveda.")
+
+    # --- LEAD COLLECTION FLOW ---
+    
+    # 1. Start New Session -> Ask NAME
+    if sender_phone not in user_sessions:
+        user_sessions[sender_phone] = {"step": "ask_name", "data": {"wa_number": sender_phone}}
+        msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\nTo better assist you, may I know your **Name**?")
         return str(resp)
-    bot_reply = generate_with_retry(user_msg)
-    if bot_reply:
-        msg.body(bot_reply)
-    else:
-        msg.body("Our servers are busy. Please try again in 1 minute! 🙏")
+
+    session = user_sessions[sender_phone]
+    step = session["step"]
+
+    # 2. Capture Name -> Ask AGE
+    if step == "ask_name":
+        session["data"]["name"] = incoming_msg
+        session["step"] = "ask_age"
+        msg.body(f"Nice to meet you, {incoming_msg}. \nMay I know your **Age**?")
+        return str(resp)
+
+    # 3. Capture Age -> Ask PLACE (Updated Order)
+    elif step == "ask_age":
+        session["data"]["age"] = incoming_msg
+        session["step"] = "ask_place"
+        msg.body("Thank you. Which **Place/District** are you from?")
+        return str(resp)
+
+    # 4. Capture Place -> Ask PHONE (Updated Order)
+    elif step == "ask_place":
+        session["data"]["place"] = incoming_msg
+        session["step"] = "ask_phone"
+        msg.body("Please type your **Phone Number** for our doctor to contact you:")
+        return str(resp)
+
+    # 5. Capture Phone -> Ask PRODUCT
+    elif step == "ask_phone":
+        session["data"]["phone"] = incoming_msg
+        session["step"] = "ask_product"
+        msg.body("Noted. Which **Product** do you want to know about? (e.g., Staamigen, Sakhi Tone, Diabetes Powder?)")
+        return str(resp)
+
+    # 6. Capture Product -> SAVE -> Answer
+    elif step == "ask_product":
+        session["data"]["product"] = incoming_msg
+        
+        # Save to Google Sheet
+        save_to_google_sheet(session["data"])
+        
+        # Switch to Normal Chat
+        session["step"] = "chat_active" 
+        
+        # Get AI Answer
+        ai_reply = get_ai_reply(f"Tell me about {incoming_msg} briefly.")
+        msg.body(f"Thank you! I have noted your details for our expert team.\n\nHere is the info about {incoming_msg}:\n{ai_reply}")
+        return str(resp)
+
+    # 7. NORMAL CHAT (Gemini)
+    elif step == "chat_active":
+        ai_reply = get_ai_reply(incoming_msg)
+        msg.body(ai_reply)
+        return str(resp)
+
     return str(resp)
 
 if __name__ == "__main__":
