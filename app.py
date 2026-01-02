@@ -48,7 +48,7 @@ SYSTEM_PROMPT = """
 **Rules:**
 1. **BILINGUAL CONTENT:** When asked about a product, provide the **Benefits** AND **Usage** in both **English AND Malayalam**.
 2. **HIDDEN PRICE:** Do NOT mention the price in the initial description. Only reveal if asked "How much?" or "Price?".
-3. **FORMATTING:** Use Single Asterisks (*) for bold text. Never use double asterisks.
+3. **FORMATTING:** Use Single Asterisks (*) for bold text.
 4. If asked about serious illness, suggest a doctor.
 
 *** INTERNAL PRICING (Reveal ONLY if asked) ***
@@ -296,15 +296,16 @@ def get_ai_reply(user_msg):
         try:
             response = requests.post(url, json=payload, timeout=10)
             if response.status_code == 200:
-                reply = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return reply
+                return response.json()["candidates"][0]["content"]["parts"][0]["text"]
             elif response.status_code in [429, 503]:
                 time.sleep(2 ** attempt)
                 continue
             else:
-                return None
+                return "Our servers are busy right now. Please try again in 1 minute."
         except:
             time.sleep(1)
+    
+    # 🔥 CRASH FIX: Return a string, NEVER return None
     return "Our servers are busy right now. Please try again in 1 minute."
 
 # --- MAIN BOT ROUTE ---
@@ -366,8 +367,9 @@ def bot():
         
         ai_reply = get_ai_reply(f"Tell me about {incoming_msg} benefits and usage. Answer in both English and Malayalam. Hide price.")
         
-        # 🔥 FIX: Remove double asterisks (**) to allow correct WhatsApp bolding (*)
-        ai_reply = ai_reply.replace("**", "*")
+        # 🔥 SAFELY FIX ASTERISKS (Crash Proof)
+        if ai_reply:
+            ai_reply = ai_reply.replace("**", "*")
         
         msg.body(f"Thank you! I have noted your details.\n\n{ai_reply}")
         
@@ -386,8 +388,9 @@ def bot():
     elif step == "chat_active":
         ai_reply = get_ai_reply(incoming_msg)
         
-        # 🔥 FIX: Remove double asterisks (**) to allow correct WhatsApp bolding (*)
-        ai_reply = ai_reply.replace("**", "*")
+        # 🔥 SAFELY FIX ASTERISKS (Crash Proof)
+        if ai_reply:
+            ai_reply = ai_reply.replace("**", "*")
         
         msg.body(ai_reply)
         
