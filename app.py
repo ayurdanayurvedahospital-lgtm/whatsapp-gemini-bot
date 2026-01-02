@@ -364,6 +364,7 @@ def bot():
             
             ai_reply = get_ai_reply(f"Tell me about {product_name} benefits ONLY. Do NOT mention Usage or Price. Answer in English and Malayalam.")
             if ai_reply: ai_reply = ai_reply.replace("**", "*")
+            if len(ai_reply) > 800: ai_reply = ai_reply[:800] + "..."
             
             msg.body(f"Thank you! I have noted your details.\n\n{ai_reply}")
             
