@@ -19,10 +19,31 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
+# --- 📸 IMAGE LIBRARY (UPDATED WITH YOUR LINKS) 📸 ---
+# The bot checks if the 'Key' word exists in the user's message.
+# If yes, it sends the corresponding 'Image Link'.
+PRODUCT_IMAGES = {
+    "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
+    "powder": "https://ayuralpha.in/cdn/shop/files/Ad2-03.jpg?v=1747049628&width=600",
+    "staamigen": "https://ayuralpha.in/cdn/shop/files/Staamigen_1.jpg?v=1747049320&width=600",
+    "sakhi": "https://ayuralpha.in/cdn/shop/files/WhatsApp-Image-2025-02-11-at-16.40.jpg?v=1747049518&width=600",
+    "vrindha": "https://ayuralpha.in/cdn/shop/files/Vrindha_Tone_3.png?v=1727084920&width=823",
+    "kanya": "https://ayuralpha.in/cdn/shop/files/Kanya_Tone_7.png?v=1727072110&width=823",
+    "diabet": "https://ayuralpha.in/cdn/shop/files/ayur_benefits.jpg?v=1755930537",
+    "gas": "https://ayuralpha.in/cdn/shop/files/medigas-syrup.webp?v=1750760543&width=823",
+    "hair": "https://ayuralpha.in/cdn/shop/files/Ayurdan_hair_oil_1_f4adc1ed-63f9-487d-be08-00c4fcf332a6.png?v=1727083604&width=823",
+    "strength": "https://ayuralpha.in/cdn/shop/files/strplus1.jpg?v=1765016122&width=823",
+    "gain": "https://ayuralpha.in/cdn/shop/files/gain-plus-2.jpg?v=1765429628&width=823",
+    "pain": "https://ayuralpha.in/cdn/shop/files/Muktanjan_Graphics_img.jpg?v=1734503551&width=823",
+    "muktanjan": "https://ayuralpha.in/cdn/shop/files/Muktanjan_Graphics_img.jpg?v=1734503551&width=823",
+    "saphala": "https://ayuralpha.in/cdn/shop/files/saphalacap1.png?v=1766987920",
+    "neeli": "https://ayuralpha.in/cdn/shop/files/18.png?v=1725948517&width=823"
+}
+
 # --- MEMORY STORAGE ---
 user_sessions = {}
 
-# --- SYSTEM INSTRUCTIONS (FULL DATA + CLEAN FORMATTING) ---
+# --- SYSTEM INSTRUCTIONS ---
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Product Specialist.
 **Tone:** Warm, empathetic, polite (English/Malayalam).
@@ -30,9 +51,7 @@ SYSTEM_PROMPT = """
 1. Answer CONCISELY.
 2. STRICTLY follow the pricing list below.
 3. **FORMATTING:** Use Single Asterisks (*) for bold text. Do NOT use double asterisks (**).
-   - Correct: *Price:* ₹749
-   - Wrong: **Price:** ₹749
-4. If asked about serious illness (Heart, Liver, Pregnancy), suggest a doctor.
+4. If asked about serious illness, suggest a doctor.
 5. Purchase options: Call +91 80781 78799 or Visit ayuralpha.in
 
 **STRICT PRICING & LINKS:**
@@ -45,6 +64,11 @@ SYSTEM_PROMPT = """
 - Ayurdan Hair Care Oil: ₹845
 - Medi Gas Syrup: ₹585
 - Muktanjan Pain Relief Oil: ₹295
+- Kanya Tone: ₹440
+- Strength Plus: ₹890
+- Gain Plus: ₹890
+- Saphala Capsules: ₹450
+- Neelibringadi Keram: ₹240
 - **Combos:** Weight Gainer (Men/Women) ₹1450 | Feminine Wellness (Sakhi+Vrindha) ₹1161
 
 --- KNOWLEDGE BASE: PRODUCT DETAILS ---
@@ -60,12 +84,10 @@ SYSTEM_PROMPT = """
 - **Benefits:** Enhances nutrient absorption, restores hormonal balance (regular periods), improves skin/hair health, and boosts energy.
 - **Key Ingredients:** Shatavari (Hormones/Curves), Vidari (Strength), Jeeraka (Metabolism), Satahwa (Appetite).
 - **Dosage:** 1 tablespoon (15g) morning and evening, 30 mins **AFTER** food.
-- **Course:** 1 bottle lasts ~15 days. Recommended: 3-4 bottles for full results.
 
 **3. JUNIOR STAAMIGEN MALT (Kids 3-12 Years)**
 - **Best For:** Kids with poor appetite, low immunity, or slow growth.
 - **Benefits:** Increases hunger, boosts memory and concentration, reduces frequent sickness (fever/cold), and supports height/weight growth.
-- **Key Ingredients:** Brahmi (Memory), Sigru (Moringa/Vitamins), Vidangam (Worms/Gut health), Sitopala (Taste).
 - **Dosage:** 5g (1 tsp) twice a day after food. Tasty and easy to eat.
 
 **4. AYUR DIABET POWDER (Diabetes Control)**
@@ -73,12 +95,10 @@ SYSTEM_PROMPT = """
 - **Benefits:** Controls sugar spikes, reduces frequent urination, fights fatigue and numbness, protects liver/kidney.
 - **Key Ingredients:** Amla, Meshashringi (The "Sugar Destroyer"), Jamun Seeds, Turmeric, Fenugreek.
 - **Usage:** Mix 1 spoon (10g) in lukewarm water/milk. Take twice daily after meals.
-- **Safety:** Safe to take along with allopathic medicines (leave a 30-min gap).
 
 **5. VRINDHA TONE SYRUP (White Discharge)**
 - **Best For:** White discharge, internal body heat, burning sensation.
 - **Benefits:** Cools the body from within, balances acidic/heat levels, cures discharge.
-- **Key Ingredients:** Cooling Ayurvedic herbs specially for 'Ushna Roga' (Heat diseases).
 - **Usage:** 15ml twice daily, 30 mins **BEFORE** food (Empty stomach is best).
 - **Diet Rule:** Avoid chicken, eggs, pickles, and spicy/fried food during the course.
 
@@ -95,20 +115,15 @@ SYSTEM_PROMPT = """
 * **Results Timeline?** Minimum 1 month for initial results. 3 months (90 days) for permanent healthy change.
 
 --- OFFLINE SHOPS ---
-[THIRUVANANTHAPURAM] Guruvayoorappan Agencies: 9895324721, Sreedhari: 0471 2331524
-[KOLLAM] AB Agencies: 9387359803, Western: 0474 2750933
-[PATHANAMTHITTA] Ayurdan Hospital: 95265 30400, Divine: 9037644232
-[ALAPPUZHA] Nagarjuna: 8848054124, Archana: 4772261385
-[KOTTAYAM] Elsa: 0481 2566923, Shine: 4828210911
-[IDUKKI] Vaidyaratnam: 8547128298, Sony: 7559950989
-[ERNAKULAM] Soniya: 9744167180, Ojus: 9562456123
-[THRISSUR] Siddhavaydyasramam: 9895268099, Seetharam: 9846302180
-[PALAKKAD] Palakkad Agencies: 0491-2522474, Shifa: 9846689715
-[MALAPPURAM] ETM: 9947959865, Changampilly: 9895377210
-[KOZHIKODE] Dhanwanthari: 9995785797, Sobha: 9496601785
-[WAYANAD] Jeeva: 9562061514, Reena: 9447933863
-[KANNUR] Lakshmi: 0497-2712730, Falcon: 9747624606
-[KASARAGOD] Bio: 9495805099, Malabar: 9656089944
+[THIRUVANANTHAPURAM] Guruvayoorappan Agencies: 9895324721
+[KOLLAM] AB Agencies: 9387359803
+[PATHANAMTHITTA] Ayurdan Hospital: 95265 30400
+[ALAPPUZHA] Nagarjuna: 8848054124
+[ERNAKULAM] Soniya: 9744167180
+[THRISSUR] Siddhavaydyasramam: 9895268099
+[KOZHIKODE] Dhanwanthari: 9995785797
+[KANNUR] Lakshmi: 0497-2712730
+[KASARAGOD] Bio: 9495805099
 """
 
 # --- FUNCTION: SAVE TO GOOGLE SHEET ---
@@ -121,12 +136,8 @@ def save_to_google_sheet(user_data):
             FORM_FIELDS["phone"]: user_data.get("phone"),
             FORM_FIELDS["product"]: user_data.get("product")
         }
-        # We send the request and print the response status for debugging
-        response = requests.post(GOOGLE_FORM_URL, data=form_data)
-        if response.status_code == 200:
-            print(f"✅ Data Saved for {user_data.get('name')}")
-        else:
-            print(f"❌ Error saving to Sheet: {response.status_code}")
+        requests.post(GOOGLE_FORM_URL, data=form_data)
+        print(f"✅ Data Saved for {user_data.get('name')}")
     except Exception as e:
         print(f"❌ Error saving to Sheet: {e}")
 
@@ -178,7 +189,6 @@ def bot():
 
     # --- LEAD COLLECTION FLOW ---
     
-    # 1. Start New Session -> Ask NAME
     if sender_phone not in user_sessions:
         user_sessions[sender_phone] = {"step": "ask_name", "data": {"wa_number": sender_phone}}
         msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\nTo better assist you, may I know your *Name*?")
@@ -187,53 +197,59 @@ def bot():
     session = user_sessions[sender_phone]
     step = session["step"]
 
-    # 2. Capture Name -> Ask AGE
     if step == "ask_name":
         session["data"]["name"] = incoming_msg
         session["step"] = "ask_age"
         msg.body(f"Nice to meet you, {incoming_msg}. \nMay I know your *Age*?")
         return str(resp)
 
-    # 3. Capture Age -> Ask PLACE
     elif step == "ask_age":
         session["data"]["age"] = incoming_msg
         session["step"] = "ask_place"
         msg.body("Thank you. Which *Place/District* are you from?")
         return str(resp)
 
-    # 4. Capture Place -> Ask PHONE
     elif step == "ask_place":
         session["data"]["place"] = incoming_msg
         session["step"] = "ask_phone"
         msg.body("Please type your *Phone Number* for our doctor to contact you:")
         return str(resp)
 
-    # 5. Capture Phone -> Ask PRODUCT
     elif step == "ask_phone":
         session["data"]["phone"] = incoming_msg
         session["step"] = "ask_product"
         msg.body("Noted. Which *Product* do you want to know about? (e.g., Staamigen, Sakhi Tone, Diabetes Powder?)")
         return str(resp)
 
-    # 6. Capture Product -> SAVE -> Answer
     elif step == "ask_product":
         session["data"]["product"] = incoming_msg
-        
-        # Save to Google Sheet
         save_to_google_sheet(session["data"])
-        
-        # Switch to Normal Chat
         session["step"] = "chat_active" 
         
-        # Get AI Answer
         ai_reply = get_ai_reply(f"Tell me about {incoming_msg} briefly.")
-        msg.body(f"Thank you! I have noted your details for our expert team.\n\nHere is the info about {incoming_msg}:\n{ai_reply}")
+        msg.body(f"Thank you! I have noted your details.\n\n{ai_reply}")
+        
+        # 📸 AUTO-ATTACH IMAGE 📸
+        user_text_lower = incoming_msg.lower()
+        for key, image_url in PRODUCT_IMAGES.items():
+            if key in user_text_lower:
+                msg.media(image_url)
+                break
+                
         return str(resp)
 
-    # 7. NORMAL CHAT (Gemini)
+    # 7. NORMAL CHAT (With Image Detection)
     elif step == "chat_active":
         ai_reply = get_ai_reply(incoming_msg)
         msg.body(ai_reply)
+        
+        # 📸 AUTO-ATTACH IMAGE 📸
+        user_text_lower = incoming_msg.lower()
+        for key, image_url in PRODUCT_IMAGES.items():
+            if key in user_text_lower:
+                msg.media(image_url)
+                break
+                
         return str(resp)
 
     return str(resp)
