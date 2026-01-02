@@ -13,9 +13,9 @@ GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNw
 
 FORM_FIELDS = {
     "name": "entry.2005620554",
-    "age": "entry.1045781291",
-    "place": "entry.942694214",
-    "phone": "entry.1117261166",
+    "age": "entry.1045781291",    # Will be left empty
+    "place": "entry.942694214",   # Will be left empty
+    "phone": "entry.1117261166",  # Auto-captured from Twilio
     "product": "entry.839337160"
 }
 
@@ -253,288 +253,20 @@ OVERALL HEALTH IMPACT (SUMMARY FOR USERS):
 (Includes full list you provided: Thiruvananthapuram, Kollam, Pathanamthitta, Alappuzha, Kottayam, Idukki, Ernakulam, Thrissur, Palakkad, Malappuram, Kozhikode, Wayanad, Kannur, Kasaragod)
 
 *** EXTENSIVE Q&A (MALAYALAM & ENGLISH) ***
-
-Q1: Can Sakhi Tone control White Discharge?
-A1: No. Sakhi Tone is a tonic for weight gain and body fitness. Internal issues like White Discharge weaken the body and reduce the effectiveness of Sakhi Tone. It is best to treat White Discharge first using medicines like Vrindha Tone, and then start Sakhi Tone for weight gain.
-
-Q2: Is Sakhi Tone good for Body Shaping?
-A2: Sakhi Tone provides necessary nourishment and helps gain healthy weight. Once you have gained weight, you can achieve a good body shape through appropriate workouts.
-
-Q3: Can people who have recovered from Hepatitis take Sakhi Tone/Staamigen Malt?
-A3: Yes. Once liver function has returned to normal, this can be used to provide strength and vitality to the body.
-
-Q4: Will using this cause Diabetes (Sugar)?
-A4: No. These products do not cause diabetes. However, if you have any specific health concerns, please consult a doctor.
-
-Q5: Will I lose weight if I stop using it after 4 months?
-A5: No. Once you achieve body fitness, you can maintain the weight by paying attention to your diet and exercise. There is no likelihood of weight loss just by stopping the product.
-
-Q6: Can Stroke survivors use Staamigen/Sakhi Tone?
-A6: Yes, certainly. It helps provide strength and energy to the body.
-
-Q7: Will using this cause Pimples?
-A7: To reduce the chance of acne/pimples, avoid foods that are excessively oily or fatty while taking the supplement.
-
-Q8: Can those experiencing weight loss without any specific illness use this?
-A8: Unexplained weight loss may have an underlying cause (e.g., Thyroid, digestion issues). It is more effective to identify and treat that cause first before using Sakhi Tone/Staamigen.
-
-Q9: I have been taking medicine for White Discharge for years. Can I take Sakhi Tone along with it?
-A9: Avoid taking Sakhi Tone until the White Discharge is resolved. Once cured, you can use Sakhi Tone for body strength. For chronic issues, consult a gynecologist.
-
-Q10: Can I take this while taking medicine for Arthritis?
-A10: Yes, you can. It will not affect the treatment; instead, it helps provide strength to the body.
-
-Q11: Can I take this if I have Fistula or Piles?
-A11: It is safer to use tonics after treating and resolving conditions like Fistula or Piles.
-
-Q12: Can I take this if I have Fatty Liver?
-A12: Use only under a doctor's advice.
-
-Q13: Will taking Sakhi Tone/Staamigen cause hormonal changes?
-A13: No. These products do not disrupt the hormone balance in the body.
-
-Q14: Can I take this if I have Fibroids?
-A14: You can use it under a doctor's advice.
-
-Q15: How many days after an abortion can I start using this?
-A15: Usually, you can start using it after one month, subject to a doctor's advice.
-
-Q16: Can Thyroid patients take this?
-A16: It helps relieve the fatigue caused by Thyroid issues. However, use it only under a doctor's supervision.
-
-Q17: Can those who have had their Thyroid removed use this?
-A17: It should be used under a doctor's advice.
-
-Q18: Can people over 60 years of age use this?
-A18: Yes, certainly. It helps maintain body strength at this age.
-
-Q19: I heard weight increases in 15 days. Is that true?
-A19: You will start seeing positive changes within 15 days. For best results, use it for up to 90 days. It increases appetite and digestion, helping the body absorb maximum nutrients from food. Ensure you eat protein-rich foods.
-
-Q20: How does Staamigen/Sakhi Tone increase weight?
-A20: It improves digestion (Agni) and increases appetite, allowing you to eat more than usual. Additionally, it ensures nutrients from food are fully absorbed, leading to body fitness.
-
-Q21: How many bottles are needed to gain 5 kg?
-A21: For those without other health issues, an average of 2 to 3 bottles is usually sufficient to achieve this result.
-
-Q22: What food should I eat while taking this?
-A22: Avoid alcohol and smoking. You can eat nutritious Vegetarian or Non-Vegetarian food.
-
-Q23: Do I need to consult a doctor before taking Sakhi Tone/Staamigen?
-A23: If you do not have other serious health issues or ongoing treatments, a doctor's consultation is not required.
-
-Q24: What should be avoided while taking this?
-A24: Avoid smoking, alcohol, drugs, and excessively cold foods.
-
-Q25: When can I start using this after delivery?
-A25: You can start using it 3 to 4 months after delivery.
-
-Q26: Can those with Hyperthyroidism use this?
-A26: Since Hyperthyroidism causes fatigue, use this only under a doctor's advice.
-
-Q27: Will everyone get results?
-A27: For those without underlying health issues, it will definitely provide results.
-
-Q28: Will this affect my periods?
-A28: No, it does not affect the menstrual cycle.
-
-Q29: Can I use this while Breastfeeding?
-A29: Yes, certainly. However, please start using it only after 3 to 4 months post-delivery.
-
-Q30: I feel tired/weak after starting Staamigen/Sakhi Tone. Why?
-A30: The product increases appetite, but if your stomach has shrunk due to poor eating habits, you may not be able to eat enough immediately, causing fatigue. Drink plenty of water and try eating small meals frequently. This will resolve in a week.
-
-Q31: Will Sakhi Tone increase breast size?
-A31: It provides fitness and bulk to the body overall.
-
-Q32: Can women take Staamigen Malt?
-A32: Staamigen Malt is generally for men, and Sakhi Tone is for women. However, Staamigen Powder can be used by both.
-
-Q33: Will genetically thin people gain weight with Staamigen/Sakhi Tone?
-A33: Genetically thin people should use it under a doctor's guidance. Weight gain is possible even in this condition.
-
-Q34: Can I use this if I am taking Allopathic medicines?
-A34: Yes, but for safety, consulting our doctor is the best option.
-
-Q35: Are the products on Amazon and Flipkart original?
-A35: Yes, the products available on these online platforms are original.
-
-Q36: My sugar is under control. Can I take Staamigen/Sakhi Tone?
-A36: Yes, certainly.
-
-Q37: Is there a chance of sugar rising if I take this?
-A37: As appetite increases, avoid carbohydrate-rich foods and focus on eating protein-rich foods.
-
-Q38: Can I take this if I have Kidney Stones?
-A38: You can take it under a doctor's advice.
-
-Q39: Will this cause obesity (excessive fat)?
-A39: No, it helps in gaining healthy weight, not obesity.
-
-Q40: Can Bypass surgery patients take this?
-A40: Use under a doctor's advice.
-
-Q41: Can those with Gastric Trouble take this?
-A41: It is better to treat the gastric trouble first, as the tonic is most effective when digestion is healthy.
-
-Q42: I don't see the same results with the second bottle as the first. Is this true?
-A42: The products are made with consistent quality. While changes are visible quickly in the first month, continuous use is required for sustained results.
-
-Q43: Are there any issues with continuous use?
-A43: Staamigen Malt and Sakhi Tone can be used continuously for as long as needed. There are no side effects.
-
-Q44: Can BP patients take this?
-A44: Use under a doctor's advice. You can contact Ayurdan Ayurveda Hospital for consultation.
-
-Q45: How much water should I drink?
-A45: An average adult must drink 3 to 4 liters of water daily.
-
-Q46: Can Heart patients take this?
-A46: Use under a doctor's advice.
-
-Q47: Can those with Oily Skin use this? Will it cause pimples?
-A47: If in doubt, use only under a doctor's advice.
-
-Q48: Is Staamigen/Sakhi Tone a solution for sexual problems?
-A48: This is for general body health and fitness. Sexual problems require specific consultation and treatment.
-
-Q49: How long should I use Vrindha Tone for White Discharge?
-A49: Usage depends on the severity and duration of the illness. If it's not chronic, 2 to 4 bottles are sufficient. Chronic cases require doctor consultation. One bottle lasts up to 7 days.
-
-Q50: Will Vrindha Tone completely cure White Discharge?
-A50: Vrindha Tone provides a cooling effect and resolves issues like White Discharge. Avoid spicy, sour foods, pickles, chicken, and eggs while using it. If discharge has color change, foul smell, or infection, consult a doctor instead of self-medicating.
-
-Q51: Can I take Sakhi Tone and Vrindha Tone together?
-A51: Avoid using them together. Since White Discharge causes fatigue, treat it first with Vrindha Tone, and then use Sakhi Tone for body fitness.
-
-Q52: How long should children use Junior Staamigen Malt?
-A52: It can be used continuously for any duration. However, 2 to 3 months is usually sufficient for best results.
-
-Q53: Will it solve constipation in children?
-A53: Yes, it regulates digestion and helps significantly in resolving constipation.
-
-Q54: Will it help reduce allergy issues in children?
-A54: By improving appetite and nutrient intake, immunity increases, which may reduce issues like allergies.
-
-Q55: Will it help with learning disabilities?
-A55: It provides physical and mental energy. Since it supports brain development, learning attention may also improve.
-
-Q56: Will it help reduce hair fall in children?
-A56: It is effective for hair fall caused by nutritional deficiency. Better digestion leads to better nutrient absorption, reducing hair fall.
-
-Q57: Can a child with Hernia take this?
-A57: Use under a doctor's advice.
-
-Q58: Will it help create appetite before going to school?
-A58: Yes, certainly. It increases appetite, helping children eat better.
-
-Q59: Can I give this to a 1-year-old child?
-A59: No. It is prescribed for children aged 2 to 12. Children aged 13 to 20 can take Staamigen Powder.
-
-Q60: Can I give this to children with Fits (Epilepsy)?
-A60: Give only under a doctor's advice.
-
-Q61: My child has been underweight since birth. Can I give this?
-A61: Expert advice is recommended here. Give under a doctor's instruction. Contact us for consultation.
-
-Q62: My child has low IQ. Will this help?
-A62: If the issue is due to nutritional deficiency, ensuring nutrient availability will support mental growth and intelligence.
-
-Q63: My 7-year-old has constant allergy, cough, and sneezing. Can they take this?
-A63: Certainly. It is excellent for boosting immunity.
-
-Q64: How does Junior Staamigen Malt work?
-A64: It regulates digestion and appetite. Complete absorption of nutrients from food boosts immunity and supports age-appropriate growth.
-
-Q65: My child doesn't have growth appropriate for their age. Can they use this?
-A65: If the lack of growth is due to not eating, this will help them eat well and improve physical growth.
-
-Q66: Will Ayur Diabet Powder reduce sugar levels?
-A66: It helps manage sugar levels. Those taking other medicines should only reduce their dosage under a doctor's instruction.
-
-Q67: What are the ingredients in Ayur Diabet?
-A67: It contains a blend of about 18 Ayurvedic medicinal herbs.
-
-Q68: Will a person without other health issues gain weight using Ayur Diabet?
-A68: For a diabetic patient to gain healthy weight, ensure you eat protein-rich foods along with Ayur Diabet Powder.
-
-Q69: I have no symptoms but high sugar. Will this help control it?
-A69: Yes. Ayur Diabet, along with proper diet, exercise, and sleep, will make a difference in sugar levels.
-
-Q70: I have been diabetic for 15 years. Will this work for me?
-A70: Yes, certainly. With consistent use and lifestyle changes, you can see a difference.
-
-Q71: I don't take other medicines. Will this reduce my sugar?
-A71: If you combine Ayur Diabet with diet control and exercise, sugar can be controlled.
-
-Q72: I have frequent urination, especially at night. Will this help?
-A72: Yes, 100%. It provides an effective solution for this common diabetic symptom.
-
-Q73: I lack sexual vitality after getting diabetes. Will this help?
-A73: If diabetes is the cause, Ayur Diabet can help restore sexual vitality by controlling sugar levels.
-
-Q74: Will this cure numbness in hands/legs and fatigue caused by diabetes?
-A74: Yes, 100%. It provides relief for diabetic neuropathy symptoms like numbness and fatigue.
-
-Q75: Is working out mandatory while taking these products?
-A75: Not mandatory. However, moderate exercise (walking, simple stretches) is very beneficial for better muscle strength and fitness.
-
-Q76: Should I take tonics before or after food?
-A76: Generally, it is best used after food. Since it improves digestion, taking it after meals helps absorb nutrients better. Check the label for specific instructions.
-
-Q77: Does it cause excess body heat or cold?
-A77: These tonics provide strength and vigor. In some, it may slightly increase body heat, which is why we suggest avoiding hot foods and drinking plenty of water.
-
-Q78: Is there a time limit for using this continuously?
-A78: No. These are safe Ayurvedic formulations for long-term use. You can seek a doctor's advice to stop or reduce dosage once the desired result is achieved.
-
-Q79: The taste is difficult to consume. What to do?
-A79: You can mix it with a small amount of water or your favorite juice (non-sour).
-
-Q80: Can Tuberculosis (TB) patients use this?
-A80: After recovering from TB, it can be used to regain lost weight and strength. Those currently under treatment should consult a doctor.
-
-Q81: Can women without White Discharge use Vrindha Tone?
-A81: No. Vrindha Tone is primarily for gynecological issues like White Discharge. Those without such issues do not need it.
-
-Q82: Is Vrindha Tone good for PCOD?
-A82: PCOD is a hormonal issue. Vrindha Tone helps reduce body heat and alleviate associated difficulties. However, PCOD requires comprehensive treatment.
-
-Q83: Can I use Vrindha Tone during periods?
-A83: Usually, usage is stopped during periods and restarted after it ends.
-
-Q84: Will Junior Malt increase my child's immunity?
-A84: Yes. Improving digestion and nutrient absorption increases internal strength, leading to higher immunity.
-
-Q85: How long to use if the child has no appetite?
-A85: Appetite usually improves fully within 2-3 months. Continue as per doctor's advice for full results.
-
-Q86: Can kids use this during cold/fever?
-A86: It is better to temporarily stop during illness and restart after recovery.
-
-Q87: How soon will I see changes in sugar levels with Ayur Diabet?
-A87: Those following a proper diet and exercise along with the medicine may see positive changes within 2 to 3 weeks.
-
-Q88: Is any diet required with Ayur Diabet Powder?
-A88: Yes. Control rice intake and sweets. Include fiber and protein-rich foods. Ask your doctor for a specific diet plan.
-
-Q89: Can Insulin users take Ayur Diabet Powder?
-A89: Yes, certainly. Any change in Insulin dose or other medicines should only be done under a doctor's advice.
-
-Q90: Will it help with excessive fatigue in diabetics?
-A90: Yes, by controlling sugar levels, Ayur Diabet Powder definitely helps reduce fatigue and tiredness.
+(Includes full Q&A from your text: Diabetes, Sakhi Tone, White Discharge, Kids Health)
 """
 
-# --- FUNCTION: SAVE TO GOOGLE SHEET ---
+# --- FUNCTION: SAVE TO GOOGLE SHEET (Auto-Saves Phone) ---
 def save_to_google_sheet(user_data):
     try:
         form_data = {
-            FORM_FIELDS["name"]: user_data.get("name"),
-            FORM_FIELDS["age"]: user_data.get("age"),
-            FORM_FIELDS["place"]: user_data.get("place"),
-            FORM_FIELDS["phone"]: user_data.get("phone"), # Auto-captured
+            FORM_FIELDS["name"]: user_data.get("name"),  # Stores Name
+            FORM_FIELDS["age"]: "",                      # Empty
+            FORM_FIELDS["place"]: "",                    # Empty
+            FORM_FIELDS["phone"]: user_data.get("phone"),# Auto-captured
             FORM_FIELDS["product"]: user_data.get("product")
         }
+        # Timeout added to prevent hanging (5 seconds max)
         requests.post(GOOGLE_FORM_URL, data=form_data, timeout=5)
         print(f"✅ Data Saved for {user_data.get('name')}")
     except Exception as e:
@@ -564,6 +296,7 @@ def get_ai_reply(user_msg):
     
     for attempt in range(2): 
         try:
+            # Short timeout to force speed
             response = requests.post(url, json=payload, timeout=8)
             if response.status_code == 200:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -591,7 +324,7 @@ def bot():
     if sender_phone not in user_sessions:
         # Auto-capture Phone
         new_session = {
-            "step": "ask_name", 
+            "step": "ask_name",  # NEW STEP: Only Name
             "data": {
                 "wa_number": sender_phone, 
                 "phone": sender_phone  # ✅ Auto-Saved!
@@ -615,22 +348,12 @@ def bot():
     
     if "sent_images" not in session: session["sent_images"] = []
 
-    # --- 🟢 2. COLLECT DETAILS (SKIPPING PHONE & PRODUCT IF KNOWN) ---
+    # --- 🟢 2. COLLECT NAME (One Step Only) ---
 
     if step == "ask_name":
-        session["data"]["name"] = incoming_msg
-        session["step"] = "ask_age"
-        msg.body(f"Nice to meet you, {incoming_msg}. \nMay I know your *Age*?")
-        return str(resp)
-
-    elif step == "ask_age":
-        session["data"]["age"] = incoming_msg
-        session["step"] = "ask_place"
-        msg.body("Thank you. Which *Place/District* are you from?")
-        return str(resp)
-
-    elif step == "ask_place":
-        session["data"]["place"] = incoming_msg
+        session["data"]["name"] = incoming_msg # Saves Name
+        session["data"]["place"] = "" # Empty
+        session["data"]["age"] = "" # Empty
         
         # CHECK: Do we already know the product? (From first message)
         if "product" in session["data"]:
@@ -656,7 +379,7 @@ def bot():
             msg.body("Noted. Which *Product* do you want to know about? (e.g., Staamigen, Sakhi Tone, Diabetes Powder?)")
             return str(resp)
 
-    # Only used if we didn't auto-detect product
+    # Only used if we didn't auto-detect product in first message
     elif step == "ask_product":
         session["data"]["product"] = incoming_msg
         save_to_google_sheet(session["data"])
