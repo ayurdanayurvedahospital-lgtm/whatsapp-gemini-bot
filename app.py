@@ -7,10 +7,13 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO) # Enable logging
+logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Double check this URL. It must end in /formResponse
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
+# ⚠️ TRIPLE CHECK THESE IDs! If one is wrong, nothing saves.
 FORM_FIELDS = {
     "name": "entry.2005620554",
     "phone": "entry.1117261166",
@@ -48,7 +51,7 @@ SYSTEM_PROMPT = """
 5. **MEDICAL DISCLAIMER:** If asked about medical prescriptions/diseases, state: "I am not a doctor. Please consult a qualified doctor for medical advice."
 6. **STRICT INGREDIENTS:** If asked about ingredients, use the **EXACT LIST** below.
 
-*** 🌿 STRICT INGREDIENT LIST (FETCHED DATA) 🌿 ***
+*** 🌿 STRICT INGREDIENT LIST 🌿 ***
 1. **JUNIOR STAAMIGEN MALT:** Satavari, Brahmi, Abhaya (Haritaki), Sunti (Dry Ginger), Maricham (Black Pepper), Pippali (Long Pepper), Sigru (Moringa), Vidangam, Honey.
 2. **SAKHI TONE:** Jeeraka (Cumin), Satahwa (Dill), Pippali, Draksha (Grapes), Vidari, Sathavari, Ashwagandha.
 3. **STAAMIGEN MALT:** Ashwagandha, Draksha, Jeevanthi, Honey, Ghee, Sunti, Vidarikand, Gokshura.
@@ -128,43 +131,49 @@ Q: Does Junior Malt help constipation? A: Yes, regulates digestion.
 
 def save_to_google_sheet(user_data):
     try:
+        # 🟢 DEBUGGING: Check what we are trying to send
+        print(f"📤 SENDING TO GOOGLE: Name={user_data.get('name')}, Phone={user_data.get('phone')}")
+        
         form_data = {
             FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
             FORM_FIELDS["phone"]: user_data.get("phone", "Unknown"),
             FORM_FIELDS["product"]: user_data.get("product", "Pending")
         }
-        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=5)
-        print(f"✅ Data Saved for {user_data.get('name')}")
+        
+        # Send data
+        response = requests.post(GOOGLE_FORM_URL, data=form_data, timeout=5)
+        
+        # 🟢 DEBUGGING: Check what Google replied
+        if response.status_code == 200:
+            print(f"✅ GOOGLE ACCEPTED DATA (200 OK)")
+        else:
+            print(f"❌ GOOGLE REJECTED DATA: Status {response.status_code}")
+            
     except Exception as e:
-        print(f"❌ Error saving to Sheet: {e}")
-
-def get_safe_model():
-    return "gemini-1.5-flash"
+        print(f"❌ CRITICAL SAVE ERROR: {e}")
 
 def get_ai_reply(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
-    model_name = get_safe_model()
+    model_name = "gemini-1.5-flash-001" 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    # Retry logic with ERROR LOGGING
     for attempt in range(2): 
         try:
-            # Increased timeout to 12 seconds to prevent "Server Busy"
             response = requests.post(url, json=payload, timeout=12)
             if response.status_code == 200:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text
-            elif response.status_code == 429:
-                print(f"⚠️ API LIMIT REACHED (429). Retrying...")
-                time.sleep(2)
+            elif response.status_code == 404:
+                 # Fallback
+                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={API_KEY}"
+                 continue
             else:
                 print(f"⚠️ API ERROR: {response.status_code} - {response.text}")
-                return "Our servers are busy right now (API Error). Please try again."
+                return "Our servers are busy right now. Please try again."
         except Exception as e:
             print(f"⚠️ CONNECTION ERROR: {e}")
             time.sleep(1)
-    
     return "Our servers are busy right now. Please try again."
 
 @app.route("/bot", methods=["POST"])
@@ -175,27 +184,30 @@ def bot():
     resp = MessagingResponse()
     msg = resp.message() 
 
-    # --- MEMORY WIPE FIX ---
-    # If server restarted and lost memory, treat unknown user as existing if they ask a question
+    # --- SESSION MANAGEMENT ---
     if sender_phone not in user_sessions:
-        # Check if this looks like a name (short) or a question (long)
-        is_question = len(incoming_msg.split()) > 2 or "benefit" in incoming_msg.lower() or "price" in incoming_msg.lower()
+        detected_product = None
+        user_text_lower = incoming_msg.lower()
         
-        if is_question:
-             # Treat as active chat immediately
+        for key in PRODUCT_IMAGES.keys():
+            if key in user_text_lower:
+                detected_product = key
+                break
+        
+        if detected_product:
+             # Returning User or Smart Start
              user_sessions[sender_phone] = {
                  "step": "chat_active",
-                 "data": {"wa_number": sender_phone, "phone": sender_phone},
+                 "data": {"wa_number": sender_phone, "phone": sender_phone, "product": detected_product, "name": "Returning User"},
                  "sent_images": []
              }
         else:
-             # Treat as new user
-             new_session = {
+             # New User
+             user_sessions[sender_phone] = {
                  "step": "ask_name",
                  "data": {"wa_number": sender_phone, "phone": sender_phone},
                  "sent_images": []
              }
-             user_sessions[sender_phone] = new_session
              msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\nTo better assist you, may I know your *Name*?")
              return Response(str(resp), mimetype="application/xml")
 
@@ -206,13 +218,14 @@ def bot():
 
     if step == "ask_name":
         session["data"]["name"] = incoming_msg
+        
+        # 🔥 TRIGGER SAVE IMMEDIATELY
         save_to_google_sheet(session["data"])
         
         session["step"] = "chat_active"
         msg.body("Thank you! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone?)")
 
     elif step == "chat_active":
-        # Check for product names to send images
         user_text_lower = incoming_msg.lower()
         for key, image_url in PRODUCT_IMAGES.items():
             if key in user_text_lower:
@@ -220,7 +233,6 @@ def bot():
                     msg.media(image_url)
                     session["sent_images"].append(key)
                 
-                # Update product in sheet if detected
                 session["data"]["product"] = key
                 save_to_google_sheet(session["data"])
                 break
