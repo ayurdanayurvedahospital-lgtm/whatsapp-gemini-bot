@@ -1,25 +1,22 @@
 import os
 import time
 import requests
+import logging
 from flask import Flask, request, Response
 from twilio.twiml.messaging_response import MessagingResponse
 
+# --- CONFIGURATION ---
 app = Flask(__name__)
-
+logging.basicConfig(level=logging.INFO) # Enable logging
 API_KEY = os.environ.get("GEMINI_API_KEY")
-
-# --- 🔴 GOOGLE FORM CONFIGURATION 🔴 ---
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
 FORM_FIELDS = {
     "name": "entry.2005620554",
-    "age": "entry.1045781291",    # Left empty
-    "place": "entry.942694214",   # Left empty
-    "phone": "entry.1117261166",  # Auto-captured
+    "phone": "entry.1117261166",
     "product": "entry.839337160"
 }
 
-# --- 📸 IMAGE LIBRARY 📸 ---
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
     "powder": "https://ayuralpha.in/cdn/shop/files/Ad2-03.jpg?v=1747049628&width=600",
@@ -38,10 +35,8 @@ PRODUCT_IMAGES = {
     "neeli": "https://ayuralpha.in/cdn/shop/files/18.png?v=1725948517&width=823"
 }
 
-# --- MEMORY STORAGE ---
 user_sessions = {}
 
-# --- SYSTEM INSTRUCTIONS (FULL BRAIN RESTORED) ---
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Product Specialist.
 **Tone:** Warm, empathetic, polite (English/Malayalam).
@@ -70,12 +65,11 @@ SYSTEM_PROMPT = """
 - Kanya Tone: ₹495
 - Combo: ₹1450
 
-*** 📄 OFFICIAL KNOWLEDGE BASE (YOUR FULL TEXT) ***
-
+*** 📄 OFFICIAL KNOWLEDGE BASE ***
 --- SECTION 1: ABOUT US & LEGACY ---
 Brand Name: Alpha Ayurveda (Online Division of Ayurdan Ayurveda Hospital).
 Founder: Late Vaidyan M.K. Pankajakshan Nair (Founded 60 years ago).
-Heritage: Manufacturing division of Ayurdan Hospital, Pandalam. Located near Pandalam Palace.
+Heritage: Manufacturing division of Ayurdan Hospital, Pandalam.
 Mission: "Loka Samasta Sukhino Bhavantu".
 Certifications: AYUSH Approved, ISO, GMP, HACCP.
 
@@ -132,14 +126,11 @@ Q: Is it good for learning disability? A: Supports brain development and energy.
 Q: Does Junior Malt help constipation? A: Yes, regulates digestion.
 """
 
-# --- FUNCTION: SAVE TO GOOGLE SHEET ---
 def save_to_google_sheet(user_data):
     try:
         form_data = {
-            FORM_FIELDS["name"]: user_data.get("name"),
-            FORM_FIELDS["age"]: "",                      
-            FORM_FIELDS["place"]: "",                    
-            FORM_FIELDS["phone"]: user_data.get("phone"),
+            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+            FORM_FIELDS["phone"]: user_data.get("phone", "Unknown"),
             FORM_FIELDS["product"]: user_data.get("product", "Pending")
         }
         requests.post(GOOGLE_FORM_URL, data=form_data, timeout=5)
@@ -147,45 +138,35 @@ def save_to_google_sheet(user_data):
     except Exception as e:
         print(f"❌ Error saving to Sheet: {e}")
 
-# --- SMART MODEL DETECTOR ---
 def get_safe_model():
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            all_models = [m['name'].replace("models/", "") for m in data.get('models', [])]
-            safe_models = [m for m in all_models if "gemini" in m and "embedding" not in m and "exp" not in m]
-            if any("flash" in m for m in safe_models): return [m for m in safe_models if "flash" in m][0]
-            if safe_models: return safe_models[0]
-    except:
-        pass
     return "gemini-1.5-flash"
 
-# --- GENERATE WITH RETRY ---
 def get_ai_reply(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
     model_name = get_safe_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
+    # Retry logic with ERROR LOGGING
     for attempt in range(2): 
         try:
-            response = requests.post(url, json=payload, timeout=8)
+            # Increased timeout to 12 seconds to prevent "Server Busy"
+            response = requests.post(url, json=payload, timeout=12)
             if response.status_code == 200:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text
-            elif response.status_code in [429, 503]:
-                time.sleep(1)
-                continue
+            elif response.status_code == 429:
+                print(f"⚠️ API LIMIT REACHED (429). Retrying...")
+                time.sleep(2)
             else:
-                return "Our servers are busy right now. Please try again."
-        except:
+                print(f"⚠️ API ERROR: {response.status_code} - {response.text}")
+                return "Our servers are busy right now (API Error). Please try again."
+        except Exception as e:
+            print(f"⚠️ CONNECTION ERROR: {e}")
             time.sleep(1)
     
     return "Our servers are busy right now. Please try again."
 
-# --- MAIN BOT ROUTE ---
 @app.route("/bot", methods=["POST"])
 def bot():
     incoming_msg = request.values.get("Body", "").strip()
@@ -194,95 +175,60 @@ def bot():
     resp = MessagingResponse()
     msg = resp.message() 
 
-    # --- 1. NEW SESSION: CAPTURE PHONE & PRODUCT INTENT ---
+    # --- MEMORY WIPE FIX ---
+    # If server restarted and lost memory, treat unknown user as existing if they ask a question
     if sender_phone not in user_sessions:
-        new_session = {
-            "step": "ask_name",
-            "data": {
-                "wa_number": sender_phone, 
-                "phone": sender_phone  # ✅ Phone Saved
-            },
-            "sent_images": []
-        }
+        # Check if this looks like a name (short) or a question (long)
+        is_question = len(incoming_msg.split()) > 2 or "benefit" in incoming_msg.lower() or "price" in incoming_msg.lower()
         
-        # Smart Product Detection
-        user_text_lower = incoming_msg.lower()
-        for key in PRODUCT_IMAGES.keys():
-            if key in user_text_lower:
-                new_session["data"]["product"] = key
-                break
-        
-        user_sessions[sender_phone] = new_session
-        msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\nTo better assist you, may I know your *Name*?")
-        return Response(str(resp), mimetype="application/xml")
+        if is_question:
+             # Treat as active chat immediately
+             user_sessions[sender_phone] = {
+                 "step": "chat_active",
+                 "data": {"wa_number": sender_phone, "phone": sender_phone},
+                 "sent_images": []
+             }
+        else:
+             # Treat as new user
+             new_session = {
+                 "step": "ask_name",
+                 "data": {"wa_number": sender_phone, "phone": sender_phone},
+                 "sent_images": []
+             }
+             user_sessions[sender_phone] = new_session
+             msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\nTo better assist you, may I know your *Name*?")
+             return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
     step = session["step"]
     
     if "sent_images" not in session: session["sent_images"] = []
 
-    # --- 2. CAPTURE NAME & SAVE TO SHEET IMMEDIATELY ---
     if step == "ask_name":
         session["data"]["name"] = incoming_msg
-        
-        # ✅ FORCE SAVE NOW (Name + Phone + Product/Pending)
-        save_to_google_sheet(session["data"])
-
-        # Decide Next Step (Answer or Ask Product)
-        if "product" in session["data"]:
-            session["step"] = "chat_active"
-            product_name = session["data"]["product"]
-            
-            ai_reply = get_ai_reply(f"Tell me about {product_name} benefits ONLY. Answer in English and Malayalam.")
-            if ai_reply: ai_reply = ai_reply.replace("**", "*")
-            if len(ai_reply) > 800: ai_reply = ai_reply[:800] + "..."
-            
-            msg.body(f"Thank you! I have noted your details.\n\n{ai_reply}")
-            
-            if product_name in PRODUCT_IMAGES and product_name not in session["sent_images"]:
-                 msg.media(PRODUCT_IMAGES[product_name])
-                 session["sent_images"].append(product_name)
-        else:
-            session["step"] = "ask_product"
-            msg.body("Noted. Which *Product* do you want to know about? (e.g., Staamigen, Sakhi Tone, Diabetes Powder?)")
-    
-    # --- 3. ASK PRODUCT (If not detected earlier) ---
-    elif step == "ask_product":
-        session["data"]["product"] = incoming_msg
-        
-        # ✅ UPDATE SHEET with Product
         save_to_google_sheet(session["data"])
         
-        session["step"] = "chat_active" 
-        
-        ai_reply = get_ai_reply(f"Tell me about {incoming_msg} benefits ONLY. Answer in English and Malayalam.")
-        if ai_reply: ai_reply = ai_reply.replace("**", "*")
-        if len(ai_reply) > 800: ai_reply = ai_reply[:800] + "..."
+        session["step"] = "chat_active"
+        msg.body("Thank you! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone?)")
 
-        msg.body(f"Thank you! I have noted your details.\n\n{ai_reply}")
-        
+    elif step == "chat_active":
+        # Check for product names to send images
         user_text_lower = incoming_msg.lower()
         for key, image_url in PRODUCT_IMAGES.items():
             if key in user_text_lower:
                 if key not in session["sent_images"]:
                     msg.media(image_url)
                     session["sent_images"].append(key)
+                
+                # Update product in sheet if detected
+                session["data"]["product"] = key
+                save_to_google_sheet(session["data"])
                 break
 
-    # --- 4. ONGOING CHAT ---
-    elif step == "chat_active":
         ai_reply = get_ai_reply(incoming_msg)
         if ai_reply: ai_reply = ai_reply.replace("**", "*")
         if len(ai_reply) > 1000: ai_reply = ai_reply[:1000] + "..."
         msg.body(ai_reply)
-        
-        user_text_lower = incoming_msg.lower()
-        for key, image_url in PRODUCT_IMAGES.items():
-            if key in user_text_lower:
-                if key not in session["sent_images"]:
-                    msg.media(image_url)
-                    session["sent_images"].append(key)
-                break
 
     return Response(str(resp), mimetype="application/xml")
 
