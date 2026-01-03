@@ -10,7 +10,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ⚠️ FORM FIELDS MUST BE "SHORT ANSWER" IN GOOGLE FORMS (NO NUMBER VALIDATION)
+# ⚠️ FORM FIELDS MUST BE "SHORT ANSWER" IN GOOGLE FORMS
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
 FORM_FIELDS = {
@@ -150,32 +150,46 @@ def save_to_google_sheet(user_data):
     except Exception as e:
         print(f"❌ SAVE ERROR: {e}")
 
+# 🔴 NEW FUNCTION: AUTO-DETECT WORKING MODEL
+def get_dynamic_model():
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            # Look for ANY valid Gemini model
+            for model in data.get('models', []):
+                m_name = model['name'].replace("models/", "")
+                if "gemini" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
+                    return m_name
+    except:
+        pass
+    # Fallback if detection fails
+    return "gemini-1.5-flash"
+
 def get_ai_reply(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
     
-    # 🔴 UPDATED: Primary Model List (Try Newest First)
-    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+    # 🔴 STEP 1: Auto-Detect the correct model name
+    model_name = get_dynamic_model()
     
-    for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
-        payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
-        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+    
+    for attempt in range(2): 
         try:
-            print(f"🤖 Trying AI Model: {model_name}...")
+            print(f"🤖 Using Auto-Detected Model: {model_name}")
             response = requests.post(url, json=payload, timeout=12)
             
             if response.status_code == 200:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text
-            elif response.status_code == 404:
-                 print(f"⚠️ Model {model_name} not found. Switching...")
-                 continue # Try next model
             else:
-                print(f"⚠️ API ERROR ({model_name}): {response.status_code} - {response.text}")
-                continue # Try next model
+                print(f"⚠️ API ERROR: {response.status_code} - {response.text}")
+                time.sleep(1)
         except Exception as e:
             print(f"⚠️ CONNECTION ERROR: {e}")
-            continue
+            time.sleep(1)
 
     return "Our servers are busy right now. Please try again later."
 
