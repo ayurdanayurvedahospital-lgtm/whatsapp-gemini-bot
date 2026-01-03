@@ -10,10 +10,9 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Double check this URL. It must end in /formResponse
+# ⚠️ FORM FIELDS MUST BE "SHORT ANSWER" IN GOOGLE FORMS (NO NUMBER VALIDATION)
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
-# ⚠️ TRIPLE CHECK THESE IDs! If one is wrong, nothing saves.
 FORM_FIELDS = {
     "name": "entry.2005620554",
     "phone": "entry.1117261166",
@@ -131,50 +130,54 @@ Q: Does Junior Malt help constipation? A: Yes, regulates digestion.
 
 def save_to_google_sheet(user_data):
     try:
-        # 🟢 DEBUGGING: Check what we are trying to send
-        print(f"📤 SENDING TO GOOGLE: Name={user_data.get('name')}, Phone={user_data.get('phone')}")
+        # Clean phone number (Remove + to satisfy Google Form if validation is on)
+        phone_clean = user_data.get('phone', '').replace("+", "")
         
         form_data = {
             FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-            FORM_FIELDS["phone"]: user_data.get("phone", "Unknown"),
+            FORM_FIELDS["phone"]: phone_clean, 
             FORM_FIELDS["product"]: user_data.get("product", "Pending")
         }
         
         # Send data
-        response = requests.post(GOOGLE_FORM_URL, data=form_data, timeout=5)
+        response = requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
         
-        # 🟢 DEBUGGING: Check what Google replied
         if response.status_code == 200:
-            print(f"✅ GOOGLE ACCEPTED DATA (200 OK)")
+            print(f"✅ DATA SAVED for {user_data.get('name')}")
         else:
-            print(f"❌ GOOGLE REJECTED DATA: Status {response.status_code}")
+            print(f"❌ GOOGLE REJECT: {response.status_code}. CHECK FORM VALIDATION!")
             
     except Exception as e:
-        print(f"❌ CRITICAL SAVE ERROR: {e}")
+        print(f"❌ SAVE ERROR: {e}")
 
 def get_ai_reply(user_msg):
     full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
-    model_name = "gemini-1.5-flash-001" 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
-    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    for attempt in range(2): 
+    # 🔴 UPDATED: Primary Model List (Try Newest First)
+    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+    
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+        payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
+        
         try:
+            print(f"🤖 Trying AI Model: {model_name}...")
             response = requests.post(url, json=payload, timeout=12)
+            
             if response.status_code == 200:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text
             elif response.status_code == 404:
-                 # Fallback
-                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={API_KEY}"
-                 continue
+                 print(f"⚠️ Model {model_name} not found. Switching...")
+                 continue # Try next model
             else:
-                print(f"⚠️ API ERROR: {response.status_code} - {response.text}")
-                return "Our servers are busy right now. Please try again."
+                print(f"⚠️ API ERROR ({model_name}): {response.status_code} - {response.text}")
+                continue # Try next model
         except Exception as e:
             print(f"⚠️ CONNECTION ERROR: {e}")
-            time.sleep(1)
-    return "Our servers are busy right now. Please try again."
+            continue
+
+    return "Our servers are busy right now. Please try again later."
 
 @app.route("/bot", methods=["POST"])
 def bot():
@@ -195,14 +198,12 @@ def bot():
                 break
         
         if detected_product:
-             # Returning User or Smart Start
              user_sessions[sender_phone] = {
                  "step": "chat_active",
                  "data": {"wa_number": sender_phone, "phone": sender_phone, "product": detected_product, "name": "Returning User"},
                  "sent_images": []
              }
         else:
-             # New User
              user_sessions[sender_phone] = {
                  "step": "ask_name",
                  "data": {"wa_number": sender_phone, "phone": sender_phone},
@@ -218,10 +219,7 @@ def bot():
 
     if step == "ask_name":
         session["data"]["name"] = incoming_msg
-        
-        # 🔥 TRIGGER SAVE IMMEDIATELY
-        save_to_google_sheet(session["data"])
-        
+        save_to_google_sheet(session["data"]) # Save Immediately
         session["step"] = "chat_active"
         msg.body("Thank you! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone?)")
 
