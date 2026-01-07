@@ -47,7 +47,7 @@ PRODUCT_IMAGES = {
 
 user_sessions = {}
 
-# 🧠 THE SUPER-BRAIN (UPDATED WITH ALL FETCHED DATA)
+# 🧠 THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTACT)
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Product Specialist.
 **Tone:** Warm, empathetic, polite (English/Malayalam).
@@ -311,16 +311,24 @@ def get_dynamic_model():
         pass
     return "gemini-1.5-flash"
 
-def get_ai_reply(user_msg):
-    full_prompt = SYSTEM_PROMPT + "\n\nUser Query: " + user_msg
-    model_name = get_dynamic_model()
+# 🟢 UPDATED: AI FUNCTION NOW ACCEPTS CONTEXT
+def get_ai_reply(user_msg, product_context=None):
+    # Base Prompt
+    full_prompt = SYSTEM_PROMPT
     
+    # Inject Product Context if available
+    if product_context:
+        full_prompt += f"\n\n*** CURRENT CONTEXT: The user is asking about '{product_context}'. Answer this specific question based on that product. ***"
+    
+    full_prompt += "\n\nUser Query: " + user_msg
+    
+    model_name = get_dynamic_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
     for attempt in range(2): 
         try:
-            print(f"🤖 Using Model: {model_name}")
+            print(f"🤖 Using Model: {model_name} | Context: {product_context}")
             response = requests.post(url, json=payload, timeout=12)
             
             if response.status_code == 200:
@@ -381,19 +389,22 @@ def bot():
     elif step == "chat_active":
         user_text_lower = incoming_msg.lower()
         
-        # Check for keywords to trigger images
+        # Check for keywords to update context & trigger images
         for key, image_url in PRODUCT_IMAGES.items():
             if key in user_text_lower:
                 if key not in session["sent_images"]:
                     msg.media(image_url)
                     session["sent_images"].append(key)
                 
-                # Update product in sheet
+                # Update product in session & sheet
                 session["data"]["product"] = key
                 save_to_google_sheet(session["data"])
                 break
 
-        ai_reply = get_ai_reply(incoming_msg)
+        # 🟢 PASS THE SAVED PRODUCT AS CONTEXT TO AI
+        current_product = session["data"].get("product")
+        ai_reply = get_ai_reply(incoming_msg, product_context=current_product)
+        
         if ai_reply: ai_reply = ai_reply.replace("**", "*")
         if len(ai_reply) > 1000: ai_reply = ai_reply[:1000] + "..."
         msg.body(ai_reply)
