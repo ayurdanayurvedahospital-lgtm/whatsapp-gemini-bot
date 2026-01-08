@@ -10,7 +10,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ⚠️ FORM FIELDS (KEPT EXACTLY AS ORIGINAL)
+# ⚠️ FORM FIELDS
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
 FORM_FIELDS = {
@@ -19,7 +19,7 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
-# 🔴 SMART IMAGE LIBRARY (KEPT EXACTLY AS ORIGINAL)
+# 🔴 SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
     "kids": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -225,6 +225,7 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text
             else:
+                # 🚨 LOG ERROR TO SEE IF IT'S QUOTA OR 404
                 print(f"❌ API ERROR: {response.status_code} - {response.text}")
                 time.sleep(2)
         except Exception as e:
