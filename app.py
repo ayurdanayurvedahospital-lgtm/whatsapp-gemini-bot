@@ -57,7 +57,7 @@ LANGUAGES = {
     "6": "Telugu"
 }
 
-# 🧠 THE SUPER-BRAIN (UPDATED WITH JUNIOR STAAMIGEN EMOTIONAL MANUAL)
+# 🧠 THE SUPER-BRAIN (EMOTIONAL INTELLIGENCE + SALES PSYCHOLOGY)
 SYSTEM_PROMPT = """
 **Role:** Senior Consultant at Alpha Ayurveda.
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
@@ -73,18 +73,16 @@ SYSTEM_PROMPT = """
 
 *** 👶 JUNIOR STAAMIGEN (PARENTS & KIDS 2-12 YRS) - "THE PARENT COACH" ***
 *Philosophy:* We are not selling a tonic; we are helping a child FALL IN LOVE WITH FOOD.
-*Tone:* Warm, Reassuring, "Advice from a Friend".
-- **Step 1: Validate & Remove Guilt:** "It is painful when a child refuses food. You are not alone. It is not your fault. Modern lifestyle makes hunger hard."
-- **Step 2: The Solution:** "Junior Staamigen is like a grandmother's recipe. It gently wakes up the 'Digestive Fire' (Hunger Switch)."
-- **Step 3: The Promise:** "We don't want 'balloon weight'. We want 'Strong Weight' (Active, Happy, Sparkle in eyes)."
-- **Usage (Dosage):**
-  - **3 Years:** 1/2 teaspoon twice daily.
+- **Validate the Pain:** "It is painful when a child refuses food. You are not alone. It is not your fault."
+- **The Solution:** "Junior Staamigen is like a grandmother's recipe. It gently wakes up the 'Digestive Fire' (Hunger Switch)."
+- **The Promise:** We don't want 'balloon weight'. We want 'Strong Weight' and active energy.
+- **Usage (Dosage):** - **3 Years:** 1/2 teaspoon twice daily.
   - **8 Years:** 1 full teaspoon twice daily.
   - **Best Time:** After breakfast and after dinner.
-- **Safety:** "As safe as home food. No chemicals, no steroids. 100% Vegetarian."
-- **Taste:** "Sweet and yummy like a treat (Jam). Kids love it!"
-- **Results:** First week: "Sparkle in eyes" & active. 10 days: Asking for food/Second helping.
-- **Lifestyle Advice:** "Don't force feed (War Zone). Eat together. Limit screen time. Swap packets for fruits."
+- **Safety:** "As safe as home food. No chemicals, no steroids."
+- **Taste:** "Sweet and yummy like a treat. Kids love it!"
+- **Results:** First week: "Sparkle in eyes" & active. 10 days: Asking for food. 
+- **Lifestyle Advice:** "Don't force feed. Eat together. Limit screen time."
 
 *** 💪 MEN (STAAMIGEN MALT - AGES 18-35) - "FITNESS BROTHER" ***
 *Core Concept:* Shift from "Gas-causing Powders" to "Pre-digested Bio-Fuel (Lehya)."
@@ -154,6 +152,30 @@ SYSTEM_PROMPT = """
 [Kasaragod]: Bio, VJ.
 """
 
+# 🛠️ AUTO-DETECT MODEL AT STARTUP (FIXES 404 ERROR)
+def get_working_model_name():
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            for model in data.get('models', []):
+                m_name = model['name'].replace("models/", "")
+                # Prioritize Flash, fallback to Pro
+                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
+                    print(f"✅ FOUND MODEL: {m_name}")
+                    return m_name
+            # Fallback to any generation model
+            for model in data.get('models', []):
+                if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
+                    return model['name'].replace("models/", "")
+    except Exception as e:
+        print(f"⚠️ MODEL INIT ERROR: {e}")
+    return "gemini-1.5-flash" # Default fallback
+
+# GLOBAL VARIABLE TO STORE MODEL NAME
+ACTIVE_MODEL_NAME = get_working_model_name()
+
 def save_to_google_sheet(user_data):
     try:
         phone_clean = user_data.get('phone', '').replace("+", "")
@@ -167,7 +189,7 @@ def save_to_google_sheet(user_data):
     except Exception as e:
         print(f"❌ SAVE ERROR: {e}")
 
-# 🟢 AI FUNCTION (SPEED OPTIMIZED: 25s TIMEOUT)
+# 🟢 AI FUNCTION (USES DETECTED MODEL + 25s TIMEOUT)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English"):
     full_prompt = SYSTEM_PROMPT
     
@@ -179,6 +201,7 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
         full_prompt += f"\n1. You MUST provide the answer in **{language}** FIRST."
         full_prompt += f"\n2. Then add a separator line '---'."
         full_prompt += f"\n3. Then provide the EXACT SAME answer in **English** below it."
+        full_prompt += f"\nExample Output:\n[Tamil Text]\n---\n[English Translation]"
     else:
         full_prompt += "\nReply in English only."
 
@@ -188,25 +211,27 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     
     full_prompt += "\n\nUser Query: " + user_msg
     
-    # 🔴 DIRECT CALL, SINGLE ATTEMPT
-    model_name = "gemini-1.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+    # Use the globally detected model name
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    try:
-        print(f"🤖 AI Request for {user_name} | Lang: {language}")
-        # ⚡️ TIMEOUT SET TO 25 SECONDS TO PREVENT RENDER CRASH ⚡️
-        response = requests.post(url, json=payload, timeout=25) 
-        
-        if response.status_code == 200:
-            text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-            return text
-        else:
-            print(f"❌ API ERROR: {response.status_code} - {response.text}")
-            return "My brain is a bit slow right now. Please ask me again! 🙏"
-    except Exception as e:
-        print(f"❌ TIMEOUT/ERROR: {e}")
-        return "I am having a connection issue. Please type your message again."
+    # 🔴 TIMEOUT SET TO 25s TO PREVENT RENDER KILL
+    for attempt in range(2): 
+        try:
+            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
+            response = requests.post(url, json=payload, timeout=25) 
+            
+            if response.status_code == 200:
+                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return text
+            else:
+                print(f"❌ API ERROR: {response.status_code} - {response.text}")
+                time.sleep(2)
+        except Exception as e:
+            print(f"❌ TIMEOUT/ERROR: {e}")
+            time.sleep(2)
+
+    return "Our servers are busy right now. Please try again later."
 
 # ✂️ SPLITTER FUNCTION
 def split_message(text, limit=1500):
@@ -230,6 +255,7 @@ def bot():
 
     # --- SESSION START ---
     if sender_phone not in user_sessions:
+         # NEW USER -> ASK LANGUAGE FIRST
          user_sessions[sender_phone] = {
              "step": "ask_language",
              "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English"},
