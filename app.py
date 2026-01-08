@@ -180,7 +180,7 @@ def get_dynamic_model():
         pass
     return "gemini-1.5-flash"
 
-# 🟢 AI FUNCTION (DUAL LANGUAGE ENABLED)
+# 🟢 AI FUNCTION (FIXED: 30 SECOND TIMEOUT + DUAL LANGUAGE)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English"):
     full_prompt = SYSTEM_PROMPT
     
@@ -196,8 +196,7 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     else:
         full_prompt += "\nReply in English only."
 
-    # Inject Name and Product Context
-    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally to be friendly (but not in every sentence). ***"
+    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally. ***"
     
     if product_context:
         full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
@@ -208,26 +207,26 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
+    # 🔴 INCREASED TIMEOUT TO 30 SECONDS
     for attempt in range(2): 
         try:
-            print(f"🤖 AI Request for {user_name} | Product: {product_context} | Lang: {language}")
-            response = requests.post(url, json=payload, timeout=12)
+            print(f"🤖 AI Request for {user_name} | Lang: {language}")
+            response = requests.post(url, json=payload, timeout=30) 
             
             if response.status_code == 200:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text
             else:
-                time.sleep(1)
+                time.sleep(2)
         except Exception as e:
-            time.sleep(1)
+            time.sleep(2)
 
     return "Our servers are busy right now. Please try again later."
 
-# ✂️ NEW FUNCTION: SPLIT MESSAGES CORRECTLY
+# ✂️ SPLITTER FUNCTION
 def split_message(text, limit=1500):
     chunks = []
     while len(text) > limit:
-        # Find the last space within the limit to avoid cutting words
         split_at = text.rfind(' ', 0, limit)
         if split_at == -1:
             split_at = limit
@@ -263,9 +262,7 @@ def bot():
     # --- STEP 1: HANDLE LANGUAGE SELECTION ---
     if step == "ask_language":
         selection = incoming_msg.strip()
-        selected_lang = LANGUAGES.get(selection, "English") # Default to English if invalid
-        
-        # If user typed "Tamil" instead of "3"
+        selected_lang = LANGUAGES.get(selection, "English") 
         for key, val in LANGUAGES.items():
             if val.lower() in selection.lower():
                 selected_lang = val
@@ -274,7 +271,6 @@ def bot():
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
         
-        # Reply based on selection
         if selected_lang == "Malayalam":
             msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
         elif selected_lang == "Tamil":
@@ -295,7 +291,6 @@ def bot():
         user_lang = session["data"]["language"]
         welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
         
-        # Simple localization for welcome message
         if user_lang == "Malayalam":
              welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
         elif user_lang == "Tamil":
@@ -307,19 +302,16 @@ def bot():
     elif step == "chat_active":
         user_text_lower = incoming_msg.lower()
         
-        # Check for keywords to update context & trigger images
         for key, image_url in PRODUCT_IMAGES.items():
             if key in user_text_lower:
                 if key not in session["sent_images"]:
                     msg.media(image_url)
                     session["sent_images"].append(key)
                 
-                # Update product in session & sheet
                 session["data"]["product"] = key
                 save_to_google_sheet(session["data"])
                 break
 
-        # 🟢 PASS THE SAVED PRODUCT, NAME & LANGUAGE TO AI
         current_product = session["data"].get("product")
         current_name = session["data"].get("name", "Friend")
         current_lang = session["data"].get("language", "English")
@@ -328,15 +320,8 @@ def bot():
         
         if ai_reply: 
             ai_reply = ai_reply.replace("**", "*")
-            
-            # 🟢 SPLITTER FIX APPLIED
-            # If message is > 1500 chars, it will be split into multiple bubbles
             chunks = split_message(ai_reply, limit=1500)
-            
-            # Send first chunk in the main message object
             msg.body(chunks[0])
-            
-            # Send remaining chunks as new messages
             for chunk in chunks[1:]:
                 resp.message(chunk)
 
