@@ -47,11 +47,20 @@ PRODUCT_IMAGES = {
 
 user_sessions = {}
 
-# 🧠 THE SUPER-BRAIN (MERGED: OLD DATA + NEW SALES PSYCHOLOGY)
+# 🌐 LANGUAGE OPTIONS
+LANGUAGES = {
+    "1": "English",
+    "2": "Malayalam",
+    "3": "Tamil",
+    "4": "Hindi",
+    "5": "Kannada",
+    "6": "Telugu"
+}
+
+# 🧠 THE SUPER-BRAIN (MERGED: OLD DATA + NEW SALES PSYCHOLOGY + LANGUAGE RULES)
 SYSTEM_PROMPT = """
 **Role:** Senior Consultant at Alpha Ayurveda.
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
-**Language:** English (Primary) & Malayalam (If user asks in Malayalam).
 
 **⚠️ CRITICAL RULES:**
 1. **IDENTIFY THE USER:**
@@ -195,11 +204,22 @@ def get_dynamic_model():
         pass
     return "gemini-1.5-flash"
 
-# 🟢 AI FUNCTION (NOW ACCEPTS USER NAME)
-def get_ai_reply(user_msg, product_context=None, user_name="Customer"):
-    # Base Prompt
+# 🟢 AI FUNCTION (DUAL LANGUAGE ENABLED)
+def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English"):
     full_prompt = SYSTEM_PROMPT
     
+    # --- DUAL LANGUAGE INSTRUCTION ---
+    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
+    full_prompt += f"\nThe user has selected: **{language}**."
+    
+    if language != "English":
+        full_prompt += f"\n1. You MUST provide the answer in **{language}** FIRST."
+        full_prompt += f"\n2. Then add a separator line '---'."
+        full_prompt += f"\n3. Then provide the EXACT SAME answer in **English** below it."
+        full_prompt += f"\nExample Output:\n[Tamil Text]\n---\n[English Translation]"
+    else:
+        full_prompt += "\nReply in English only."
+
     # Inject Name and Product Context
     full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally to be friendly (but not in every sentence). ***"
     
@@ -214,7 +234,7 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer"):
     
     for attempt in range(2): 
         try:
-            print(f"🤖 AI Request for {user_name} | Product: {product_context}")
+            print(f"🤖 AI Request for {user_name} | Product: {product_context} | Lang: {language}")
             response = requests.post(url, json=payload, timeout=12)
             
             if response.status_code == 200:
@@ -235,44 +255,66 @@ def bot():
     resp = MessagingResponse()
     msg = resp.message() 
 
-    # --- SESSION MANAGEMENT ---
+    # --- SESSION START ---
     if sender_phone not in user_sessions:
-        detected_product = None
-        user_text_lower = incoming_msg.lower()
-        
-        # Check for product in first message
-        for key in PRODUCT_IMAGES.keys():
-            if key in user_text_lower:
-                detected_product = key
-                break
-        
-        if detected_product:
-             user_sessions[sender_phone] = {
-                 "step": "chat_active",
-                 "data": {"wa_number": sender_phone, "phone": sender_phone, "product": detected_product, "name": "Friend"},
-                 "sent_images": []
-             }
-        else:
-             user_sessions[sender_phone] = {
-                 "step": "ask_name",
-                 "data": {"wa_number": sender_phone, "phone": sender_phone, "name": "Friend"},
-                 "sent_images": []
-             }
-             msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\nTo better assist you, may I know your *Name*?")
-             return Response(str(resp), mimetype="application/xml")
+         # NEW USER -> ASK LANGUAGE FIRST
+         user_sessions[sender_phone] = {
+             "step": "ask_language",
+             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English"},
+             "sent_images": []
+         }
+         msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n\n*(Reply with 1, 2, 3...)*")
+         return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
     step = session["step"]
     
     if "sent_images" not in session: session["sent_images"] = []
 
-    if step == "ask_name":
+    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
+    if step == "ask_language":
+        selection = incoming_msg.strip()
+        selected_lang = LANGUAGES.get(selection, "English") # Default to English if invalid
+        
+        # If user typed "Tamil" instead of "3"
+        for key, val in LANGUAGES.items():
+            if val.lower() in selection.lower():
+                selected_lang = val
+                break
+        
+        session["data"]["language"] = selected_lang
+        session["step"] = "ask_name"
+        
+        # Reply based on selection
+        if selected_lang == "Malayalam":
+            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
+        elif selected_lang == "Tamil":
+            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
+        elif selected_lang == "Hindi":
+            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
+        else:
+            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
+            
+        return Response(str(resp), mimetype="application/xml")
+
+    # --- STEP 2: ASK NAME ---
+    elif step == "ask_name":
         session["data"]["name"] = incoming_msg
         save_to_google_sheet(session["data"]) # Save Immediately
         session["step"] = "chat_active"
-        # Reply using the name immediately
-        msg.body(f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)")
+        
+        user_lang = session["data"]["language"]
+        welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
+        
+        # Simple localization for welcome message
+        if user_lang == "Malayalam":
+             welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
+        elif user_lang == "Tamil":
+             welcome_text = f"நன்றி {incoming_msg}! இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?"
 
+        msg.body(welcome_text)
+
+    # --- STEP 3: MAIN CHAT (DUAL LANGUAGE) ---
     elif step == "chat_active":
         user_text_lower = incoming_msg.lower()
         
@@ -288,14 +330,15 @@ def bot():
                 save_to_google_sheet(session["data"])
                 break
 
-        # 🟢 PASS THE SAVED PRODUCT & NAME TO AI
+        # 🟢 PASS THE SAVED PRODUCT, NAME & LANGUAGE TO AI
         current_product = session["data"].get("product")
         current_name = session["data"].get("name", "Friend")
+        current_lang = session["data"].get("language", "English")
         
-        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name)
+        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang)
         
         if ai_reply: ai_reply = ai_reply.replace("**", "*")
-        if len(ai_reply) > 1000: ai_reply = ai_reply[:1000] + "..."
+        if len(ai_reply) > 1500: ai_reply = ai_reply[:1500] + "..."
         msg.body(ai_reply)
 
     return Response(str(resp), mimetype="application/xml")
