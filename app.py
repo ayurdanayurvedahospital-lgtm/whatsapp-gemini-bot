@@ -57,7 +57,7 @@ LANGUAGES = {
     "6": "Telugu"
 }
 
-# 🧠 THE SUPER-BRAIN (CONTAINS ALL MANUALS & SALES SCRIPTS)
+# 🧠 THE SUPER-BRAIN (MASTER VERSION - ALL PRODUCTS)
 SYSTEM_PROMPT = """
 **Role:** Senior Consultant at Alpha Ayurveda (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
@@ -152,7 +152,7 @@ SYSTEM_PROMPT = """
 [Kasaragod]: Bio, VJ.
 """
 
-# 🛠️ AUTO-DETECT MODEL AT STARTUP (FIXES 404 ERROR)
+# 🛠️ AUTO-DETECT MODEL AT STARTUP (FIXES 404 & 429 ERRORS)
 def get_working_model_name():
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
     try:
@@ -161,7 +161,7 @@ def get_working_model_name():
             data = response.json()
             for model in data.get('models', []):
                 m_name = model['name'].replace("models/", "")
-                # Prioritize Flash, fallback to Pro
+                # Prioritize Flash models
                 if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
                     print(f"✅ FOUND MODEL: {m_name}")
                     return m_name
