@@ -47,17 +47,29 @@ PRODUCT_IMAGES = {
 
 user_sessions = {}
 
-# 🌐 LANGUAGE OPTIONS
+# 🌐 LANGUAGE OPTIONS (ADDED BENGALI)
 LANGUAGES = {
     "1": "English",
     "2": "Malayalam",
     "3": "Tamil",
     "4": "Hindi",
     "5": "Kannada",
-    "6": "Telugu"
+    "6": "Telugu",
+    "7": "Bengali"
 }
 
-# 🧠 THE SUPER-BRAIN (EMOTIONAL INTELLIGENCE + SALES PSYCHOLOGY + FULL KNOWLEDGE BASE)
+# 🔊 VOICE REJECTION MESSAGES
+VOICE_REPLIES = {
+    "English": "Sorry, I cannot listen to voice notes. Please type your message. 🙏",
+    "Malayalam": "ക്ഷമിക്കണം, എനിക്ക് വോയിസ് മെസേജ് കേൾക്കാൻ കഴിയില്ല. ദയവായി ടൈപ്പ് ചെയ്യാമോ? 🙏",
+    "Tamil": "மன்னிக்கவும், என்னால் ஆடியோ கேட்க முடியாது. தயவுசெய்து டைப் செய்யவும். 🙏",
+    "Hindi": "क्षमा करें, मैं वॉयस नोट नहीं सुन सकता। कृपया टाइप करें। 🙏",
+    "Kannada": "ಕ್ಷಮಿಸಿ, ನಾನು ಧ್ವನಿ ಸಂದೇಶಗಳನ್ನು ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ. 🙏",
+    "Telugu": "క్షమించండి, నేను వాయిస్ మెసేజ్ వినలేను. దయచేసి టైప్ చేయండి. 🙏",
+    "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
+}
+
+# 🧠 THE SUPER-BRAIN (EMOTIONAL INTELLIGENCE + SALES PSYCHOLOGY + FULL MANUALS)
 SYSTEM_PROMPT = """
 **Role:** Senior Consultant at Alpha Ayurveda (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
@@ -70,8 +82,20 @@ SYSTEM_PROMPT = """
    - **Women (Sakhi Tone):** "Wellness Partner" (Metabolic Correction, Understanding, Healthy Weight).
    - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
 2. **NO ESSAYS:** Users are on WhatsApp. Keep answers **SHORT** (Max 2-3 sentences per language) unless explaining a process.
-3. **DUAL LANGUAGE:** You MUST reply in the **Selected Language** first, followed by **English**.
+3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
 4. **PERSONAL TOUCH:** You know the user's name. Use it naturally.
+
+*** 🌸 SAKHI TONE (WOMEN'S WEIGHT GAIN & WELLNESS) - "THE CONSULTATION SCRIPT" ***
+*Target:* Women (Underweight, Fatigue, Hormonal Issues).
+*Tone:* "Wellness Partner".
+*Golden Rule:* Comfort → Trust → Education → Guidance → Product.
+- **Step 1 (Assessment):** Ask for **Age, Height (cm), and Weight (kg)** to guide them safely.
+- **Step 2 (The Logic):** Use this formula: `Height(cm) - 100 = Ideal Weight`. Tell the user how many kg they are below healthy range.
+- **Step 3 (Root Cause):** If weight gap > 8kg, ask: "Are you facing Low Appetite, Digestion issues, Thyroid, or Stress?"
+- **The Philosophy:** "Weight gain isn't just eating more; it's fixing Appetite & Digestion."
+- **The Expectation:** "For healthy body change, **60–120 days** of consistent effort is important."
+- **Critical Advice:** "Do not stay hungry! Eat 5-6 small meals. Staying hungry causes gas/bloating."
+- **Usage:** 1 tablespoon twice daily, after food.
 
 *** 🩸 AYURDIABET POWDER (DIABETIC CARE & VITALITY SUPPORT) ***
 *Target:* Diabetic Patients (Type 2), Pre-Diabetics, Elderly.
@@ -107,25 +131,18 @@ SYSTEM_PROMPT = """
 - **Dosage:** 1 Tablespoon (Malt) or 1 Scoop (Powder) twice daily after food.
 - **Result:** Expect 2-4kg/month. Real muscle takes time.
 
-*** 🌸 SAKHI TONE (WOMEN'S WEIGHT GAIN & WELLNESS) ***
-*Target:* Women (Underweight, Fatigue, Hormonal Issues).
-*Tone:* "Wellness Partner" (Metabolic Correction, Understanding).
-*Philosophy:* Weight gain isn't just eating more; it's fixing Appetite & Digestion.
-- **Ideal Weight Calculation:** Height (cm) - 100 = Ideal Weight (approx).
-- **The Logic:** "If you are >8kg underweight, it's due to weak digestion or stress. We fix the root cause."
-- **Usage:** 1 tablespoon twice daily, after food. Can be taken with milk or lukewarm water.
-- **Critical Rule:** "Do not stay hungry! Eat 5-6 small meals. Staying hungry causes gas/bloating."
-- **Timeline:** 60-120 days for healthy, permanent change. First changes are appetite and digestion.
-
-*** 👶 JUNIOR STAAMIGEN (PARENTS & KIDS 2-12 YRS) ***
-*Target:* Parents of picky eaters.
-*Tone:* "Parent Coach" (Warmth, Reassurance).
-*Philosophy:* Helping a child FALL IN LOVE WITH FOOD.
-- **Validation:** "It is painful when a child refuses food. You are not alone. It is not your fault."
+*** 👶 JUNIOR STAAMIGEN (PARENTS & KIDS 2-12 YRS) - "THE PARENT COACH" ***
+*Philosophy:* We are not selling a tonic; we are helping a child FALL IN LOVE WITH FOOD.
+- **Validate the Pain:** "It is painful when a child refuses food. You are not alone. It is not your fault."
 - **The Solution:** "Junior Staamigen is like a grandmother's recipe. It gently wakes up the 'Digestive Fire' (Hunger Switch)."
-- **Dosage:** 3 Years (1/2 tsp), 8 Years (1 tsp) twice daily. Best after breakfast/dinner.
-- **Result:** "Sparkle in eyes" & active in 1 week. Asking for food in 10 days.
-- **Lifestyle:** Don't force feed. Limit screen time.
+- **The Promise:** We don't want 'balloon weight'. We want 'Strong Weight' and active energy.
+- **Usage (Dosage):** - **3 Years:** 1/2 teaspoon twice daily.
+  - **8 Years:** 1 full teaspoon twice daily.
+  - **Best Time:** After breakfast and after dinner.
+- **Safety:** "As safe as home food. No chemicals, no steroids."
+- **Taste:** "Sweet and yummy like a treat. Kids love it!"
+- **Results:** First week: "Sparkle in eyes" & active. 10 days: Asking for food. 
+- **Lifestyle Advice:** "Don't force feed. Eat together. Limit screen time."
 
 *** 🌿 PRODUCT QUICK DATABASE 🌿 ***
 - **Vrindha Tone:** White Discharge. (Usage: 15ml BEFORE food).
@@ -174,7 +191,7 @@ SYSTEM_PROMPT = """
 [Kasaragod]: Bio, VJ.
 """
 
-# 🛠️ AUTO-DETECT MODEL AT STARTUP (FIXES 404 ERROR)
+# 🛠️ AUTO-DETECT MODEL AT STARTUP
 def get_working_model_name():
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
     try:
@@ -183,17 +200,15 @@ def get_working_model_name():
             data = response.json()
             for model in data.get('models', []):
                 m_name = model['name'].replace("models/", "")
-                # Prioritize Flash, fallback to Pro
                 if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
                     print(f"✅ FOUND MODEL: {m_name}")
                     return m_name
-            # Fallback to any generation model
             for model in data.get('models', []):
                 if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
                     return model['name'].replace("models/", "")
     except Exception as e:
         print(f"⚠️ MODEL INIT ERROR: {e}")
-    return "gemini-1.5-flash" # Default fallback
+    return "gemini-1.5-flash"
 
 # GLOBAL VARIABLE TO STORE MODEL NAME
 ACTIVE_MODEL_NAME = get_working_model_name()
@@ -215,17 +230,11 @@ def save_to_google_sheet(user_data):
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English"):
     full_prompt = SYSTEM_PROMPT
     
-    # --- DUAL LANGUAGE INSTRUCTION ---
+    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
     full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
     full_prompt += f"\nThe user has selected: **{language}**."
-    
-    if language != "English":
-        full_prompt += f"\n1. You MUST provide the answer in **{language}** FIRST."
-        full_prompt += f"\n2. Then add a separator line '---'."
-        full_prompt += f"\n3. Then provide the EXACT SAME answer in **English** below it."
-        full_prompt += f"\nExample Output:\n[Tamil Text]\n---\n[English Translation]"
-    else:
-        full_prompt += "\nReply in English only."
+    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
+    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
 
     full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally. ***"
     if product_context:
@@ -233,11 +242,9 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     
     full_prompt += "\n\nUser Query: " + user_msg
     
-    # Use the globally detected model name
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    # 🔴 TIMEOUT SET TO 25s TO PREVENT RENDER KILL
     for attempt in range(2): 
         try:
             print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
@@ -247,7 +254,6 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return text
             else:
-                # 🚨 LOG ERROR TO SEE IF IT'S QUOTA OR 404
                 print(f"❌ API ERROR: {response.status_code} - {response.text}")
                 time.sleep(2)
         except Exception as e:
@@ -272,6 +278,7 @@ def split_message(text, limit=1500):
 def bot():
     incoming_msg = request.values.get("Body", "").strip()
     sender_phone = request.values.get("From", "").replace("whatsapp:", "")
+    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
     
     resp = MessagingResponse()
     msg = resp.message() 
@@ -279,18 +286,34 @@ def bot():
     # --- SESSION START ---
     if sender_phone not in user_sessions:
          # NEW USER -> ASK LANGUAGE FIRST
+         
+         # 🟢 AD-SMART DETECTION
+         detected_product = "Pending"
+         incoming_lower = incoming_msg.lower()
+         for key in PRODUCT_IMAGES.keys():
+             if key in incoming_lower:
+                 detected_product = key
+                 break
+         
          user_sessions[sender_phone] = {
              "step": "ask_language",
-             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English"},
+             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
              "sent_images": []
          }
-         msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n\n*(Reply with 1, 2, 3...)*")
+         msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
     step = session["step"]
     
     if "sent_images" not in session: session["sent_images"] = []
+
+    # 🛑 1. VOICE MESSAGE CHECK
+    if num_media > 0:
+        current_lang = session["data"].get("language", "English")
+        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
+        msg.body(warning_msg)
+        return Response(str(resp), mimetype="application/xml")
 
     # --- STEP 1: HANDLE LANGUAGE SELECTION ---
     if step == "ask_language":
@@ -304,12 +327,15 @@ def bot():
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
         
+        # Reply based on selection
         if selected_lang == "Malayalam":
             msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
         elif selected_lang == "Tamil":
             msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
         elif selected_lang == "Hindi":
             msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
+        elif selected_lang == "Bengali":
+            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
         else:
             msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
             
@@ -321,20 +347,48 @@ def bot():
         save_to_google_sheet(session["data"]) # Save Immediately
         session["step"] = "chat_active"
         
-        user_lang = session["data"]["language"]
-        welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
-        
-        if user_lang == "Malayalam":
-             welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
-        elif user_lang == "Tamil":
-             welcome_text = f"நன்றி {incoming_msg}! இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?"
+        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
+        if session["data"].get("product") != "Pending":
+            current_product = session["data"]["product"]
+            current_name = session["data"]["name"]
+            current_lang = session["data"]["language"]
+            
+            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
+                 msg.media(PRODUCT_IMAGES[current_product])
+                 session["sent_images"].append(current_product)
 
-        msg.body(welcome_text)
+            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang)
+            if ai_reply: 
+                ai_reply = ai_reply.replace("**", "*")
+                chunks = split_message(ai_reply, limit=1500)
+                msg.body(chunks[0])
+                for chunk in chunks[1:]:
+                    resp.message(chunk)
+            
+        else:
+            # Regular Flow
+            user_lang = session["data"]["language"]
+            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
+            if user_lang == "Malayalam":
+                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
+            elif user_lang == "Tamil":
+                 welcome_text = f"நன்றி {incoming_msg}! இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?"
+            elif user_lang == "Bengali":
+                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
+            msg.body(welcome_text)
 
-    # --- STEP 3: MAIN CHAT (DUAL LANGUAGE) ---
+    # --- STEP 3: MAIN CHAT ---
     elif step == "chat_active":
         user_text_lower = incoming_msg.lower()
         
+        # 🟢 LANGUAGE SWITCHER
+        for lang_id, lang_name in LANGUAGES.items():
+             if incoming_msg.lower() == lang_name.lower():
+                 session["data"]["language"] = lang_name
+                 msg.body(f"Language changed to {lang_name}. ✅")
+                 return Response(str(resp), mimetype="application/xml")
+
+        # Check for keywords
         for key, image_url in PRODUCT_IMAGES.items():
             if key in user_text_lower:
                 if key not in session["sent_images"]:
