@@ -68,7 +68,7 @@ VOICE_REPLIES = {
     "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
-# SYSTEM PROMPT
+# THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Assistant (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
@@ -83,12 +83,18 @@ SYSTEM_PROMPT = """
 
 2. **USE THE KNOWLEDGE BASE:** - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER. 
    - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a general Ayurvedic question (e.g., "What is Shatavari?", "Benefits of Ashwagandha") that is NOT in the specific Q&A, you **ARE AUTHORIZED** to use your general medical knowledge to answer accurately and professionally.
-   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the ordering instructions (Name, Address, Pincode). DO NOT show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
+   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the ordering instructions (Name, Address, Pincode). **DO NOT** show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
 
 3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
 4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
 5. **CONTEXT SWITCHING:** If the user asks about a NEW product (e.g. they were talking about Sakhi Tone but now ask about Junior Staamigen), STOP talking about the old product and immediately answer about the NEW product.
-6. **VISUAL AIDS:** Assess if the user would understand the response better with a diagram. If yes, insert a tag like  (e.g., ) immediately before or after the relevant text. Be economical; do not overuse.
+6. **VISUAL AIDS:** Assess if the user would understand the response better with a diagram. If yes, insert a tag like 
+
+[Image of X]
+ (e.g., 
+
+[Image of digestive system]
+) immediately before or after the relevant text. Be economical; do not overuse.
 
 *** 🔍 COMPLETE KNOWLEDGE BASE (DO NOT SUMMARIZE) ***
 
@@ -351,21 +357,21 @@ Q71. Can STAAMIGEN help sports students? A: Excellent for them. It helps repair 
 Q72. Can girls also use STAAMIGEN Powder? A: Yes. It supports their growth and iron absorption (crucial for menstrual health).
 Q73. Can STAAMIGEN help improve mood? A: Yes. "Hangry" (Hungry + Angry) is real. A well-fed teen is a calmer teen.
 Q74. Can unhealthy habits cancel benefits? A: Yes. Smoking or alcohol (in older teens) will destroy results.
-Q75. Is gradual weight gain better than fast gain? A: Yes. Fast gain leads to stretch marks and fat. Gradual gain is muscle and bone.
-Q76. Can STAAMIGEN be used with doctor advice? A: Absolutely. It is compatible with most medical advice.
-Q77. Does digestion improve appetite naturally? A: Yes. When the stomach empties faster (good digestion), hunger returns faster.
-Q78. Can hydration improve appetite? A: Yes. Drinking water between meals (not during) helps digestion.
-Q79. Can results differ month to month? A: Yes. Growth often happens in "spurts," not a straight line.
-Q80. Is patience the key factor? A: Yes. Parents need to trust the biology.
-Q81. Can STAAMIGEN help during growth spurts? A: It is essential. During a spurt, the body is desperate for nutrients.
-Q82. Can occasional junk food be allowed? A: Yes. The 80/20 rule applies. 80% healthy, 20% fun.
-Q83. Can STAAMIGEN improve overall wellness? A: Yes. Skin, hair, and nails also improve with better nutrition.
-Q84. Can poor digestion cause vitamin deficiency? A: Yes. You are not what you eat; you are what you absorb.
-Q85. Is long-term nutrition important after teens? A: Yes. The bone density built now determines bone health at age 60.
-Q86. Can STAAMIGEN help weak bones? A: Yes. It supports the absorption of calcium and minerals.
-Q87. Can parents see early signs of improvement? A: Look for: Waking up easier, better mood, and finishing school lunch.
-Q88. Can STAAMIGEN be taken with school routine? A: Yes. Morning with breakfast or evening after school.
-Q89. Can lifestyle correction alone help? A: Yes, but in today's nutrient-depleted world, supplements act as an insurance policy.
+75. Is gradual weight gain better than fast gain? A: Yes. Fast gain leads to stretch marks and fat. Gradual gain is muscle and bone.
+76. Can STAAMIGEN be used with doctor advice? A: Absolutely. It is compatible with most medical advice.
+77. Does digestion improve appetite naturally? A: Yes. When the stomach empties faster (good digestion), hunger returns faster.
+78. Can hydration improve appetite? A: Yes. Drinking water between meals (not during) helps digestion.
+79. Can results differ month to month? A: Yes. Growth often happens in "spurts," not a straight line.
+80. Is patience the key factor? A: Yes. Parents need to trust the biology.
+81. Can STAAMIGEN help during growth spurts? A: It is essential. During a spurt, the body is desperate for nutrients.
+82. Can occasional junk food be allowed? A: Yes. The 80/20 rule applies. 80% healthy, 20% fun.
+83. Can STAAMIGEN improve overall wellness? A: Yes. Skin, hair, and nails also improve with better nutrition.
+84. Can poor digestion cause vitamin deficiency? A: Yes. You are not what you eat; you are what you absorb.
+85. Is long-term nutrition important after teens? A: Yes. The bone density built now determines bone health at age 60.
+86. Can STAAMIGEN help weak bones? A: Yes. It supports the absorption of calcium and minerals.
+87. Can parents see early signs of improvement? A: Look for: Waking up easier, better mood, and finishing school lunch.
+88. Can STAAMIGEN be taken with school routine? A: Yes. Morning with breakfast or evening after school.
+89. Can lifestyle correction alone help? A: Yes, but in today's nutrient-depleted world, supplements act as an insurance policy.
 90. Is STAAMIGEN habit-forming? A: No. It does not contain addictive substances.
 91. Can STAAMIGEN be stopped suddenly? A: Yes, no side effects. But maintain the food intake.
 92. Can STAAMIGEN help children who skip meals? A: It helps minimize the damage, but the goal is to stop skipping meals.
@@ -548,7 +554,7 @@ def save_to_google_sheet(user_data):
     except Exception as e:
         print(f"❌ SAVE ERROR: {e}")
 
-# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
+# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT + MEMORY)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[]):
     full_prompt = SYSTEM_PROMPT
     
