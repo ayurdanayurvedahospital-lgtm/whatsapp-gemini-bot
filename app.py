@@ -10,7 +10,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ⚠️ FORM FIELDS (KEPT EXACTLY AS ORIGINAL)
+# ⚠️ FORM FIELDS
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
 FORM_FIELDS = {
@@ -19,7 +19,7 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
-# 🔴 SMART IMAGE LIBRARY (KEPT EXACTLY AS ORIGINAL)
+# 🔴 SMART IMAGE LIBRARY & KEYWORDS
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
     "kids": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -66,12 +66,12 @@ VOICE_REPLIES = {
     "Hindi": "क्षमा करें, मैं वॉयस नोट नहीं सुन सकता। कृपया टाइप करें। 🙏",
     "Kannada": "ಕ್ಷಮಿಸಿ, ನಾನು ಧ್ವನಿ ಸಂದೇಶಗಳನ್ನು ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ. 🙏",
     "Telugu": "క్షమించండి, నేను వాయిస్ మెసేజ్ వినలేను. దయచేసి టైప్ చేయండి. 🙏",
-    "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
+    "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
 # 🧠 THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
 SYSTEM_PROMPT = """
-**Role:** Senior Consultant at Alpha Ayurveda (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
+**Role:** Alpha Ayurveda Assistant (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
 
 **⚠️ CRITICAL RULES:**
@@ -81,9 +81,10 @@ SYSTEM_PROMPT = """
    - **Men (Saphala Capsule):** "Performance Partner" (Dignified, Internal Battery, Vitality, Stress Relief).
    - **Women (Sakhi Tone):** "Wellness Partner" (Metabolic Correction, Understanding, Healthy Weight).
    - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
-2. **NO ESSAYS:** Users are on WhatsApp. Keep answers **SHORT** (Max 2-3 sentences per language) unless explaining a process.
+2. **USE THE KNOWLEDGE BASE:** If the user asks a question that appears in the "COMPLETE KNOWLEDGE BASE" section below, you MUST provide the answer from there. Do not summarize too much.
 3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
-4. **PERSONAL TOUCH:** You know the user's name. Use it naturally.
+4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
+5. **CONTEXT SWITCHING:** If the user asks about a NEW product (e.g. they were talking about Sakhi Tone but now ask about Junior Staamigen), STOP talking about the old product and immediately answer about the NEW product.
 
 *** 🔍 COMPLETE KNOWLEDGE BASE (DO NOT SUMMARIZE) ***
 
@@ -371,7 +372,7 @@ Q96. Is balance more important than quantity? A: Yes. Quality of calories > Quan
 Q97. Can STAAMIGEN prevent weakness? A: Yes. It builds muscular endurance.
 Q98. Is STAAMIGEN a lifelong product? A: It is a tool to reach a goal. Once health is established, food is enough.
 Q99. What is the most important advice for parents? A: Be their role model. Eat healthy yourself. Create a happy dining table atmosphere.
-Q100. What is the first step before using STAAMIGEN? A: Assessment. Understand why the child is not growing (Stress? Food? Digestion?).
+100. What is the first step before using STAAMIGEN? A: Assessment. Understand why the child is not growing (Stress? Food? Digestion?).
 
 --- SECTION 7: JUNIOR STAAMIGEN (Emotional/Parent Guide Q&A) ---
 Q1. Why doesn't my child want to eat? A: A child never starves on purpose. If they refuse food, it means their internal "Hunger Switch" is turned off.
@@ -451,29 +452,29 @@ Q74. What if he refuses to take it? A: Put it on a biscuit or bread. Be creative
 Q75. Can I give it before school? A: Yes, it gives him a "Power Start" for the day.
 Q76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
 Q77. Does it help speech? A: It supports general development. A healthy body supports a healthy brain.
-Q78. Can I give it in summer? A: Yes, all seasons are fine.
-Q79. Can I give it in winter? A: Yes, it helps keep immunity strong during cold season.
-Q80. Will it make him fat? A: No, it builds muscle and health, not unhealthy fat.
-Q81. Can I give it for travel? A: Yes, carry the bottle. Don't break the routine.
-Q82. Does it contain sugar? A: It uses natural sweeteners (Jaggery/Honey) which are good for kids.
-Q83. Is it good for hair? A: Yes, healthy nutrition improves hair texture too.
-Q84. My child has exams coming. A: Perfect time. It will keep his energy up for studying.
-Q85. Can I give it twice a day? A: Yes, morning and evening is best.
-Q86. Is the bottle glass? A: (Answer based on packaging). It is packed safely.
-Q87. Can I return it? A: (Answer based on policy). But try it, you will love the results.
-Q88. Is it made in a clean place? A: Yes, Alpha Ayurveda a GMP certified hygienic facility.
-Q89. Can I give it to my 13-year-old? A: You can, but the Teenager version might be better for his age.
-Q90. Is it spicy? A: Not at all. It is sweet and pleasant.
-Q91. Can I mix with Horlicks? A: Use this instead of that. This is natural.
-Q92. Does it create gas? A: No, it actually reduces gas and bloating.
-Q93. Will he be thirsty? A: Make sure he drinks water. Growth needs water.
-Q94. Can I give it for 6 months? A: Yes, it is safe for long term support.
-Q95. Does it improve stamina? A: Yes, he will run longer without panting.
-Q96. Will he grow tall like his father? A: We give him the nutrition to reach his full potential.
-Q97. One advice for me? A: Be patient. Love him. Trust nature.
-Q98. How to order? A: We can take your details right now.
-Q99. When will you call back? A: We will check on you in 10 days to see how he likes the taste.
-Q100. Are you sure it will work? A: We have seen thousands of happy mothers. Trust the process.
+78. Can I give it in summer? A: Yes, all seasons are fine.
+79. Can I give it in winter? A: Yes, it helps keep immunity strong during cold season.
+80. Will it make him fat? A: No, it builds muscle and health, not unhealthy fat.
+81. Can I give it for travel? A: Yes, carry the bottle. Don't break the routine.
+82. Does it contain sugar? A: It uses natural sweeteners (Jaggery/Honey) which are good for kids.
+83. Is it good for hair? A: Yes, healthy nutrition improves hair texture too.
+84. My child has exams coming. A: Perfect time. It will keep his energy up for studying.
+85. Can I give it twice a day? A: Yes, morning and evening is best.
+86. Is the bottle glass? A: (Answer based on packaging). It is packed safely.
+87. Can I return it? A: (Answer based on policy). But try it, you will love the results.
+88. Is it made in a clean place? A: Yes, Alpha Ayurveda a GMP certified hygienic facility.
+89. Can I give it to my 13-year-old? A: You can, but the Teenager version might be better for his age.
+90. Is it spicy? A: Not at all. It is sweet and pleasant.
+91. Can I mix with Horlicks? A: Use this instead of that. This is natural.
+92. Does it create gas? A: No, it actually reduces gas and bloating.
+93. Will he be thirsty? A: Make sure he drinks water. Growth needs water.
+94. Can I give it for 6 months? A: Yes, it is safe for long term support.
+95. Does it improve stamina? A: Yes, he will run longer without panting.
+96. Will he grow tall like his father? A: We give him the nutrition to reach his full potential.
+97. One advice for me? A: Be patient. Love him. Trust nature.
+98. How to order? A: We can take your details right now.
+99. When will you call back? A: We will check on you in 10 days to see how he likes the taste.
+100. Are you sure it will work? A: We have seen thousands of happy mothers. Trust the process.
 
 *** 🏪 STORE LIST (KERALA) ***
 [Thiruvananthapuram]: Guruvayoorappan, Sreedhari.
@@ -537,18 +538,18 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     full_prompt += f"\nYou MUST reply ONLY in **{language}**."
     full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
 
-    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally. ***"
+    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages). ***"
     if product_context:
         full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
     
     full_prompt += "\n\nUser Query: " + user_msg
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
-    # 🔴 ADDED MAX TOKENS TO PREVENT AI CUTOFF
+    # 🔴 INCREASED MAX TOKENS TO 8000 TO PREVENT CUTOFF
     payload = {
         "contents": [{"parts": [{"text": full_prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 1000
+            "maxOutputTokens": 8000
         }
     }
     
