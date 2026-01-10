@@ -18,6 +18,15 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
+# 👥 AGENT ROTATION LIST (Names are hidden from customers)
+AGENTS = [
+    {"name": "Sreelekha", "phone": "+91 9895900809", "link": "https://wa.link/t45vpy"},
+    {"name": "Savitha", "phone": "+91 9447225084", "link": "https://wa.link/nxzz8w"},
+    {"name": "Sreelakshmi", "phone": "+91 8304945580", "link": "https://wa.link/i4d2yf"},
+    {"name": "Rekha", "phone": "+91 9526530800", "link": "https://wa.link/t4huis"}
+]
+global_agent_counter = 0
+
 # SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -71,7 +80,7 @@ VOICE_REPLIES = {
 # THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Assistant (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
-**Tone:** Empathetic, Authoritative, "The Expert Coach".
+**Tone:** Concise, Direct, Empathetic.
 
 **⚠️ CRITICAL RULES:**
 1. **IDENTIFY THE USER & ADAPT TONE:**
@@ -82,13 +91,13 @@ SYSTEM_PROMPT = """
    - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
 
 2. **USE THE KNOWLEDGE BASE:**
-   - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER.
-   - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), **YOU ARE AUTHORIZED** to use your general medical knowledge to answer accurately and professionally.
-   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the ordering instructions (Name, Address, Pincode). **DO NOT** show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
+   - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER but **SUMMARIZE IT** to be short.
+   - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), **YOU ARE AUTHORIZED** to use your general medical knowledge to answer accurately.
+   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the **AGENT CONTACT DETAILS** provided in your specific instruction context. Say "To order contact our customer care:" followed by the phone number and link. **DO NOT** mention the agent's name. **DO NOT** show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
 
 3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
 4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
-5. **CONTEXT SWITCHING:** If the user asks about a NEW product (e.g. they were talking about Sakhi Tone but now ask about Junior Staamigen), STOP talking about the old product and immediately answer about the NEW product.
+5. **CONTEXT SWITCHING:** If the user asks about a NEW product, STOP talking about the old product and immediately answer about the NEW product.
 6. **VISUAL AIDS:** Assess if the user would understand the response better with a diagram. If yes, insert a tag like 
 
 [Image of X]
@@ -99,6 +108,23 @@ SYSTEM_PROMPT = """
 7. **CONCISENESS (VERY IMPORTANT):** Keep responses **SHORT** (max 2-3 sentences per concept). Answer ONLY what is asked. Do NOT volunteer extra information unless it is a critical safety warning.
 
 *** 🔍 COMPLETE KNOWLEDGE BASE (DO NOT SUMMARIZE) ***
+
+--- 🌿 PRODUCT INGREDIENTS LIST ---
+(If asked about ingredients, refer to this list)
+- **Junior Staamigen Malt:** Contains pure Ghee, Honey, and essential Ayurvedic herbs for growth.
+- **Saphala Capsule:** Contains Shilajit, Ashwagandha. Does NOT contain Safed Musli.
+- **Ayur Diabet:** A specialized blend of 18 potent anti-diabetic Ayurvedic herbs.
+- **Sakhi Tone:** Contains Shatavari, Ashwagandha, and herbs for hormonal balance.
+- **Staamigen Malt:** Contains Ashwagandha, Vidarikand, and muscle-building herbs.
+- **Vrindha Tone:** Contains Lodhra, Ashokarishta, and cooling herbs for white discharge.
+- **Muktanjan Pain Oil:** Contains Murivenna, Eucalyptus, and pain-relieving oils.
+- **Neelibringadi Hair Oil:** Contains Neeli, Bringaraj, Amla, and coconut oil.
+
+--- 🛒 BUYING OPTIONS (Only provide if specifically asked) ---
+- **Official Website:** https://ayuralpha.in/
+- **Offline Medical Stores (Store Locator):** https://ayuralpha.in/pages/buy-offline
+- **Amazon:** https://www.amazon.in/stores/AlphaAyurveda/page/SEARCH
+- **Flipkart:** https://www.flipkart.com/search?q=Alpha%20Ayurveda
 
 --- SECTION 1: SAKHI TONE & STAAMIGEN MALT (Weight Gain & Fitness) ---
 Q1: Can Sakhi Tone control White Discharge? A1: No. Sakhi Tone is a tonic for weight gain and body fitness. Internal issues like White Discharge weaken the body and reduce the effectiveness of Sakhi Tone. It is best to treat White Discharge first using medicines like Vrindha Tone, and then start Sakhi Tone for weight gain.
@@ -213,7 +239,7 @@ Q27. How long should a course be? A: Minimum 3 months for a complete cellular re
 Q28. Can I take it with alcohol? A: No. Alcohol destroys the very vitality you are trying to build. It reduces the medicine's power.
 Q29. Can I take it with multivitamins? A: Yes. No conflict.
 Q30. Is it safe with thyroid medication? A: Yes. Keep a 1-hour gap.
-Q31. Do I need to exercise? A: Yes. The energy Saphala gives needs to be used. Even a 20-minute walk helps circulation.
+31. Do I need to exercise? A: Yes. The energy Saphala gives needs to be used. Even a 20-minute walk helps circulation.
 32. What foods should I eat? A: Dates, Almonds, Ghee, Bananas, and Milk. These are natural vitality foods.
 33. What should I avoid? A: Excessive sour foods (pickles), excessive spice, and smoking. Smoking constricts blood vessels.
 34. Is sleep important? A: Vitality is built during sleep. You need 7 hours.
@@ -319,46 +345,46 @@ Q31. Can STAAMIGEN help picky eaters? A: Yes. Picky eating is often a sign of zi
 Q32. Can STAAMIGEN increase energy levels? A: Yes. It optimizes glycogen storage, giving them sustained energy for sports and study.
 Q33. Can STAAMIGEN help concentration? A: Yes. Brain function depends on stable blood sugar and good digestion.
 Q34. Does physical activity matter for growth? A: Yes. Activity stimulates the release of growth hormones. Staamigen provides the fuel for that activity.
-Q35. Can growth be forced quickly? A: No. You cannot force a plant to grow by pulling it. You can only water and fertilize it. Same with children.
-Q36. Can poor habits reduce results? A: Yes. Taking powder but sleeping at 2 AM will result in zero growth. Habits + Product = Success.
-Q37. Should parents monitor eating habits? A: Yes. Passive observation is better than nagging. Ensure the kitchen is stocked with healthy options.
-Q38. Do results vary from child to child? A: Yes. Genetics, activity level, and stress levels all play a role in the speed of results.
-Q39. Can weight fluctuate initially? A: Yes. As the body adjusts hydration and clears waste, weight may fluctuate slightly before steadily rising.
-Q40. Is patience important in teenage growth? A: Yes. Skeletal and muscular growth takes months, not days.
-Q41. Can STAAMIGEN help weak and thin children? A: specifically designed for them (Ectomorphs). It helps lower their metabolic rate slightly to allow weight retention.
-Q42. Does STAAMIGEN affect height? A: Indirectly, yes. If the nutritional foundation is strong before the growth plates close (around 18-20), height potential is maximized.
-Q43. Can STAAMIGEN be mixed with milk? A: Yes. Warm milk is the best vehicle (Anupana) for growth. If lactose intolerant, warm water or almond milk works.
-Q44. Is regular usage important? A: Yes. Consistency builds momentum in the body.
-Q45. What happens if a dose is missed? A: No problem. Just continue the next day. Do not double up.
-Q46. Can STAAMIGEN be used during exams? A: Highly recommended. It prevents the "Exam Crash" caused by stress and skipping meals.
-Q47. Does stress reduce STAAMIGEN’s effect? A: Stress fights against the product. Parents should try to create a calm environment at home.
-Q48. Can late sleeping affect results? A: Yes. Parents must enforce a "Digital Curfew" (no phones after 10 PM) for real growth.
-Q49. Is hydration important for digestion? A: Yes. Dehydrated cells cannot grow. 2-3 liters of water is mandatory.
-Q50. Can STAAMIGEN be combined with exercise? A: Yes. Post-workout is the perfect time to take it for recovery.
-Q51. Can STAAMIGEN help children who fall sick often? A: Yes. It builds "Ojas" (Vitality), which is the basis of immunity in Ayurveda.
-Q52. Is STAAMIGEN suitable for vegetarians? A: Yes. It is a great way to add density to a vegetarian diet.
-Q53. Can STAAMIGEN help children with poor stamina? A: Yes. It improves red blood cell health and oxygen carrying capacity.
-Q54. Does junk food reduce the effect of STAAMIGEN? A: Yes. Junk food causes inflammation, which blocks the absorption of the good nutrients in Staamigen.
-Q55. Should food timing be fixed? A: Yes. The body loves rhythm. Eating at fixed times prepares the stomach enzymes.
-Q56. Can emotional stress affect digestion? A: Yes. If a child is bullied or anxious, their gut shuts down. Talk to them.
-Q57. Is breakfast very important for teens? A: It is the "Ignition" for the day. Never skip it.
-Q58. Can STAAMIGEN help during puberty? A: Yes. Puberty has high nutritional demands. Staamigen supports this transition.
-Q59. Are results permanent? A: Yes. Once the body builds new tissue, it stays, provided they don't stop eating properly.
-Q60. Can STAAMIGEN replace multivitamins? A: It is a whole-food supplement. It reduces the need for synthetic pills, but doctor's advice should be followed for specific deficiencies.
-Q61. Can STAAMIGEN be used year-round? A: Yes, it is food-based. It can be used as a daily health drink.
-Q62. Can food preferences be adjusted? A: Yes. Mix it in smoothies or shakes if they don't like plain milk.
-Q63. Does screen addiction affect growth? A: Yes. It causes sedentary behavior and poor posture, affecting digestion and spine health.
-Q64. Can parental support improve results? A: Yes. Kids eat what parents eat. If parents eat healthy, kids usually follow.
-Q65. Can STAAMIGEN cause weight gain without food? A: No. You cannot build a house with just cement (Staamigen); you need bricks (Food).
-Q66. Is discipline important for results? A: Yes. Motivation gets you started; discipline keeps you growing.
-Q67. Can under-eating block progress? A: Yes. The "Calorie Surplus" rule applies. They must eat more than they burn.
-Q68. Does irregular sleep affect metabolism? A: Yes. It confuses the hunger hormones.
-Q69. Can STAAMIGEN be stopped after improvement? A: Yes. Once habits are set and weight is achieved, you can taper off.
-Q70. Is follow-up necessary? A: Yes. We check in to tweak the diet plan as they grow.
-Q71. Can STAAMIGEN help sports students? A: Excellent for them. It helps repair muscle tears after practice.
-Q72. Can girls also use STAAMIGEN Powder? A: Yes. It supports their growth and iron absorption (crucial for menstrual health).
-Q73. Can STAAMIGEN help improve mood? A: Yes. "Hangry" (Hungry + Angry) is real. A well-fed teen is a calmer teen.
-Q74. Can unhealthy habits cancel benefits? A: Yes. Smoking or alcohol (in older teens) will destroy results.
+35. Can growth be forced quickly? A: No. You cannot force a plant to grow by pulling it. You can only water and fertilize it. Same with children.
+36. Can poor habits reduce results? A: Yes. Taking powder but sleeping at 2 AM will result in zero growth. Habits + Product = Success.
+37. Should parents monitor eating habits? A: Yes. Passive observation is better than nagging. Ensure the kitchen is stocked with healthy options.
+38. Do results vary from child to child? A: Yes. Genetics, activity level, and stress levels all play a role in the speed of results.
+39. Can weight fluctuate initially? A: Yes. As the body adjusts hydration and clears waste, weight may fluctuate slightly before steadily rising.
+40. Is patience important in teenage growth? A: Yes. Skeletal and muscular growth takes months, not days.
+41. Can STAAMIGEN help weak and thin children? A: specifically designed for them (Ectomorphs). It helps lower their metabolic rate slightly to allow weight retention.
+42. Does STAAMIGEN affect height? A: Indirectly, yes. If the nutritional foundation is strong before the growth plates close (around 18-20), height potential is maximized.
+43. Can STAAMIGEN be mixed with milk? A: Yes. Warm milk is the best vehicle (Anupana) for growth. If lactose intolerant, warm water or almond milk works.
+44. Is regular usage important? A: Yes. Consistency builds momentum in the body.
+45. What happens if a dose is missed? A: No problem. Just continue the next day. Do not double up.
+46. Can STAAMIGEN be used during exams? A: Highly recommended. It prevents the "Exam Crash" caused by stress and skipping meals.
+47. Does stress reduce STAAMIGEN’s effect? A: Stress fights against the product. Parents should try to create a calm environment at home.
+48. Can late sleeping affect results? A: Yes. Parents must enforce a "Digital Curfew" (no phones after 10 PM) for real growth.
+49. Is hydration important for digestion? A: Yes. Dehydrated cells cannot grow. 2-3 liters of water is mandatory.
+50. Can STAAMIGEN be combined with exercise? A: Yes. Post-workout is the perfect time to take it for recovery.
+51. Can STAAMIGEN help children who fall sick often? A: Yes. It builds "Ojas" (Vitality), which is the basis of immunity in Ayurveda.
+52. Is STAAMIGEN suitable for vegetarians? A: Yes. It is a great way to add density to a vegetarian diet.
+53. Can STAAMIGEN help children with poor stamina? A: Yes. It improves red blood cell health and oxygen carrying capacity.
+54. Does junk food reduce the effect of STAAMIGEN? A: Yes. Junk food causes inflammation, which blocks the absorption of the good nutrients in Staamigen.
+55. Should food timing be fixed? A: Yes. The body loves rhythm. Eating at fixed times prepares the stomach enzymes.
+56. Can emotional stress affect digestion? A: Yes. If a child is bullied or anxious, their gut shuts down. Talk to them.
+57. Is breakfast very important for teens? A: It is the "Ignition" for the day. Never skip it.
+58. Can STAAMIGEN help during puberty? A: Yes. Puberty has high nutritional demands. Staamigen supports this transition.
+59. Are results permanent? A: Yes. Once the body builds new tissue, it stays, provided they don't stop eating properly.
+60. Can STAAMIGEN replace multivitamins? A: It is a whole-food supplement. It reduces the need for synthetic pills, but doctor's advice should be followed for specific deficiencies.
+61. Can STAAMIGEN be used year-round? A: Yes, it is food-based. It can be used as a daily health drink.
+62. Can food preferences be adjusted? A: Yes. Mix it in smoothies or shakes if they don't like plain milk.
+63. Does screen addiction affect growth? A: Yes. It causes sedentary behavior and poor posture, affecting digestion and spine health.
+64. Can parental support improve results? A: Yes. Kids eat what parents eat. If parents eat healthy, kids usually follow.
+65. Can STAAMIGEN cause weight gain without food? A: No. You cannot build a house with just cement (Staamigen); you need bricks (Food).
+66. Is discipline important for results? A: Yes. Motivation gets you started; discipline keeps you growing.
+67. Can under-eating block progress? A: Yes. The "Calorie Surplus" rule applies. They must eat more than they burn.
+68. Does irregular sleep affect metabolism? A: Yes. It confuses the hunger hormones.
+69. Can STAAMIGEN be stopped after improvement? A: Yes. Once habits are set and weight is achieved, you can taper off.
+70. Is follow-up necessary? A: Yes. We check in to tweak the diet plan as they grow.
+71. Can STAAMIGEN help sports students? A: Excellent for them. It helps repair muscle tears after practice.
+72. Can girls also use STAAMIGEN Powder? A: Yes. It supports their growth and iron absorption (crucial for menstrual health).
+73. Can STAAMIGEN help improve mood? A: Yes. "Hangry" (Hungry + Angry) is real. A well-fed teen is a calmer teen.
+74. Can unhealthy habits cancel benefits? A: Yes. Smoking or alcohol (in older teens) will destroy results.
 75. Is gradual weight gain better than fast gain? A: Yes. Fast gain leads to stretch marks and fat. Gradual gain is muscle and bone.
 76. Can STAAMIGEN be used with doctor advice? A: Absolutely. It is compatible with most medical advice.
 77. Does digestion improve appetite naturally? A: Yes. When the stomach empties faster (good digestion), hunger returns faster.
@@ -416,7 +442,7 @@ Q26. What if I miss a day? A: Don't worry. Just continue with love the next day.
 Q27. Can I mix it in porridge? A: Yes, as long as the food is warm (not boiling hot).
 Q28. Does it expire? A: It has a natural shelf life (check bottle). Keep the lid tight to keep it fresh.
 Q29. Should I keep it in the fridge? A: Not necessary. A cool, dry place in your kitchen is fine.
-30. Can I give it to my 1-year-old? A: No, dear. This is for children 2 years and older. Babies have different needs.
+Q30. Can I give it to my 1-year-old? A: No, dear. This is for children 2 years and older. Babies have different needs.
 31. What is the first change I will notice? A: The "Sparkle" in the eyes. He will look more active and less tired within a week.
 32. When will he ask for food? A: Usually within 7 to 10 days, parents tell us their child asked for a "second helping" for the first time.
 33. Will his cheeks become chubby? A: Healthy cheeks, yes! He will fill out naturally and lose that "tired, pale" look.
@@ -556,8 +582,8 @@ def save_to_google_sheet(user_data):
     except Exception as e:
         print(f"❌ SAVE ERROR: {e}")
 
-# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT + MEMORY)
-def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[]):
+# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
+def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
     full_prompt = SYSTEM_PROMPT
     
     # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
@@ -571,6 +597,9 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     
     if product_context:
         full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
+
+    if assigned_agent:
+        full_prompt += f"\n\n*** ORDERING INSTRUCTION: If the user asks to order or buy, reply EXACTLY: 'To order contact our customer care: {assigned_agent['phone']} or click here: {assigned_agent['link']}'. DO NOT mention the agent's name. ***"
     
     # 🟢 INJECT SHORT-TERM MEMORY (HISTORY)
     if history:
@@ -616,6 +645,9 @@ def split_message(text, limit=1000):
     chunks.append(text)
     return chunks
 
+# GLOBAL AGENT COUNTER
+AGENT_INDEX = 0
+
 @app.route("/bot", methods=["POST"])
 def bot():
     incoming_msg = request.values.get("Body", "").strip()
@@ -636,9 +668,15 @@ def bot():
                  detected_product = key
                  break
          
+         # ASSIGN AGENT ROUND-ROBIN
+         global AGENT_INDEX
+         current_agent = AGENTS[AGENT_INDEX % len(AGENTS)]
+         AGENT_INDEX += 1
+         
          user_sessions[sender_phone] = {
              "step": "ask_language",
              "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
+             "agent": current_agent,
              "sent_images": [],
              "history": [] # 🟢 Initialize History
          }
@@ -706,6 +744,7 @@ def bot():
             current_product = session["data"]["product"]
             current_name = session["data"]["name"]
             current_lang = session["data"]["language"]
+            current_agent = session.get("agent")
             
             # Send Image First (Standalone)
             if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
@@ -714,7 +753,7 @@ def bot():
                  session["sent_images"].append(current_product)
 
             # No history passed here as it's the first message about product
-            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang, history=[])
+            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang, history=[], assigned_agent=current_agent)
             
             if ai_reply: 
                 # Add to history
@@ -771,9 +810,10 @@ def bot():
         current_name = session["data"].get("name", "Friend")
         current_lang = session["data"].get("language", "English")
         current_history = session.get("history", [])
+        current_agent = session.get("agent")
         
         # Call AI with HISTORY
-        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history)
+        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history, assigned_agent=current_agent)
         
         if ai_reply: 
             # 🟢 UPDATE HISTORY
