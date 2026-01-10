@@ -369,8 +369,8 @@ Q93. Can STAAMIGEN improve absorption of daily food? A: Yes. That is its primary
 Q94. Can parents track progress easily? A: Yes. Height chart and weighing scale once a month.
 Q95. Can STAAMIGEN be part of a routine? A: Yes. Making it a ritual (e.g., "Evening Power Drink") helps consistency.
 Q96. Is balance more important than quantity? A: Yes. Quality of calories > Quantity of calories.
-Q97. Can STAAMIGEN prevent weakness? A: Yes. It builds muscular endurance.
-Q98. Is STAAMIGEN a lifelong product? A: It is a tool to reach a goal. Once health is established, food is enough.
+97. Can STAAMIGEN prevent weakness? A: Yes. It builds muscular endurance.
+98. Is STAAMIGEN a lifelong product? A: It is a tool to reach a goal. Once health is established, food is enough.
 99. What is the most important advice for parents? A: Be their role model. Eat healthy yourself. Create a happy dining table atmosphere.
 100. What is the first step before using STAAMIGEN? A: Assessment. Understand why the child is not growing (Stress? Food? Digestion?).
 
@@ -528,7 +528,7 @@ def save_to_google_sheet(user_data):
     except Exception as e:
         print(f"❌ SAVE ERROR: {e}")
 
-# 🟢 AI FUNCTION (USES DETECTED MODEL + 25s TIMEOUT)
+# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English"):
     full_prompt = SYSTEM_PROMPT
     
@@ -547,30 +547,28 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     full_prompt += "\n\nUser Query: " + user_msg
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
-    # 🔴 INCREASED MAX TOKENS TO 8000 TO PREVENT CUTOFF
+    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
     payload = {
         "contents": [{"parts": [{"text": full_prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 8000
+            "maxOutputTokens": 4000
         }
     }
     
-    for attempt in range(2): 
-        try:
-            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
-            response = requests.post(url, json=payload, timeout=25) 
-            
-            if response.status_code == 200:
-                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return text
-            else:
-                print(f"❌ API ERROR: {response.status_code} - {response.text}")
-                time.sleep(2)
-        except Exception as e:
-            print(f"❌ TIMEOUT/ERROR: {e}")
-            time.sleep(2)
-
-    return "Our servers are busy right now. Please try again later."
+    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
+    try:
+        print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
+        response = requests.post(url, json=payload, timeout=12) 
+        
+        if response.status_code == 200:
+            text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return text
+        else:
+            print(f"❌ API ERROR: {response.status_code} - {response.text}")
+            return "Our servers are busy right now. Please try again later."
+    except Exception as e:
+        print(f"❌ TIMEOUT/ERROR: {e}")
+        return "Our servers are currently overwhelmed. Please try again in a moment."
 
 # ✂️ SPLITTER FUNCTION (UPDATED TO 1000 CHARS FOR SAFETY)
 def split_message(text, limit=1000):
