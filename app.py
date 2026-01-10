@@ -18,7 +18,7 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
-# SMART IMAGE LIBRARY & KEYWORDS
+# SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
     "kids": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -68,7 +68,7 @@ VOICE_REPLIES = {
     "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
-# THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
+# SYSTEM PROMPT
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Assistant (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
@@ -80,9 +80,11 @@ SYSTEM_PROMPT = """
    - **Men (Saphala Capsule):** "Performance Partner" (Dignified, Internal Battery, Vitality, Stress Relief).
    - **Women (Sakhi Tone):** "Wellness Partner" (Metabolic Correction, Understanding, Healthy Weight).
    - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
-2. **USE THE KNOWLEDGE BASE:** If the user asks a question that appears in the "COMPLETE KNOWLEDGE BASE" section below, you MUST provide the answer from there. Do not summarize too much.
-   - **EXCEPTION:** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), you ARE AUTHORIZED to use your general knowledge to answer accurately.
-   - **RESTRICTION:** If the user asks "How to order?", ONLY provide the ordering instructions. DO NOT show the store list unless specifically asked for "stores" or "shops".
+
+2. **USE THE KNOWLEDGE BASE:** - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER. 
+   - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a general Ayurvedic question (e.g., "What is Shatavari?", "Benefits of Ashwagandha") that is NOT in the specific Q&A, you **ARE AUTHORIZED** to use your general medical knowledge to answer accurately and professionally.
+   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the ordering instructions (Name, Address, Pincode). DO NOT show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
+
 3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
 4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
 5. **CONTEXT SWITCHING:** If the user asks about a NEW product (e.g. they were talking about Sakhi Tone but now ask about Junior Staamigen), STOP talking about the old product and immediately answer about the NEW product.
@@ -204,65 +206,65 @@ Q28. Can I take it with alcohol? A: No. Alcohol destroys the very vitality you a
 Q29. Can I take it with multivitamins? A: Yes. No conflict.
 Q30. Is it safe with thyroid medication? A: Yes. Keep a 1-hour gap.
 Q31. Do I need to exercise? A: Yes. The energy Saphala gives needs to be used. Even a 20-minute walk helps circulation.
-Q32. What foods should I eat? A: Dates, Almonds, Ghee, Bananas, and Milk. These are natural vitality foods.
-Q33. What should I avoid? A: Excessive sour foods (pickles), excessive spice, and smoking. Smoking constricts blood vessels.
-Q34. Is sleep important? A: Vitality is built during sleep. You need 7 hours.
-Q35. Can I smoke while taking this? A: Smoking blocks blood flow. For best results, try to reduce or stop.
-Q36. Does stress kill stamina? A: Yes. Stress is the #1 killer of male vitality. Saphala helps, but try to relax too.
-Q37. Can I take cold showers? A: No specific rule, but a healthy routine helps.
-Q38. Is fasting good? A: Moderate eating is better than fasting when trying to build strength.
-Q39. Can I drink coffee? A: Limit to max 2 cups. Too much caffeine increases anxiety.
-Q40. Does weight affect vitality? A: Yes. If you are overweight, Saphala will help energy, but try to lose weight for better performance.
-Q41. "I am embarrassed to buy this." A: Sir, taking care of your health is a sign of intelligence, not weakness. We ship discreetly.
-Q42. "Will my wife know?" A: The packaging is for "Wellness." It looks like a health supplement.
-Q43. "I tried other products and they failed." A: Others likely tried to force your body. We are feeding your body. Give this a fair chance.
-Q44. "I get headaches with other pills." A: That happens with chemical vasodilators. Saphala is herbal and typically does not cause headaches.
-Q45. "Will I become dependent on it?" A: No. Once your body is strong, you can stop and maintain it with diet.
-Q46. "Is it only for bedroom performance?" A: No. It helps you in the boardroom, the gym, and the bedroom. It is holistic energy.
-Q47. "Can I take it if I have heart issues?" A: Consult your cardiologist. Usually safe, but heart patients should be careful with any supplement.
-Q48. "Does it increase sperm count?" A: The ingredients support "Shukra Dhatu," which is responsible for quantity and quality.
-Q49. "I have nightfall issues. Will it help?" A: Yes. It strengthens the nerves to give better control.
-Q50. "Can I take it with Ashwagandha powder?" A: Saphala likely already contains potent herbs. No need to duplicate.
-Q51. What makes it "Ayurvedic"? A: It follows the principles of Rasayana (Rejuvenation) and Vajikarana (Virility) from ancient texts.
-Q52. Is it gluten-free? A: Yes.
-Q53. Can I take it if I have ulcers? A: Take strictly after food.
-Q54. Does it act as a mood booster? A: Yes. Dopamine levels often stabilize with good herbal support.
-Q55. "I feel lazy." A: This will kickstart your metabolism.
-Q56. Can I recommend it to my father? A: Yes, for general weakness in old age.
-Q57. Does it help hair growth? A: Indirectly, yes. Stress reduction helps hair.
-Q58. Can I travel with it? A: Yes.
-Q59. "My job involves heavy lifting." A: Saphala prevents physical burnout and muscle soreness.
-Q60. "I work night shifts." A: You need this more than anyone. It protects your body from the damage of irregular sleep.
-Q61. Does it cause acne? A: Rare. If body heat rises too much, reduce dose or drink more water.
-Q62. Is it safe for liver? A: Yes.
-Q63. Can I use it for weight gain? A: It builds muscle mass, not fat.
-Q64. Does it contain gold/bhasma? A: (Check label). If yes, mention it as a premium strength enhancer.
-Q65. How does it compare to a multivitamin? A: Vitamins are micronutrients. Saphala is a "Bio-Energizer." It does more than just fill gaps.
-Q66. Can I drink water immediately after? A: Yes.
-Q67. Does it help joint pain? A: Strengthening muscles often reduces the load on joints.
-Q68. "I am 25. Is it too early?" A: No. If you have a high-stress job, protect your vitality now.
-Q69. Is it made in a GMP factory? A: Yes, quality assured.
-Q70. Can I return it? A: No. But urge them to try.
-Q71. Does it help focus? A: Yes, mental endurance improves.
-Q72. "I feel weak after viral fever." A: Excellent for post-viral recovery.
-Q73. Can I take it with protein powder? A: Yes.
-Q74. Does it smell bad? A: Herbal smell is natural.
-Q75. Can I take it with blood thinners? A: Consult doctor.
-Q76. Does it improve blood flow? A: Yes, herbal ingredients improve circulation.
-Q77. "I have prostate issues." A: Consult doctor.
-Q78. Is it expensive? A: Cheaper than the cost of losing your confidence and health.
-Q79. Can I gift it? A: Yes, to close friends or family.
-Q80. Does it help morning wood? A: Yes, that is a sign of returning vitality.
-Q81. "I have no desire." A: Saphala helps rekindle the drive naturally.
-Q82. Can I take it before gym? A: Yes, 30 mins before.
-Q83. Does it help memory? A: A calm, strong mind remembers better.
-Q84. "My legs shake when I walk." A: This indicates severe weakness. Saphala will help strengthen the limbs.
-Q85. Is the capsule vegetarian shell? A: Usually yes.
-Q86. Can I empty it into juice? A: Not recommended.
-Q87. Does it cause gas? A: No.
-Q88. Can I take it with homeopathic drops? A: Yes.
-Q89. How to store? A: Cool, dry place.
-Q90. "I feel angry often." A: Weakness causes irritability. Strength brings calmness.
+32. What foods should I eat? A: Dates, Almonds, Ghee, Bananas, and Milk. These are natural vitality foods.
+33. What should I avoid? A: Excessive sour foods (pickles), excessive spice, and smoking. Smoking constricts blood vessels.
+34. Is sleep important? A: Vitality is built during sleep. You need 7 hours.
+35. Can I smoke while taking this? A: Smoking blocks blood flow. For best results, try to reduce or stop.
+36. Does stress kill stamina? A: Yes. Stress is the #1 killer of male vitality. Saphala helps, but try to relax too.
+37. Can I take cold showers? A: No specific rule, but a healthy routine helps.
+38. Is fasting good? A: Moderate eating is better than fasting when trying to build strength.
+39. Can I drink coffee? A: Limit to max 2 cups. Too much caffeine increases anxiety.
+40. Does weight affect vitality? A: Yes. If you are overweight, Saphala will help energy, but try to lose weight for better performance.
+41. "I am embarrassed to buy this." A: Sir, taking care of your health is a sign of intelligence, not weakness. We ship discreetly.
+42. "Will my wife know?" A: The packaging is for "Wellness." It looks like a health supplement.
+43. "I tried other products and they failed." A: Others likely tried to force your body. We are feeding your body. Give this a fair chance.
+44. "I get headaches with other pills." A: That happens with chemical vasodilators. Saphala is herbal and typically does not cause headaches.
+45. "Will I become dependent on it?" A: No. Once your body is strong, you can stop and maintain it with diet.
+46. "Is it only for bedroom performance?" A: No. It helps you in the boardroom, the gym, and the bedroom. It is holistic energy.
+47. "Can I take it if I have heart issues?" A: Consult your cardiologist. Usually safe, but heart patients should be careful with any supplement.
+48. "Does it increase sperm count?" A: The ingredients support "Shukra Dhatu," which is responsible for quantity and quality.
+49. "I have nightfall issues. Will it help?" A: Yes. It strengthens the nerves to give better control.
+50. "Can I take it with Ashwagandha powder?" A: Saphala likely already contains potent herbs. No need to duplicate.
+51. What makes it "Ayurvedic"? A: It follows the principles of Rasayana (Rejuvenation) and Vajikarana (Virility) from ancient texts.
+52. Is it gluten-free? A: Yes.
+53. Can I take it if I have ulcers? A: Take strictly after food.
+54. Does it act as a mood booster? A: Yes. Dopamine levels often stabilize with good herbal support.
+55. "I feel lazy." A: This will kickstart your metabolism.
+56. Can I recommend it to my father? A: Yes, for general weakness in old age.
+57. Does it help hair growth? A: Indirectly, yes. Stress reduction helps hair.
+58. Can I travel with it? A: Yes.
+59. "My job involves heavy lifting." A: Saphala prevents physical burnout and muscle soreness.
+60. "I work night shifts." A: You need this more than anyone. It protects your body from the damage of irregular sleep.
+61. Does it cause acne? A: Rare. If body heat rises too much, reduce dose or drink more water.
+62. Is it safe for liver? A: Yes.
+63. Can I use it for weight gain? A: It builds muscle mass, not fat.
+64. Does it contain gold/bhasma? A: (Check label). If yes, mention it as a premium strength enhancer.
+65. How does it compare to a multivitamin? A: Vitamins are micronutrients. Saphala is a "Bio-Energizer." It does more than just fill gaps.
+66. Can I drink water immediately after? A: Yes.
+67. Does it help joint pain? A: Strengthening muscles often reduces the load on joints.
+68. "I am 25. Is it too early?" A: No. If you have a high-stress job, protect your vitality now.
+69. Is it made in a GMP factory? A: Yes, quality assured.
+70. Can I return it? A: No. But urge them to try.
+71. Does it help focus? A: Yes, mental endurance improves.
+72. "I feel weak after viral fever." A: Excellent for post-viral recovery.
+73. Can I take it with protein powder? A: Yes.
+74. Does it smell bad? A: Herbal smell is natural.
+75. Can I take it with blood thinners? A: Consult doctor.
+76. Does it improve blood flow? A: Yes, herbal ingredients improve circulation.
+77. "I have prostate issues." A: Consult doctor.
+78. Is it expensive? A: Cheaper than the cost of losing your confidence and health.
+79. Can I gift it? A: Yes, to close friends or family.
+80. Does it help morning wood? A: Yes, that is a sign of returning vitality.
+81. "I have no desire." A: Saphala helps rekindle the drive naturally.
+82. Can I take it before gym? A: Yes, 30 mins before.
+83. Does it help memory? A: A calm, strong mind remembers better.
+84. "My legs shake when I walk." A: This indicates severe weakness. Saphala will help strengthen the limbs.
+85. Is the capsule vegetarian shell? A: Usually yes.
+86. Can I empty it into juice? A: Not recommended.
+87. Does it cause gas? A: No.
+88. Can I take it with homeopathic drops? A: Yes.
+89. How to store? A: Cool, dry place.
+90. "I feel angry often." A: Weakness causes irritability. Strength brings calmness.
 91. Can I use it for exam stress? A: Yes, for mental stamina.
 92. Does it help with premature graying? A: Nourishing herbs can slow down aging signs.
 93. "I am a driver, can I take it?" A: Yes, it helps alertness.
@@ -364,11 +366,11 @@ Q86. Can STAAMIGEN help weak bones? A: Yes. It supports the absorption of calciu
 Q87. Can parents see early signs of improvement? A: Look for: Waking up easier, better mood, and finishing school lunch.
 Q88. Can STAAMIGEN be taken with school routine? A: Yes. Morning with breakfast or evening after school.
 Q89. Can lifestyle correction alone help? A: Yes, but in today's nutrient-depleted world, supplements act as an insurance policy.
-Q90. Is STAAMIGEN habit-forming? A: No. It does not contain addictive substances.
-Q91. Can STAAMIGEN be stopped suddenly? A: Yes, no side effects. But maintain the food intake.
-Q92. Can STAAMIGEN help children who skip meals? A: It helps minimize the damage, but the goal is to stop skipping meals.
-Q93. Can STAAMIGEN improve absorption of daily food? A: Yes. That is its primary mechanism of action.
-Q94. Can parents track progress easily? A: Yes. Height chart and weighing scale once a month.
+90. Is STAAMIGEN habit-forming? A: No. It does not contain addictive substances.
+91. Can STAAMIGEN be stopped suddenly? A: Yes, no side effects. But maintain the food intake.
+92. Can STAAMIGEN help children who skip meals? A: It helps minimize the damage, but the goal is to stop skipping meals.
+93. Can STAAMIGEN improve absorption of daily food? A: Yes. That is its primary mechanism of action.
+94. Can parents track progress easily? A: Yes. Height chart and weighing scale once a month.
 95. Can STAAMIGEN be part of a routine? A: Yes. Making it a ritual (e.g., "Evening Power Drink") helps consistency.
 96. Is balance more important than quantity? A: Yes. Quality of calories > Quantity of calories.
 97. Can STAAMIGEN prevent weakness? A: Yes. It builds muscular endurance.
@@ -447,12 +449,12 @@ Q67. Can I buy it in shops? A: We send it directly to ensure you get fresh, orig
 Q68. How fast is delivery? A: We send it with care, it will reach you soon.
 Q69. Can I talk to you again? A: Please do! We love to hear about his progress. Send us a photo when he starts looking chubby!
 Q70. Are there preservatives? A: We use natural preservation methods (like Ghee/Honey base). It is safe.
-Q71. Can I recommend this to my sister? A: Please do. Helping another mother is a wonderful thing.
-Q72. Do I need a prescription? A: No, it is a nutritional supplement, not a pharmaceutical drug.
-Q73. Does it help teeth? A: Strong bones mean strong teeth. Nutrition helps everything.
-Q74. What if he refuses to take it? A: Put it on a biscuit or bread. Be creative! It tastes like jam.
-Q75. Can I give it before school? A: Yes, it gives him a "Power Start" for the day.
-Q76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
+71. Can I recommend this to my sister? A: Please do. Helping another mother is a wonderful thing.
+72. Do I need a prescription? A: No, it is a nutritional supplement, not a pharmaceutical drug.
+73. Does it help teeth? A: Strong bones mean strong teeth. Nutrition helps everything.
+74. What if he refuses to take it? A: Put it on a biscuit or bread. Be creative! It tastes like jam.
+75. Can I give it before school? A: Yes, it gives him a "Power Start" for the day.
+76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
 77. Does it help speech? A: It supports general development. A healthy body supports a healthy brain.
 78. Can I give it in summer? A: Yes, all seasons are fine.
 79. Can I give it in winter? A: Yes, it helps keep immunity strong during cold season.
@@ -513,271 +515,274 @@ Q76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
 
 # 🛠️ AUTO-DETECT MODEL AT STARTUP
 def get_working_model_name():
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            for model in data.get('models', []):
-                m_name = model['name'].replace("models/", "")
-                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
-                    print(f"✅ FOUND MODEL: {m_name}")
-                    return m_name
-            for model in data.get('models', []):
-                if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
-                    return model['name'].replace("models/", "")
-    except Exception as e:
-        print(f"⚠️ MODEL INIT ERROR: {e}")
-    return "gemini-1.5-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            for model in data.get('models', []):
+                m_name = model['name'].replace("models/", "")
+                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
+                    print(f"✅ FOUND MODEL: {m_name}")
+                    return m_name
+            for model in data.get('models', []):
+                if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
+                    return model['name'].replace("models/", "")
+    except Exception as e:
+        print(f"⚠️ MODEL INIT ERROR: {e}")
+    return "gemini-1.5-flash"
 
 # GLOBAL VARIABLE TO STORE MODEL NAME
 ACTIVE_MODEL_NAME = get_working_model_name()
 
 def save_to_google_sheet(user_data):
-    try:
-        phone_clean = user_data.get('phone', '').replace("+", "")
-        form_data = {
-            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-            FORM_FIELDS["phone"]: phone_clean, 
-            FORM_FIELDS["product"]: user_data.get("product", "Pending")
-        }
-        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
-        print(f"✅ DATA SAVED for {user_data.get('name')}")
-    except Exception as e:
-        print(f"❌ SAVE ERROR: {e}")
+    try:
+        phone_clean = user_data.get('phone', '').replace("+", "")
+        form_data = {
+            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+            FORM_FIELDS["phone"]: phone_clean, 
+            FORM_FIELDS["product"]: user_data.get("product", "Pending")
+        }
+        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
+        print(f"✅ DATA SAVED for {user_data.get('name')}")
+    except Exception as e:
+        print(f"❌ SAVE ERROR: {e}")
 
 # 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[]):
-    full_prompt = SYSTEM_PROMPT
-    
-    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
-    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
-    full_prompt += f"\nThe user has selected: **{language}**."
-    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
-    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
+    full_prompt = SYSTEM_PROMPT
+    
+    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
+    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
+    full_prompt += f"\nThe user has selected: **{language}**."
+    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
+    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
 
-    # 4. NATURAL NAME USAGE RULE
-    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
-    
-    if product_context:
-        full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
-    
-    # 🟢 INJECT SHORT-TERM MEMORY (HISTORY)
-    if history:
-        history_text = "\n".join([f"{msg['role']}: {msg['text']}" for msg in history])
-        full_prompt += f"\n\n*** CHAT HISTORY (Last 3 messages) ***\n{history_text}"
+    # 4. NATURAL NAME USAGE RULE
+    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
+    
+    if product_context:
+        full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
+    
+    # 🟢 INJECT SHORT-TERM MEMORY (HISTORY)
+    if history:
+        history_text = "\n".join([f"{msg['role']}: {msg['text']}" for msg in history])
+        full_prompt += f"\n\n*** CHAT HISTORY (Last 3 messages) ***\n{history_text}"
 
-    full_prompt += "\n\nUser Query: " + user_msg
-    
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
-    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
-    payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": 4000
-        }
-    }
-    
-    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
-    try:
-        print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
-        response = requests.post(url, json=payload, timeout=12) 
-        
-        if response.status_code == 200:
-            text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-            return text
-        else:
-            print(f"❌ API ERROR: {response.status_code} - {response.text}")
-            return "Our servers are busy right now. Please try again later."
-    except Exception as e:
-        print(f"❌ TIMEOUT/ERROR: {e}")
-        return "Our servers are currently overwhelmed. Please try again in a moment."
+    full_prompt += "\n\nUser Query: " + user_msg
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
+    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
+    payload = {
+        "contents": [{"parts": [{"text": full_prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": 4000
+        }
+    }
+    
+    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
+    for attempt in range(1): 
+        try:
+            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
+            response = requests.post(url, json=payload, timeout=12) 
+            
+            if response.status_code == 200:
+                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return text
+            else:
+                print(f"❌ API ERROR: {response.status_code} - {response.text}")
+                return "Our servers are busy right now. Please try again later."
+        except Exception as e:
+            print(f"❌ TIMEOUT/ERROR: {e}")
+            return "Our servers are currently overwhelmed. Please try again in a moment."
 
 # ✂️ SPLITTER FUNCTION (UPDATED TO 1000 CHARS FOR SAFETY)
 def split_message(text, limit=1000):
-    chunks = []
-    while len(text) > limit:
-        split_at = text.rfind(' ', 0, limit)
-        if split_at == -1:
-            split_at = limit
-        chunks.append(text[:split_at])
-        text = text[split_at:].strip()
-    chunks.append(text)
-    return chunks
+    chunks = []
+    while len(text) > limit:
+        split_at = text.rfind(' ', 0, limit)
+        if split_at == -1:
+            split_at = limit
+        chunks.append(text[:split_at])
+        text = text[split_at:].strip()
+    chunks.append(text)
+    return chunks
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    incoming_msg = request.values.get("Body", "").strip()
-    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
-    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
-    
-    resp = MessagingResponse()
-    
-    # --- SESSION START ---
-    if sender_phone not in user_sessions:
-         # NEW USER -> ASK LANGUAGE FIRST
-         
-         # 🟢 AD-SMART DETECTION
-         detected_product = "Pending"
-         incoming_lower = incoming_msg.lower()
-         for key in PRODUCT_IMAGES.keys():
-             if key in incoming_lower:
-                 detected_product = key
-                 break
-         
-         user_sessions[sender_phone] = {
-             "step": "ask_language",
-             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
-             "sent_images": [],
-             "history": [] # 🟢 Initialize History
-         }
-         msg = resp.message()
-         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
-         return Response(str(resp), mimetype="application/xml")
+    incoming_msg = request.values.get("Body", "").strip()
+    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
+    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
+    
+    resp = MessagingResponse()
+    
+    # --- SESSION START ---
+    if sender_phone not in user_sessions:
+         # NEW USER -> ASK LANGUAGE FIRST
+         
+         # 🟢 AD-SMART DETECTION
+         detected_product = "Pending"
+         incoming_lower = incoming_msg.lower()
+         for key in PRODUCT_IMAGES.keys():
+             if key in incoming_lower:
+                 detected_product = key
+                 break
+         
+         user_sessions[sender_phone] = {
+             "step": "ask_language",
+             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
+             "sent_images": [],
+             "history": [] # 🟢 Initialize History
+         }
+         msg = resp.message()
+         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
+         return Response(str(resp), mimetype="application/xml")
 
-    session = user_sessions[sender_phone]
-    step = session["step"]
-    
-    if "sent_images" not in session: session["sent_images"] = []
-    if "history" not in session: session["history"] = [] # Safety check
+    session = user_sessions[sender_phone]
+    step = session["step"]
+    
+    if "sent_images" not in session: session["sent_images"] = []
+    if "history" not in session: session["history"] = [] # Safety check
 
-    # 🧹 CLEAN SLATE / RESET COMMAND
-    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
-        if sender_phone in user_sessions:
-            del user_sessions[sender_phone]
-        msg = resp.message()
-        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
-        return Response(str(resp), mimetype="application/xml")
+    # 🧹 CLEAN SLATE / RESET COMMAND
+    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
+        if sender_phone in user_sessions:
+            del user_sessions[sender_phone]
+        msg = resp.message()
+        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
+        return Response(str(resp), mimetype="application/xml")
 
-    # 🛑 1. VOICE MESSAGE CHECK
-    if num_media > 0:
-        current_lang = session["data"].get("language", "English")
-        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
-        msg = resp.message()
-        msg.body(warning_msg)
-        return Response(str(resp), mimetype="application/xml")
+    # 🛑 1. VOICE MESSAGE CHECK
+    if num_media > 0:
+        current_lang = session["data"].get("language", "English")
+        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
+        msg = resp.message()
+        msg.body(warning_msg)
+        return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
-    if step == "ask_language":
-        selection = incoming_msg.strip()
-        selected_lang = LANGUAGES.get(selection, "English") 
-        for key, val in LANGUAGES.items():
-            if val.lower() in selection.lower():
-                selected_lang = val
-                break
-        
-        session["data"]["language"] = selected_lang
-        session["step"] = "ask_name"
-        
-        msg = resp.message()
-        # Reply based on selection
-        if selected_lang == "Malayalam":
-            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
-        elif selected_lang == "Tamil":
-            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
-        elif selected_lang == "Hindi":
-            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
-        elif selected_lang == "Bengali":
-            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
-        else:
-            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
-            
-        return Response(str(resp), mimetype="application/xml")
+    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
+    if step == "ask_language":
+        selection = incoming_msg.strip()
+        selected_lang = LANGUAGES.get(selection, "English") 
+        for key, val in LANGUAGES.items():
+            if val.lower() in selection.lower():
+                selected_lang = val
+                break
+        
+        session["data"]["language"] = selected_lang
+        session["step"] = "ask_name"
+        
+        msg = resp.message()
+        # Reply based on selection
+        if selected_lang == "Malayalam":
+            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
+        elif selected_lang == "Tamil":
+            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
+        elif selected_lang == "Hindi":
+            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
+        elif selected_lang == "Bengali":
+            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
+        else:
+            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
+            
+        return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 2: ASK NAME ---
-    elif step == "ask_name":
-        session["data"]["name"] = incoming_msg
-        save_to_google_sheet(session["data"]) # Save Immediately
-        session["step"] = "chat_active"
-        
-        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
-        if session["data"].get("product") != "Pending":
-            current_product = session["data"]["product"]
-            current_name = session["data"]["name"]
-            current_lang = session["data"]["language"]
-            
-            # Send Image First (Standalone)
-            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
-                 msg_media = resp.message()
-                 msg_media.media(PRODUCT_IMAGES[current_product])
-                 session["sent_images"].append(current_product)
+    # --- STEP 2: ASK NAME ---
+    elif step == "ask_name":
+        session["data"]["name"] = incoming_msg
+        save_to_google_sheet(session["data"]) # Save Immediately
+        session["step"] = "chat_active"
+        
+        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
+        if session["data"].get("product") != "Pending":
+            current_product = session["data"]["product"]
+            current_name = session["data"]["name"]
+            current_lang = session["data"]["language"]
+            
+            # Send Image First (Standalone)
+            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
+                 msg_media = resp.message()
+                 msg_media.media(PRODUCT_IMAGES[current_product])
+                 session["sent_images"].append(current_product)
 
-            # No history passed here as it's the first message about product
-            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang, history=[])
-            
-            if ai_reply: 
-                # Add to history
-                session["history"].append({"role": "user", "text": f"Tell me about {current_product}"})
-                session["history"].append({"role": "model", "text": ai_reply})
-                
-                ai_reply = ai_reply.replace("**", "*")
-                chunks = split_message(ai_reply, limit=1000)
-                
-                for chunk in chunks:
-                    resp.message(chunk)
-            
-        else:
-            # Regular Flow
-            user_lang = session["data"]["language"]
-            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
-            if user_lang == "Malayalam":
-                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
-            elif user_lang == "Tamil":
-                 welcome_text = f"நன்றி {incoming_msg}! இன்று ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
-            elif user_lang == "Bengali":
-                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
-            
-            msg = resp.message()
-            msg.body(welcome_text)
+            # No history passed here as it's the first message about product
+            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang, history=[])
+            
+            if ai_reply: 
+                # Add to history
+                session["history"].append({"role": "user", "text": f"Tell me about {current_product}"})
+                session["history"].append({"role": "model", "text": ai_reply})
+                
+                ai_reply = ai_reply.replace("**", "*")
+                chunks = split_message(ai_reply, limit=1000)
+                
+                for chunk in chunks:
+                    msg_txt = resp.message()
+                    msg_txt.body(chunk)
+            
+        else:
+            # Regular Flow
+            user_lang = session["data"]["language"]
+            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
+            if user_lang == "Malayalam":
+                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
+            elif user_lang == "Tamil":
+                 welcome_text = f"நன்றி {incoming_msg}! ഇന്ന് ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
+            elif user_lang == "Bengali":
+                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
+            
+            msg = resp.message()
+            msg.body(welcome_text)
 
-    # --- STEP 3: MAIN CHAT ---
-    elif step == "chat_active":
-        user_text_lower = incoming_msg.lower()
-        
-        # 🟢 LANGUAGE SWITCHER TRIGGER
-        for lang_id, lang_name in LANGUAGES.items():
-             if incoming_msg.lower() == lang_name.lower():
-                 session["data"]["language"] = lang_name
-                 msg = resp.message()
-                 msg.body(f"Language changed to {lang_name}. ✅")
-                 return Response(str(resp), mimetype="application/xml")
+    # --- STEP 3: MAIN CHAT ---
+    elif step == "chat_active":
+        user_text_lower = incoming_msg.lower()
+        
+        # 🟢 LANGUAGE SWITCHER TRIGGER
+        for lang_id, lang_name in LANGUAGES.items():
+             if incoming_msg.lower() == lang_name.lower():
+                 session["data"]["language"] = lang_name
+                 msg = resp.message()
+                 msg.body(f"Language changed to {lang_name}. ✅")
+                 return Response(str(resp), mimetype="application/xml")
 
-        # Check for keywords & CONTEXT SWITCHING
-        for key, image_url in PRODUCT_IMAGES.items():
-            if key in user_text_lower:
-                # If product changes, update session
-                session["data"]["product"] = key
-                save_to_google_sheet(session["data"])
-                
-                if key not in session["sent_images"]:
-                    msg_media = resp.message()
-                    msg_media.media(image_url)
-                    session["sent_images"].append(key)
-                break
+        # Check for keywords & CONTEXT SWITCHING
+        for key, image_url in PRODUCT_IMAGES.items():
+            if key in user_text_lower:
+                # If product changes, update session
+                session["data"]["product"] = key
+                save_to_google_sheet(session["data"])
+                
+                if key not in session["sent_images"]:
+                    msg_media = resp.message()
+                    msg_media.media(image_url)
+                    session["sent_images"].append(key)
+                break
 
-        current_product = session["data"].get("product")
-        current_name = session["data"].get("name", "Friend")
-        current_lang = session["data"].get("language", "English")
-        current_history = session.get("history", [])
-        
-        # Call AI with HISTORY
-        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history)
-        
-        if ai_reply: 
-            # 🟢 UPDATE HISTORY
-            session["history"].append({"role": "user", "text": incoming_msg})
-            session["history"].append({"role": "model", "text": ai_reply})
-            
-            # Keep history short (last 6 items = 3 turns)
-            session["history"] = session["history"][-6:]
-            
-            ai_reply = ai_reply.replace("**", "*")
-            chunks = split_message(ai_reply, limit=1000)
-            
-            for chunk in chunks:
-                resp.message(chunk)
+        current_product = session["data"].get("product")
+        current_name = session["data"].get("name", "Friend")
+        current_lang = session["data"].get("language", "English")
+        current_history = session.get("history", [])
+        
+        # Call AI with HISTORY
+        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history)
+        
+        if ai_reply: 
+            # 🟢 UPDATE HISTORY
+            session["history"].append({"role": "user", "text": incoming_msg})
+            session["history"].append({"role": "model", "text": ai_reply})
+            
+            # Keep history short (last 6 items = 3 turns)
+            session["history"] = session["history"][-6:]
+            
+            ai_reply = ai_reply.replace("**", "*")
+            chunks = split_message(ai_reply, limit=1000)
+            
+            for chunk in chunks:
+                msg_txt = resp.message()
+                msg_txt.body(chunk)
 
-    return Response(str(resp), mimetype="application/xml")
+    return Response(str(resp), mimetype="application/xml")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000)
