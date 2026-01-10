@@ -268,8 +268,8 @@ Q94. Does it contain Shilajit? A: Yes
 Q95. Does it contain Ashwagandha? A: Yes
 Q96. Does it contain Safed Musli? A: No
 Q97. One final tip? A: Trust the process.
-Q98. How soon does it ship? A: Immediate dispatch.
-Q99. Is it discreet? A: Yes.
+98. How soon does it ship? A: Immediate dispatch.
+99. Is it discreet? A: Yes.
 100. Are you sure it works? A: We have thousands of repeat customers who have regained their confidence. You will too.
 
 --- SECTION 6: STAAMIGEN POWDER (Teenagers) ---
@@ -368,7 +368,7 @@ Q92. Can STAAMIGEN help children who skip meals? A: It helps minimize the damage
 Q93. Can STAAMIGEN improve absorption of daily food? A: Yes. That is its primary mechanism of action.
 Q94. Can parents track progress easily? A: Yes. Height chart and weighing scale once a month.
 Q95. Can STAAMIGEN be part of a routine? A: Yes. Making it a ritual (e.g., "Evening Power Drink") helps consistency.
-Q96. Is balance more important than quantity? A: Yes. Quality of calories > Quantity of calories.
+96. Is balance more important than quantity? A: Yes. Quality of calories > Quantity of calories.
 97. Can STAAMIGEN prevent weakness? A: Yes. It builds muscular endurance.
 98. Is STAAMIGEN a lifelong product? A: It is a tool to reach a goal. Once health is established, food is enough.
 99. What is the most important advice for parents? A: Be their role model. Eat healthy yourself. Create a happy dining table atmosphere.
@@ -495,242 +495,265 @@ Q77. Does it help speech? A: It supports general development. A healthy body sup
 
 # 🛠️ AUTO-DETECT MODEL AT STARTUP
 def get_working_model_name():
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            for model in data.get('models', []):
-                m_name = model['name'].replace("models/", "")
-                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
-                    print(f"✅ FOUND MODEL: {m_name}")
-                    return m_name
-            for model in data.get('models', []):
-                if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
-                    return model['name'].replace("models/", "")
-    except Exception as e:
-        print(f"⚠️ MODEL INIT ERROR: {e}")
-    return "gemini-1.5-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            for model in data.get('models', []):
+                m_name = model['name'].replace("models/", "")
+                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
+                    print(f"✅ FOUND MODEL: {m_name}")
+                    return m_name
+            for model in data.get('models', []):
+                if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
+                    return model['name'].replace("models/", "")
+    except Exception as e:
+        print(f"⚠️ MODEL INIT ERROR: {e}")
+    return "gemini-1.5-flash"
 
 # GLOBAL VARIABLE TO STORE MODEL NAME
 ACTIVE_MODEL_NAME = get_working_model_name()
 
 def save_to_google_sheet(user_data):
-    try:
-        phone_clean = user_data.get('phone', '').replace("+", "")
-        form_data = {
-            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-            FORM_FIELDS["phone"]: phone_clean, 
-            FORM_FIELDS["product"]: user_data.get("product", "Pending")
-        }
-        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
-        print(f"✅ DATA SAVED for {user_data.get('name')}")
-    except Exception as e:
-        print(f"❌ SAVE ERROR: {e}")
+    try:
+        phone_clean = user_data.get('phone', '').replace("+", "")
+        form_data = {
+            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+            FORM_FIELDS["phone"]: phone_clean, 
+            FORM_FIELDS["product"]: user_data.get("product", "Pending")
+        }
+        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
+        print(f"✅ DATA SAVED for {user_data.get('name')}")
+    except Exception as e:
+        print(f"❌ SAVE ERROR: {e}")
 
-# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
-def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English"):
-    full_prompt = SYSTEM_PROMPT
-    
-    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
-    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
-    full_prompt += f"\nThe user has selected: **{language}**."
-    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
-    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
+# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT + MEMORY)
+def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[]):
+    full_prompt = SYSTEM_PROMPT
+    
+    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
+    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
+    full_prompt += f"\nThe user has selected: **{language}**."
+    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
+    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
 
-    # 4. NATURAL NAME USAGE RULE
-    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
-    
-    if product_context:
-        full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
-    
-    full_prompt += "\n\nUser Query: " + user_msg
-    
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
-    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
-    payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": 4000
-        }
-    }
-    
-    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
-    try:
-        print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
-        response = requests.post(url, json=payload, timeout=12) 
-        
-        if response.status_code == 200:
-            text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-            return text
-        else:
-            print(f"❌ API ERROR: {response.status_code} - {response.text}")
-            return "Our servers are busy right now. Please try again later."
-    except Exception as e:
-        print(f"❌ TIMEOUT/ERROR: {e}")
-        return "Our servers are currently overwhelmed. Please try again in a moment."
+    # 4. NATURAL NAME USAGE RULE
+    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
+    
+    if product_context:
+        full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
+    
+    # 🟢 INJECT SHORT-TERM MEMORY (HISTORY)
+    if history:
+        history_text = "\n".join([f"{msg['role']}: {msg['text']}" for msg in history])
+        full_prompt += f"\n\n*** CHAT HISTORY (Last 3 messages) ***\n{history_text}"
+
+    full_prompt += "\n\nUser Query: " + user_msg
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
+    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
+    payload = {
+        "contents": [{"parts": [{"text": full_prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": 4000
+        }
+    }
+    
+    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
+    for attempt in range(1): 
+        try:
+            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
+            response = requests.post(url, json=payload, timeout=12) 
+            
+            if response.status_code == 200:
+                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return text
+            else:
+                print(f"❌ API ERROR: {response.status_code} - {response.text}")
+                return "Our servers are busy right now. Please try again later."
+        except Exception as e:
+            print(f"❌ TIMEOUT/ERROR: {e}")
+            return "Our servers are currently overwhelmed. Please try again in a moment."
 
 # ✂️ SPLITTER FUNCTION (UPDATED TO 1000 CHARS FOR SAFETY)
 def split_message(text, limit=1000):
-    chunks = []
-    while len(text) > limit:
-        split_at = text.rfind(' ', 0, limit)
-        if split_at == -1:
-            split_at = limit
-        chunks.append(text[:split_at])
-        text = text[split_at:].strip()
-    chunks.append(text)
-    return chunks
+    chunks = []
+    while len(text) > limit:
+        split_at = text.rfind(' ', 0, limit)
+        if split_at == -1:
+            split_at = limit
+        chunks.append(text[:split_at])
+        text = text[split_at:].strip()
+    chunks.append(text)
+    return chunks
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    incoming_msg = request.values.get("Body", "").strip()
-    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
-    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
-    
-    resp = MessagingResponse()
-    msg = resp.message() 
+    incoming_msg = request.values.get("Body", "").strip()
+    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
+    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
+    
+    resp = MessagingResponse()
+    msg = resp.message() 
 
-    # --- SESSION START ---
-    if sender_phone not in user_sessions:
-         # NEW USER -> ASK LANGUAGE FIRST
-         
-         # 🟢 AD-SMART DETECTION
-         detected_product = "Pending"
-         incoming_lower = incoming_msg.lower()
-         for key in PRODUCT_IMAGES.keys():
-             if key in incoming_lower:
-                 detected_product = key
-                 break
-         
-         user_sessions[sender_phone] = {
-             "step": "ask_language",
-             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
-             "sent_images": []
-         }
-         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
-         return Response(str(resp), mimetype="application/xml")
+    # --- SESSION START ---
+    if sender_phone not in user_sessions:
+         # NEW USER -> ASK LANGUAGE FIRST
+         
+         # 🟢 AD-SMART DETECTION
+         detected_product = "Pending"
+         incoming_lower = incoming_msg.lower()
+         for key in PRODUCT_IMAGES.keys():
+             if key in incoming_lower:
+                 detected_product = key
+                 break
+         
+         user_sessions[sender_phone] = {
+             "step": "ask_language",
+             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
+             "sent_images": [],
+             "history": [] # 🟢 Initialize History
+         }
+         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
+         return Response(str(resp), mimetype="application/xml")
 
-    session = user_sessions[sender_phone]
-    step = session["step"]
-    
-    if "sent_images" not in session: session["sent_images"] = []
+    session = user_sessions[sender_phone]
+    step = session["step"]
+    
+    if "sent_images" not in session: session["sent_images"] = []
+    if "history" not in session: session["history"] = [] # Safety check
 
-    # 🧹 CLEAN SLATE / RESET COMMAND
-    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
-        if sender_phone in user_sessions:
-            del user_sessions[sender_phone]
-        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
-        return Response(str(resp), mimetype="application/xml")
+    # 🧹 CLEAN SLATE / RESET COMMAND
+    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
+        if sender_phone in user_sessions:
+            del user_sessions[sender_phone]
+        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
+        return Response(str(resp), mimetype="application/xml")
 
-    # 🛑 1. VOICE MESSAGE CHECK
-    if num_media > 0:
-        current_lang = session["data"].get("language", "English")
-        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
-        msg.body(warning_msg)
-        return Response(str(resp), mimetype="application/xml")
+    # 🛑 1. VOICE MESSAGE CHECK
+    if num_media > 0:
+        current_lang = session["data"].get("language", "English")
+        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
+        msg.body(warning_msg)
+        return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
-    if step == "ask_language":
-        selection = incoming_msg.strip()
-        selected_lang = LANGUAGES.get(selection, "English") 
-        for key, val in LANGUAGES.items():
-            if val.lower() in selection.lower():
-                selected_lang = val
-                break
-        
-        session["data"]["language"] = selected_lang
-        session["step"] = "ask_name"
-        
-        # Reply based on selection
-        if selected_lang == "Malayalam":
-            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
-        elif selected_lang == "Tamil":
-            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
-        elif selected_lang == "Hindi":
-            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
-        elif selected_lang == "Bengali":
-            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
-        else:
-            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
-            
-        return Response(str(resp), mimetype="application/xml")
+    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
+    if step == "ask_language":
+        selection = incoming_msg.strip()
+        selected_lang = LANGUAGES.get(selection, "English") 
+        for key, val in LANGUAGES.items():
+            if val.lower() in selection.lower():
+                selected_lang = val
+                break
+        
+        session["data"]["language"] = selected_lang
+        session["step"] = "ask_name"
+        
+        # Reply based on selection
+        if selected_lang == "Malayalam":
+            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
+        elif selected_lang == "Tamil":
+            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
+        elif selected_lang == "Hindi":
+            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
+        elif selected_lang == "Bengali":
+            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
+        else:
+            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
+            
+        return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 2: ASK NAME ---
-    elif step == "ask_name":
-        session["data"]["name"] = incoming_msg
-        save_to_google_sheet(session["data"]) # Save Immediately
-        session["step"] = "chat_active"
-        
-        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
-        if session["data"].get("product") != "Pending":
-            current_product = session["data"]["product"]
-            current_name = session["data"]["name"]
-            current_lang = session["data"]["language"]
-            
-            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
-                 msg.media(PRODUCT_IMAGES[current_product])
-                 session["sent_images"].append(current_product)
-                 time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
+    # --- STEP 2: ASK NAME ---
+    elif step == "ask_name":
+        session["data"]["name"] = incoming_msg
+        save_to_google_sheet(session["data"]) # Save Immediately
+        session["step"] = "chat_active"
+        
+        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
+        if session["data"].get("product") != "Pending":
+            current_product = session["data"]["product"]
+            current_name = session["data"]["name"]
+            current_lang = session["data"]["language"]
+            
+            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
+                 msg.media(PRODUCT_IMAGES[current_product])
+                 session["sent_images"].append(current_product)
+                 time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
 
-            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang)
-            if ai_reply: 
-                ai_reply = ai_reply.replace("**", "*")
-                chunks = split_message(ai_reply, limit=1000)
-                msg.body(chunks[0])
-                for chunk in chunks[1:]:
-                    resp.message(chunk)
-            
-        else:
-            # Regular Flow
-            user_lang = session["data"]["language"]
-            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
-            if user_lang == "Malayalam":
-                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
-            elif user_lang == "Tamil":
-                 welcome_text = f"நன்றி {incoming_msg}! இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?"
-            elif user_lang == "Bengali":
-                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
-            msg.body(welcome_text)
+            # No history passed here as it's the first message about product
+            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang, history=[])
+            
+            if ai_reply: 
+                # Add to history
+                session["history"].append({"role": "user", "text": f"Tell me about {current_product}"})
+                session["history"].append({"role": "model", "text": ai_reply})
+                
+                ai_reply = ai_reply.replace("**", "*")
+                chunks = split_message(ai_reply, limit=1000)
+                msg.body(chunks[0])
+                for chunk in chunks[1:]:
+                    resp.message(chunk)
+            
+        else:
+            # Regular Flow
+            user_lang = session["data"]["language"]
+            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
+            if user_lang == "Malayalam":
+                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
+            elif user_lang == "Tamil":
+                 welcome_text = f"நன்றி {incoming_msg}! இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?"
+            elif user_lang == "Bengali":
+                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
+            msg.body(welcome_text)
 
-    # --- STEP 3: MAIN CHAT ---
-    elif step == "chat_active":
-        user_text_lower = incoming_msg.lower()
-        
-        # 🟢 LANGUAGE SWITCHER TRIGGER
-        for lang_id, lang_name in LANGUAGES.items():
-             if incoming_msg.lower() == lang_name.lower():
-                 session["data"]["language"] = lang_name
-                 msg.body(f"Language changed to {lang_name}. ✅")
-                 return Response(str(resp), mimetype="application/xml")
+    # --- STEP 3: MAIN CHAT ---
+    elif step == "chat_active":
+        user_text_lower = incoming_msg.lower()
+        
+        # 🟢 LANGUAGE SWITCHER TRIGGER
+        for lang_id, lang_name in LANGUAGES.items():
+             if incoming_msg.lower() == lang_name.lower():
+                 session["data"]["language"] = lang_name
+                 msg.body(f"Language changed to {lang_name}. ✅")
+                 return Response(str(resp), mimetype="application/xml")
 
-        # Check for keywords & CONTEXT SWITCHING
-        for key, image_url in PRODUCT_IMAGES.items():
-            if key in user_text_lower:
-                # If product changes, update session
-                session["data"]["product"] = key
-                save_to_google_sheet(session["data"])
-                
-                if key not in session["sent_images"]:
-                    msg.media(image_url)
-                    session["sent_images"].append(key)
-                    time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
-                break
+        # Check for keywords & CONTEXT SWITCHING
+        for key, image_url in PRODUCT_IMAGES.items():
+            if key in user_text_lower:
+                # If product changes, update session
+                session["data"]["product"] = key
+                save_to_google_sheet(session["data"])
+                
+                if key not in session["sent_images"]:
+                    msg.media(image_url)
+                    session["sent_images"].append(key)
+                    time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
+                break
 
-        current_product = session["data"].get("product")
-        current_name = session["data"].get("name", "Friend")
-        current_lang = session["data"].get("language", "English")
-        
-        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang)
-        
-        if ai_reply: 
-            ai_reply = ai_reply.replace("**", "*")
-            chunks = split_message(ai_reply, limit=1000)
-            msg.body(chunks[0])
-            for chunk in chunks[1:]:
-                resp.message(chunk)
+        current_product = session["data"].get("product")
+        current_name = session["data"].get("name", "Friend")
+        current_lang = session["data"].get("language", "English")
+        current_history = session.get("history", [])
+        
+        # Call AI with HISTORY
+        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history)
+        
+        if ai_reply: 
+            # 🟢 UPDATE HISTORY
+            session["history"].append({"role": "user", "text": incoming_msg})
+            session["history"].append({"role": "model", "text": ai_reply})
+            
+            # Keep history short (last 6 items = 3 turns)
+            session["history"] = session["history"][-6:]
+            
+            ai_reply = ai_reply.replace("**", "*")
+            chunks = split_message(ai_reply, limit=1000)
+            msg.body(chunks[0])
+            for chunk in chunks[1:]:
+                resp.message(chunk)
 
-    return Response(str(resp), mimetype="application/xml")
+    return Response(str(resp), mimetype="application/xml")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000)
