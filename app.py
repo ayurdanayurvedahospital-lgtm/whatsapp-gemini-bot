@@ -231,35 +231,35 @@ Q57. Does it help hair growth? A: Indirectly, yes. Stress reduction helps hair.
 Q58. Can I travel with it? A: Yes.
 Q59. "My job involves heavy lifting." A: Saphala prevents physical burnout and muscle soreness.
 Q60. "I work night shifts." A: You need this more than anyone. It protects your body from the damage of irregular sleep.
-61. Does it cause acne? A: Rare. If body heat rises too much, reduce dose or drink more water.
-62. Is it safe for liver? A: Yes.
-63. Can I use it for weight gain? A: It builds muscle mass, not fat.
-64. Does it contain gold/bhasma? A: (Check label). If yes, mention it as a premium strength enhancer.
-65. How does it compare to a multivitamin? A: Vitamins are micronutrients. Saphala is a "Bio-Energizer." It does more than just fill gaps.
-66. Can I drink water immediately after? A: Yes.
-67. Does it help joint pain? A: Strengthening muscles often reduces the load on joints.
-68. "I am 25. Is it too early?" A: No. If you have a high-stress job, protect your vitality now.
-69. Is it made in a GMP factory? A: Yes, quality assured.
-70. Can I return it? A: No. But urge them to try.
-71. Does it help focus? A: Yes, mental endurance improves.
-72. "I feel weak after viral fever." A: Excellent for post-viral recovery.
-73. Can I take it with protein powder? A: Yes.
-74. Does it smell bad? A: Herbal smell is natural.
-75. Can I take it with blood thinners? A: Consult doctor.
-76. Does it improve blood flow? A: Yes, herbal ingredients improve circulation.
-77. "I have prostate issues." A: Consult doctor.
-78. Is it expensive? A: Cheaper than the cost of losing your confidence and health.
-79. Can I gift it? A: Yes, to close friends or family.
-80. Does it help morning wood? A: Yes, that is a sign of returning vitality.
-81. "I have no desire." A: Saphala helps rekindle the drive naturally.
-82. Can I take it before gym? A: Yes, 30 mins before.
-83. Does it help memory? A: A calm, strong mind remembers better.
-84. "My legs shake when I walk." A: This indicates severe weakness. Saphala will help strengthen the limbs.
-85. Is the capsule vegetarian shell? A: Usually yes.
-86. Can I empty it into juice? A: Not recommended.
-87. Does it cause gas? A: No.
-88. Can I take it with homeopathic drops? A: Yes.
-89. How to store? A: Cool, dry place.
+Q61. Does it cause acne? A: Rare. If body heat rises too much, reduce dose or drink more water.
+Q62. Is it safe for liver? A: Yes.
+Q63. Can I use it for weight gain? A: It builds muscle mass, not fat.
+Q64. Does it contain gold/bhasma? A: (Check label). If yes, mention it as a premium strength enhancer.
+Q65. How does it compare to a multivitamin? A: Vitamins are micronutrients. Saphala is a "Bio-Energizer." It does more than just fill gaps.
+Q66. Can I drink water immediately after? A: Yes.
+Q67. Does it help joint pain? A: Strengthening muscles often reduces the load on joints.
+Q68. "I am 25. Is it too early?" A: No. If you have a high-stress job, protect your vitality now.
+Q69. Is it made in a GMP factory? A: Yes, quality assured.
+Q70. Can I return it? A: No. But urge them to try.
+Q71. Does it help focus? A: Yes, mental endurance improves.
+Q72. "I feel weak after viral fever." A: Excellent for post-viral recovery.
+Q73. Can I take it with protein powder? A: Yes.
+Q74. Does it smell bad? A: Herbal smell is natural.
+Q75. Can I take it with blood thinners? A: Consult doctor.
+Q76. Does it improve blood flow? A: Yes, herbal ingredients improve circulation.
+Q77. "I have prostate issues." A: Consult doctor.
+Q78. Is it expensive? A: Cheaper than the cost of losing your confidence and health.
+Q79. Can I gift it? A: Yes, to close friends or family.
+Q80. Does it help morning wood? A: Yes, that is a sign of returning vitality.
+Q81. "I have no desire." A: Saphala helps rekindle the drive naturally.
+Q82. Can I take it before gym? A: Yes, 30 mins before.
+Q83. Does it help memory? A: A calm, strong mind remembers better.
+Q84. "My legs shake when I walk." A: This indicates severe weakness. Saphala will help strengthen the limbs.
+Q85. Is the capsule vegetarian shell? A: Usually yes.
+Q86. Can I empty it into juice? A: Not recommended.
+Q87. Does it cause gas? A: No.
+Q88. Can I take it with homeopathic drops? A: Yes.
+Q89. How to store? A: Cool, dry place.
 90. "I feel angry often." A: Weakness causes irritability. Strength brings calmness.
 91. Can I use it for exam stress? A: Yes, for mental stamina.
 92. Does it help with premature graying? A: Nourishing herbs can slow down aging signs.
@@ -367,7 +367,7 @@ Q91. Can STAAMIGEN be stopped suddenly? A: Yes, no side effects. But maintain th
 Q92. Can STAAMIGEN help children who skip meals? A: It helps minimize the damage, but the goal is to stop skipping meals.
 Q93. Can STAAMIGEN improve absorption of daily food? A: Yes. That is its primary mechanism of action.
 Q94. Can parents track progress easily? A: Yes. Height chart and weighing scale once a month.
-Q95. Can STAAMIGEN be part of a routine? A: Yes. Making it a ritual (e.g., "Evening Power Drink") helps consistency.
+95. Can STAAMIGEN be part of a routine? A: Yes. Making it a ritual (e.g., "Evening Power Drink") helps consistency.
 96. Is balance more important than quantity? A: Yes. Quality of calories > Quantity of calories.
 97. Can STAAMIGEN prevent weakness? A: Yes. It builds muscular endurance.
 98. Is STAAMIGEN a lifelong product? A: It is a tool to reach a goal. Once health is established, food is enough.
@@ -445,19 +445,19 @@ Q67. Can I buy it in shops? A: We send it directly to ensure you get fresh, orig
 Q68. How fast is delivery? A: We send it with care, it will reach you soon.
 Q69. Can I talk to you again? A: Please do! We love to hear about his progress. Send us a photo when he starts looking chubby!
 Q70. Are there preservatives? A: We use natural preservation methods (like Ghee/Honey base). It is safe.
-71. Can I recommend this to my sister? A: Please do. Helping another mother is a wonderful thing.
-72. Do I need a prescription? A: No, it is a nutritional supplement, not a pharmaceutical drug.
-73. Does it help teeth? A: Strong bones mean strong teeth. Nutrition helps everything.
-74. What if he refuses to take it? A: Put it on a biscuit or bread. Be creative! It tastes like jam.
-75. Can I give it before school? A: Yes, it gives him a "Power Start" for the day.
-76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
-77. Does it help speech? A: It supports general development. A healthy body supports a healthy brain.
-78. Can I give it in summer? A: Yes, all seasons are fine.
-79. Can I give it in winter? A: Yes, it helps keep immunity strong during cold season.
-80. Will it make him fat? A: No, it builds muscle and health, not unhealthy fat.
-81. Can I give it for travel? A: Yes, carry the bottle. Don't break the routine.
-82. Does it contain sugar? A: It uses natural sweeteners (Jaggery/Honey) which are good for kids.
-83. Is it good for hair? A: Yes, healthy nutrition improves hair texture too.
+Q71. Can I recommend this to my sister? A: Please do. Helping another mother is a wonderful thing.
+Q72. Do I need a prescription? A: No, it is a nutritional supplement, not a pharmaceutical drug.
+Q73. Does it help teeth? A: Strong bones mean strong teeth. Nutrition helps everything.
+Q74. What if he refuses to take it? A: Put it on a biscuit or bread. Be creative! It tastes like jam.
+Q75. Can I give it before school? A: Yes, it gives him a "Power Start" for the day.
+Q76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
+Q77. Does it help speech? A: It supports general development. A healthy body supports a healthy brain.
+Q78. Can I give it in summer? A: Yes, all seasons are fine.
+Q79. Can I give it in winter? A: Yes, it helps keep immunity strong during cold season.
+Q80. Will it make him fat? A: No, it builds muscle and health, not unhealthy fat.
+Q81. Can I give it for travel? A: Yes, carry the bottle. Don't break the routine.
+Q82. Does it contain sugar? A: It uses natural sweeteners (Jaggery/Honey) which are good for kids.
+Q83. Is it good for hair? A: Yes, healthy nutrition improves hair texture too.
 84. My child has exams coming. A: Perfect time. It will keep his energy up for studying.
 85. Can I give it twice a day? A: Yes, morning and evening is best.
 86. Is the bottle glass? A: (Answer based on packaging). It is packed safely.
@@ -491,6 +491,22 @@ Q70. Are there preservatives? A: We use natural preservation methods (like Ghee/
 [Wayanad]: Jeeva.
 [Kannur]: Lakshmi.
 [Kasaragod]: Bio.
+
+*** 💰 PRICING LIST (Use for Ordering Context) ***
+- Staamigen Malt: ₹749
+- Sakhi Tone: ₹749
+- Junior Staamigen: ₹599
+- Ayur Diabet: ₹690
+- Vrindha Tone: ₹440
+- Kanya Tone: ₹495
+- Staamigen Powder: ₹950
+- Ayurdan Hair Oil: ₹845
+- Medi Gas Syrup: ₹585
+- Muktanjan Pain Oil: ₹295
+- Strength Plus: ₹395
+- Neelibringadi Oil: ₹599
+- Weight Gainer Combo: ₹1450
+- Feminine Wellness Combo: ₹1161
 """
 
 # 🛠️ AUTO-DETECT MODEL AT STARTUP
@@ -528,7 +544,7 @@ def save_to_google_sheet(user_data):
     except Exception as e:
         print(f"❌ SAVE ERROR: {e}")
 
-# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT + MEMORY)
+# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[]):
     full_prompt = SYSTEM_PROMPT
     
@@ -561,20 +577,19 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     }
     
     # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
-    for attempt in range(1): 
-        try:
-            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
-            response = requests.post(url, json=payload, timeout=12) 
-            
-            if response.status_code == 200:
-                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return text
-            else:
-                print(f"❌ API ERROR: {response.status_code} - {response.text}")
-                return "Our servers are busy right now. Please try again later."
-        except Exception as e:
-            print(f"❌ TIMEOUT/ERROR: {e}")
-            return "Our servers are currently overwhelmed. Please try again in a moment."
+    try:
+        print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
+        response = requests.post(url, json=payload, timeout=12) 
+        
+        if response.status_code == 200:
+            text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return text
+        else:
+            print(f"❌ API ERROR: {response.status_code} - {response.text}")
+            return "Our servers are busy right now. Please try again later."
+    except Exception as e:
+        print(f"❌ TIMEOUT/ERROR: {e}")
+        return "Our servers are currently overwhelmed. Please try again in a moment."
 
 # ✂️ SPLITTER FUNCTION (UPDATED TO 1000 CHARS FOR SAFETY)
 def split_message(text, limit=1000):
@@ -595,8 +610,7 @@ def bot():
     num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
     
     resp = MessagingResponse()
-    msg = resp.message() 
-
+    
     # --- SESSION START ---
     if sender_phone not in user_sessions:
          # NEW USER -> ASK LANGUAGE FIRST
@@ -615,6 +629,7 @@ def bot():
              "sent_images": [],
              "history": [] # 🟢 Initialize History
          }
+         msg = resp.message()
          msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
          return Response(str(resp), mimetype="application/xml")
 
@@ -628,6 +643,7 @@ def bot():
     if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
         if sender_phone in user_sessions:
             del user_sessions[sender_phone]
+        msg = resp.message()
         msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
         return Response(str(resp), mimetype="application/xml")
 
@@ -635,6 +651,7 @@ def bot():
     if num_media > 0:
         current_lang = session["data"].get("language", "English")
         warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
+        msg = resp.message()
         msg.body(warning_msg)
         return Response(str(resp), mimetype="application/xml")
 
@@ -650,6 +667,7 @@ def bot():
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
         
+        msg = resp.message()
         # Reply based on selection
         if selected_lang == "Malayalam":
             msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
@@ -676,10 +694,11 @@ def bot():
             current_name = session["data"]["name"]
             current_lang = session["data"]["language"]
             
+            # Send Image First (Standalone)
             if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
-                 msg.media(PRODUCT_IMAGES[current_product])
+                 msg_media = resp.message()
+                 msg_media.media(PRODUCT_IMAGES[current_product])
                  session["sent_images"].append(current_product)
-                 time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
 
             # No history passed here as it's the first message about product
             ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang, history=[])
@@ -691,8 +710,8 @@ def bot():
                 
                 ai_reply = ai_reply.replace("**", "*")
                 chunks = split_message(ai_reply, limit=1000)
-                msg.body(chunks[0])
-                for chunk in chunks[1:]:
+                
+                for chunk in chunks:
                     resp.message(chunk)
             
         else:
@@ -702,9 +721,11 @@ def bot():
             if user_lang == "Malayalam":
                  welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
             elif user_lang == "Tamil":
-                 welcome_text = f"நன்றி {incoming_msg}! இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?"
+                 welcome_text = f"நன்றி {incoming_msg}! ഇന്ന് ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
             elif user_lang == "Bengali":
                  welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
+            
+            msg = resp.message()
             msg.body(welcome_text)
 
     # --- STEP 3: MAIN CHAT ---
@@ -715,6 +736,7 @@ def bot():
         for lang_id, lang_name in LANGUAGES.items():
              if incoming_msg.lower() == lang_name.lower():
                  session["data"]["language"] = lang_name
+                 msg = resp.message()
                  msg.body(f"Language changed to {lang_name}. ✅")
                  return Response(str(resp), mimetype="application/xml")
 
@@ -726,9 +748,9 @@ def bot():
                 save_to_google_sheet(session["data"])
                 
                 if key not in session["sent_images"]:
-                    msg.media(image_url)
+                    msg_media = resp.message()
+                    msg_media.media(image_url)
                     session["sent_images"].append(key)
-                    time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
                 break
 
         current_product = session["data"].get("product")
@@ -749,8 +771,8 @@ def bot():
             
             ai_reply = ai_reply.replace("**", "*")
             chunks = split_message(ai_reply, limit=1000)
-            msg.body(chunks[0])
-            for chunk in chunks[1:]:
+            
+            for chunk in chunks:
                 resp.message(chunk)
 
     return Response(str(resp), mimetype="application/xml")
