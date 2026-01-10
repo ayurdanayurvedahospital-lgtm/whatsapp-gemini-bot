@@ -270,7 +270,7 @@ Q96. Does it contain Safed Musli? A: No
 Q97. One final tip? A: Trust the process.
 Q98. How soon does it ship? A: Immediate dispatch.
 Q99. Is it discreet? A: Yes.
-Q100. Are you sure it works? A: We have thousands of repeat customers who have regained their confidence. You will too.
+100. Are you sure it works? A: We have thousands of repeat customers who have regained their confidence. You will too.
 
 --- SECTION 6: STAAMIGEN POWDER (Teenagers) ---
 Q1. Why is nutrition critical during teenage years? A: This is the "Final Growth Spurt." 50% of adult body weight and 20% of adult height are gained during adolescence. Poor nutrition now leads to lifelong weakness.
@@ -371,7 +371,7 @@ Q95. Can STAAMIGEN be part of a routine? A: Yes. Making it a ritual (e.g., "Even
 Q96. Is balance more important than quantity? A: Yes. Quality of calories > Quantity of calories.
 Q97. Can STAAMIGEN prevent weakness? A: Yes. It builds muscular endurance.
 Q98. Is STAAMIGEN a lifelong product? A: It is a tool to reach a goal. Once health is established, food is enough.
-Q99. What is the most important advice for parents? A: Be their role model. Eat healthy yourself. Create a happy dining table atmosphere.
+99. What is the most important advice for parents? A: Be their role model. Eat healthy yourself. Create a happy dining table atmosphere.
 100. What is the first step before using STAAMIGEN? A: Assessment. Understand why the child is not growing (Stress? Food? Digestion?).
 
 --- SECTION 7: JUNIOR STAAMIGEN (Emotional/Parent Guide Q&A) ---
@@ -538,7 +538,9 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     full_prompt += f"\nYou MUST reply ONLY in **{language}**."
     full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
 
-    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages). ***"
+    # 4. NATURAL NAME USAGE RULE
+    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
+    
     if product_context:
         full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
     
@@ -608,13 +610,20 @@ def bot():
              "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
              "sent_images": []
          }
-         msg.body("Namaste! Welcome to Alpha Ayurveda. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
+         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
     step = session["step"]
     
     if "sent_images" not in session: session["sent_images"] = []
+
+    # 🧹 CLEAN SLATE / RESET COMMAND
+    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
+        if sender_phone in user_sessions:
+            del user_sessions[sender_phone]
+        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
+        return Response(str(resp), mimetype="application/xml")
 
     # 🛑 1. VOICE MESSAGE CHECK
     if num_media > 0:
@@ -664,6 +673,7 @@ def bot():
             if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
                  msg.media(PRODUCT_IMAGES[current_product])
                  session["sent_images"].append(current_product)
+                 time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
 
             ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang)
             if ai_reply: 
@@ -696,15 +706,17 @@ def bot():
                  msg.body(f"Language changed to {lang_name}. ✅")
                  return Response(str(resp), mimetype="application/xml")
 
-        # Check for keywords
+        # Check for keywords & CONTEXT SWITCHING
         for key, image_url in PRODUCT_IMAGES.items():
             if key in user_text_lower:
+                # If product changes, update session
+                session["data"]["product"] = key
+                save_to_google_sheet(session["data"])
+                
                 if key not in session["sent_images"]:
                     msg.media(image_url)
                     session["sent_images"].append(key)
-                
-                session["data"]["product"] = key
-                save_to_google_sheet(session["data"])
+                    time.sleep(2) # 🟢 WAIT 2 SECONDS FOR IMAGE TO SEND
                 break
 
         current_product = session["data"].get("product")
