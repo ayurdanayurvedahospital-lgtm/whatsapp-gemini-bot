@@ -9,7 +9,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ⚠️ FORM FIELDS
+# FORM FIELDS
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
 
 FORM_FIELDS = {
@@ -18,7 +18,7 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
-# 🔴 SMART IMAGE LIBRARY & KEYWORDS
+# SMART IMAGE LIBRARY & KEYWORDS
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
     "kids": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -46,7 +46,7 @@ PRODUCT_IMAGES = {
 
 user_sessions = {}
 
-# 🌐 LANGUAGE OPTIONS
+# LANGUAGE OPTIONS
 LANGUAGES = {
     "1": "English",
     "2": "Malayalam",
@@ -57,18 +57,18 @@ LANGUAGES = {
     "7": "Bengali"
 }
 
-# 🔊 VOICE REJECTION MESSAGES
+# VOICE REJECTION MESSAGES
 VOICE_REPLIES = {
     "English": "Sorry, I cannot listen to voice notes. Please type your message. 🙏",
     "Malayalam": "ക്ഷമിക്കണം, എനിക്ക് വോയിസ് മെസേജ് കേൾക്കാൻ കഴിയില്ല. ദയവായി ടൈപ്പ് ചെയ്യാമോ? 🙏",
-    "Tamil": "മന്നிக்கவும், என்னால் ஆடியோ கேட்க முடியாது. தயவுசெய்து டைப் செய்யவும். 🙏",
+    "Tamil": "மன்னிக்கவும், என்னால் ஆடியோ கேட்க முடியாது. தயவுசெய்து டைப் செய்யவும். 🙏",
     "Hindi": "क्षमा करें, मैं वॉयस नोट नहीं सुन सकता। कृपया टाइप करें। 🙏",
     "Kannada": "ಕ್ಷಮಿಸಿ, ನಾನು ಧ್ವನಿ ಸಂದೇಶಗಳನ್ನು ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ. 🙏",
     "Telugu": "క్షమించండి, నేను వాయిస్ మెసేజ్ వినలేను. దయచేసి టైప్ చేయండి. 🙏",
     "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
-# 🧠 THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
+# THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Assistant (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, "The Expert Coach".
@@ -81,16 +81,12 @@ SYSTEM_PROMPT = """
    - **Women (Sakhi Tone):** "Wellness Partner" (Metabolic Correction, Understanding, Healthy Weight).
    - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
 2. **USE THE KNOWLEDGE BASE:** If the user asks a question that appears in the "COMPLETE KNOWLEDGE BASE" section below, you MUST provide the answer from there. Do not summarize too much.
-   - **EXCEPTION:** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?"), you ARE AUTHORIZED to use your general knowledge to answer accurately.
+   - **EXCEPTION:** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), you ARE AUTHORIZED to use your general knowledge to answer accurately.
    - **RESTRICTION:** If the user asks "How to order?", ONLY provide the ordering instructions. DO NOT show the store list unless specifically asked for "stores" or "shops".
 3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
 4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
 5. **CONTEXT SWITCHING:** If the user asks about a NEW product (e.g. they were talking about Sakhi Tone but now ask about Junior Staamigen), STOP talking about the old product and immediately answer about the NEW product.
-6. **VISUAL AIDS:** Assess if the user would understand the response better with a diagram. If yes, insert a tag like 
-
-[Image of X]
- (e.g.,
-) immediately before or after the relevant text. Be economical; do not overuse.
+6. **VISUAL AIDS:** Assess if the user would understand the response better with a diagram. If yes, insert a tag like  (e.g., ) immediately before or after the relevant text. Be economical; do not overuse.
 
 *** 🔍 COMPLETE KNOWLEDGE BASE (DO NOT SUMMARIZE) ***
 
@@ -267,13 +263,13 @@ Q87. Does it cause gas? A: No.
 Q88. Can I take it with homeopathic drops? A: Yes.
 Q89. How to store? A: Cool, dry place.
 Q90. "I feel angry often." A: Weakness causes irritability. Strength brings calmness.
-Q91. Can I use it for exam stress? A: Yes, for mental stamina.
-Q92. Does it help with premature graying? A: Nourishing herbs can slow down aging signs.
-Q93. "I am a driver, can I take it?" A: Yes, it helps alertness.
-Q94. Does it contain Shilajit? A: Yes
-Q95. Does it contain Ashwagandha? A: Yes
-Q96. Does it contain Safed Musli? A: No
-Q97. One final tip? A: Trust the process.
+91. Can I use it for exam stress? A: Yes, for mental stamina.
+92. Does it help with premature graying? A: Nourishing herbs can slow down aging signs.
+93. "I am a driver, can I take it?" A: Yes, it helps alertness.
+94. Does it contain Shilajit? A: Yes
+95. Does it contain Ashwagandha? A: Yes
+96. Does it contain Safed Musli? A: No
+97. One final tip? A: Trust the process.
 98. How soon does it ship? A: Immediate dispatch.
 99. Is it discreet? A: Yes.
 100. Are you sure it works? A: We have thousands of repeat customers who have regained their confidence. You will too.
@@ -456,7 +452,7 @@ Q72. Do I need a prescription? A: No, it is a nutritional supplement, not a phar
 Q73. Does it help teeth? A: Strong bones mean strong teeth. Nutrition helps everything.
 Q74. What if he refuses to take it? A: Put it on a biscuit or bread. Be creative! It tastes like jam.
 Q75. Can I give it before school? A: Yes, it gives him a "Power Start" for the day.
-76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
+Q76. Is it good for skin? A: Healthy nutrition gives a natural glow to the skin.
 77. Does it help speech? A: It supports general development. A healthy body supports a healthy brain.
 78. Can I give it in summer? A: Yes, all seasons are fine.
 79. Can I give it in winter? A: Yes, it helps keep immunity strong during cold season.
@@ -583,20 +579,19 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     }
     
     # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
-    for attempt in range(1): 
-        try:
-            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
-            response = requests.post(url, json=payload, timeout=12) 
-            
-            if response.status_code == 200:
-                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return text
-            else:
-                print(f"❌ API ERROR: {response.status_code} - {response.text}")
-                return "Our servers are busy right now. Please try again later."
-        except Exception as e:
-            print(f"❌ TIMEOUT/ERROR: {e}")
-            return "Our servers are currently overwhelmed. Please try again in a moment."
+    try:
+        print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
+        response = requests.post(url, json=payload, timeout=12) 
+        
+        if response.status_code == 200:
+            text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return text
+        else:
+            print(f"❌ API ERROR: {response.status_code} - {response.text}")
+            return "Our servers are busy right now. Please try again later."
+    except Exception as e:
+        print(f"❌ TIMEOUT/ERROR: {e}")
+        return "Our servers are currently overwhelmed. Please try again in a moment."
 
 # ✂️ SPLITTER FUNCTION (UPDATED TO 1000 CHARS FOR SAFETY)
 def split_message(text, limit=1000):
@@ -728,7 +723,7 @@ def bot():
             if user_lang == "Malayalam":
                  welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
             elif user_lang == "Tamil":
-                 welcome_text = f"நன்றி {incoming_msg}! ഇന്ന് ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
+                 welcome_text = f"நன்றி {incoming_msg}! இன்று ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
             elif user_lang == "Bengali":
                  welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
             
