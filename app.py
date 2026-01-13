@@ -1,4 +1,6 @@
 import os
+import re
+import time
 import requests
 import logging
 from flask import Flask, request, Response
@@ -77,10 +79,25 @@ VOICE_REPLIES = {
     "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
+# --- MALAYALAM SCRIPTS (New Logic Added Here) ---
+M_SCRIPTS = {
+    "sakhitone_intro": "സ്ത്രീകൾക്ക് ശരീരഭാരവും ശരീരസൗന്ദര്യവും മെച്ചപ്പെടുത്താൻ സപ്പോർട്ട് ചെയ്യുന്ന സഖിടോണിനെ പറ്റിയാണ് താങ്കൾ അറിയാൻ ആഗ്രഹിക്കുന്നത് എന്ന് ഞങ്ങൾ മനസിലാക്കുന്നു.",
+    "staamigen_intro": "പുരുഷന്മാർക്ക് ശരീരഭാരവും മസിലും വർധിപ്പിക്കാൻ സഹായിക്കുന്ന സ്റ്റാമിജൻ മാൾട്ടിനെ പറ്റിയാണ് താങ്കൾ അറിയാൻ ആഗ്രഹിക്കുന്നത്.",
+    "powder_intro": "കൗമാരക്കാർക്ക് (Teenagers) ശരീരവളർച്ചയ്ക്കും തൂക്കം കൂടാനും സഹായിക്കുന്ന സ്റ്റാമിജൻ പൗഡറിനെ പറ്റിയാണ് താങ്കൾ അന്വേഷിക്കുന്നത്.",
+    "ask_doubts": "താങ്കളുടെ സംശയങ്ങൾ എന്താണെങ്കിലും ഇപ്പോൾ ആത്മവിശ്വാസത്തോടു കൂടി ഞങ്ങളോട് ചോദിച്ചോളൂ, അതിന് കൃത്യമായ മറുപടി നൽകാൻ ഉറപ്പായും ഞങ്ങൾക്ക് കഴിയും.",
+    "reality_check": "ശരീരഭാരം മെച്ചപ്പെടുത്തുന്ന പ്രക്രിയ ഒരിക്കലും ഒരു easy പ്രോസസ്സ് അല്ല. അതിനു വേണ്ടി ശ്രമിക്കുമ്പോൾ കൃത്യമായ ആത്മസമര്‍പ്പണം ഉള്ള ഒരാൾക്ക് മാത്രമേ അവരാഗ്രഹിക്കുന്ന റിസൾട്ടിലേക്ക് എത്താൻ കഴിയുകയുള്ളു എന്നതാണ് യാഥാർഥ്യം.",
+    "collect_data": "താങ്കളുടെ ഭാഗത്തുനിന്ന് കുറച്ചു കാര്യങ്ങൾ ഷെയർ ചെയ്യുകയാണെങ്കിൽ വളരെ ഫലപ്രദമായി ശരീരഭാരം മെച്ചപ്പെടുത്താൻ താങ്കളെ സഹായിക്കാൻ ഞങ്ങൾക്ക് കഴിയും. Please tell me your **Age, Height and Weight**.",
+    "underweight_msg": "{name}, നിങ്ങൾക്ക് ആവശ്യമുള്ളതിലും {diff}kg കുറവാണെന്ന കാര്യം താങ്കൾ മനസ്സിലാക്കിയിട്ടുണ്ടോ? ഇത്രയും kg കുറയാൻ ഉള്ള കാരണം എന്താണെന്നാണ് താങ്കൾ മനസ്സിലാക്കുന്നത്?",
+    "normalweight_msg": "{name}, നിങ്ങൾ തന്ന വിവരങ്ങൾ പ്രകാരം താങ്കൾക്ക് ഉയരത്തിനൊത്ത ശരീരഭാരം ആണല്ലോ! അപ്പോൾ എന്താണ് നേരിടുന്ന മറ്റ് ബുദ്ധിമുട്ടുകൾ എന്ന് ഞങ്ങളോട് പറയാമോ?",
+    "women_health": "നിങ്ങൾക്ക് white discharge, PCOD, Thyroid, Gastric issues, Diabetes, Ulcer പോലത്തെ എന്തെങ്കിലും ബുദ്ധിമുട്ടുകളുണ്ടോ?",
+    "men_health": "നിങ്ങൾക്ക് Thyroid, Diabetes, Ulcer പോലത്തെ എന്തെങ്കിലും ബുദ്ധിമുട്ടുകളോ, മദ്യപാനം, പുകവലി മറ്റും പോലെയുള്ള ദുഃശീലങ്ങൾ ഉണ്ടോ?",
+    "closing_advice": "ആരോഗ്യകരമായി ശരീര ഭാരം വർധിപ്പിക്കാൻ ആഗ്രഹിക്കുന്ന ഒരാൾക്ക് ഒരു മാസം 3 മുതൽ 4 കിലോഗ്രാം വരെയാണ് പാർശ്വഫലങ്ങൾ ഒന്നുമില്ലാതെ വർധിപ്പിക്കാൻ കഴിയുന്നത്. നമ്മൾ കഴിക്കുന്ന ഭക്ഷണം ഉപയോഗിച്ച് ശരീരഭാരം കൂടുമ്പോഴാണ് അത് സ്ഥിരമായി നിലനിൽക്കുന്നത് എന്ന് തിരിച്ചറിയണം."
+}
+
 # THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Assistant (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
-**Tone:** Concise, Direct, Empathetic.
+**Tone:** Empathetic, Authoritative, "The Expert Coach".
 
 **⚠️ CRITICAL RULES:**
 1. **IDENTIFY THE USER & ADAPT TONE:**
@@ -91,9 +108,9 @@ SYSTEM_PROMPT = """
    - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
 
 2. **USE THE KNOWLEDGE BASE:**
-   - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER but **SUMMARIZE IT** to be short (2-3 sentences max).
-   - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), **YOU ARE AUTHORIZED** to use your general medical knowledge to answer accurately.
-   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the **AGENT CONTACT DETAILS** provided in your specific instruction context. Say "To order contact our customer care:" followed by the phone number and link. **DO NOT** mention the agent's name. **DO NOT** show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
+   - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER.
+   - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), **YOU ARE AUTHORIZED** to use your general medical knowledge to answer accurately and professionally.
+   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the ordering instructions (Name, Address, Pincode). **DO NOT** show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
 
 3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
 4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
@@ -106,36 +123,8 @@ SYSTEM_PROMPT = """
 [Image of digestive system]
 ) immediately before or after the relevant text. Be economical; do not overuse.
 7. **CONCISENESS (VERY IMPORTANT):** Keep responses **SHORT** (max 2-3 sentences per concept). Answer ONLY what is asked. Do NOT volunteer extra information unless it is a critical safety warning.
-8. **REPLY STRATEGY (NEW VS EXISTING USER):**
-   - **Strategy A (New User/Ad Lead - Short History):** Be warm, welcoming, use emojis to build trust, and explain concepts clearly. Treat them as a VIP new lead.
-   - **Strategy B (Existing User - Long History):** Be direct, fast, efficient, minimize pleasantries, and focus on the specific answer or order taking.
 
 *** 🔍 COMPLETE KNOWLEDGE BASE (DO NOT SUMMARIZE) ***
-
---- 📦 PRODUCT QUANTITY & USAGE DURATION (Based on usage twice a day) ---
-- **Staamigen Malt:** 500gm (Lasts 15 Days)
-- **Sakhi Tone:** 500gm (Lasts 15 Days)
-- **Staamigen Powder:** 500gm (Lasts 1 Month) | 250gm (Lasts 15 Days)
-- **Junior Staamigen:** 350gm (Lasts 15 Days)
-- **Ayur Diabet:** 250gm (Lasts 15 Days)
-- **Strength Plus:** 450gm (Lasts 15 Days)
-
---- 🌿 PRODUCT INGREDIENTS LIST ---
-(If asked about ingredients, refer to this list)
-- **Junior Staamigen Malt:** Contains pure Ghee, Honey, and essential Ayurvedic herbs for growth.
-- **Saphala Capsule:** Contains Shilajit, Ashwagandha. Does NOT contain Safed Musli.
-- **Ayur Diabet:** A specialized blend of 18 potent anti-diabetic Ayurvedic herbs.
-- **Sakhi Tone:** Contains Shatavari, Ashwagandha, and herbs for hormonal balance.
-- **Staamigen Malt:** Contains Ashwagandha, Vidarikand, and muscle-building herbs.
-- **Vrindha Tone:** Contains Lodhra, Ashokarishta, and cooling herbs for white discharge.
-- **Muktanjan Pain Oil:** Contains Murivenna, Eucalyptus, and pain-relieving oils.
-- **Neelibringadi Hair Oil:** Contains Neeli, Bringaraj, Amla, and coconut oil.
-
---- 🛒 BUYING OPTIONS (Only provide if specifically asked for these platforms) ---
-- **Official Website:** https://ayuralpha.in/
-- **Offline Medical Stores (Store Locator):** https://ayuralpha.in/pages/buy-offline
-- **Amazon:** https://www.amazon.in/stores/AlphaAyurveda/page/SEARCH
-- **Flipkart:** https://www.flipkart.com/search?q=Alpha%20Ayurveda
 
 --- SECTION 1: SAKHI TONE & STAAMIGEN MALT (Weight Gain & Fitness) ---
 Q1: Can Sakhi Tone control White Discharge? A1: No. Sakhi Tone is a tonic for weight gain and body fitness. Internal issues like White Discharge weaken the body and reduce the effectiveness of Sakhi Tone. It is best to treat White Discharge first using medicines like Vrindha Tone, and then start Sakhi Tone for weight gain.
@@ -577,7 +566,6 @@ def get_working_model_name():
         print(f"⚠️ MODEL INIT ERROR: {e}")
     return "gemini-1.5-flash"
 
-# GLOBAL VARIABLE TO STORE MODEL NAME
 ACTIVE_MODEL_NAME = get_working_model_name()
 
 def save_to_google_sheet(user_data):
@@ -589,89 +577,59 @@ def save_to_google_sheet(user_data):
             FORM_FIELDS["product"]: user_data.get("product", "Pending")
         }
         requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
-        print(f"✅ DATA SAVED for {user_data.get('name')}")
     except Exception as e:
         print(f"❌ SAVE ERROR: {e}")
 
-# 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
-    full_prompt = SYSTEM_PROMPT
-    
-    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
-    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
-    full_prompt += f"\nThe user has selected: **{language}**."
-    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
-    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
-
-    # 4. NATURAL NAME USAGE RULE
-    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
-    
-    if product_context:
-        full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
-
+    full_prompt = SYSTEM_PROMPT + f"\n\nUser: {user_name}, Lang: {language}. Query: {user_msg}"
     if assigned_agent:
-        full_prompt += f"\n\n*** ORDERING INSTRUCTION: If the user asks to order or buy, reply EXACTLY: 'To order contact our customer care: {assigned_agent['phone']} or click here: {assigned_agent['link']}'. DO NOT mention the agent's name. ***"
-    
-    # 🟢 INJECT SHORT-TERM MEMORY (HISTORY)
-    if history:
-        history_text = "\n".join([f"{msg['role']}: {msg['text']}" for msg in history])
-        full_prompt += f"\n\n*** CHAT HISTORY (Last 3 messages) ***\n{history_text}"
-
-    full_prompt += "\n\nUser Query: " + user_msg
+        full_prompt += f"\nORDER LINK: {assigned_agent['link']} (Phone: {assigned_agent['phone']})"
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
-    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
-    payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": 4000
-        }
-    }
+    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
-    for attempt in range(1): 
-        try:
-            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
-            response = requests.post(url, json=payload, timeout=12) 
+    try:
+        response = requests.post(url, json=payload, timeout=12)
+        if response.status_code == 200:
+            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return "Sorry, I am thinking... please ask again."
+    except:
+        return "Server busy. Please try again."
+
+def parse_measurements(text):
+    # Extract numbers for logic (Simple Regex)
+    height_cm = 0
+    weight_kg = 0
+    
+    # Try find height (cm)
+    cm_match = re.search(r'(\d{2,3})\s*cm', text.lower())
+    if cm_match:
+        height_cm = int(cm_match.group(1))
+    else:
+        # Try ft
+        ft_match = re.search(r'(\d)\.(\d+)', text)
+        if ft_match:
+            feet = int(ft_match.group(1))
+            inches = int(ft_match.group(2))
+            height_cm = int((feet * 30.48) + (inches * 2.54))
             
-            if response.status_code == 200:
-                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return text
-            else:
-                print(f"❌ API ERROR: {response.status_code} - {response.text}")
-                return "Our servers are busy right now. Please try again later."
-        except Exception as e:
-            print(f"❌ TIMEOUT/ERROR: {e}")
-            return "Our servers are currently overwhelmed. Please try again in a moment."
-
-# ✂️ SPLITTER FUNCTION (UPDATED TO 1000 CHARS FOR SAFETY)
-def split_message(text, limit=1000):
-    chunks = []
-    while len(text) > limit:
-        split_at = text.rfind(' ', 0, limit)
-        if split_at == -1:
-            split_at = limit
-        chunks.append(text[:split_at])
-        text = text[split_at:].strip()
-    chunks.append(text)
-    return chunks
-
-# GLOBAL AGENT COUNTER
-AGENT_INDEX = 0
+    # Try find weight
+    kg_match = re.search(r'(\d{2,3})\s*kg', text.lower())
+    if kg_match:
+        weight_kg = int(kg_match.group(1))
+        
+    return height_cm, weight_kg
 
 @app.route("/bot", methods=["POST"])
 def bot():
     incoming_msg = request.values.get("Body", "").strip()
     sender_phone = request.values.get("From", "").replace("whatsapp:", "")
-    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
+    num_media = int(request.values.get("NumMedia", 0))
     
     resp = MessagingResponse()
     
-    # --- SESSION START ---
     if sender_phone not in user_sessions:
-         # NEW USER -> ASK LANGUAGE FIRST
-         
-         # 🟢 AD-SMART DETECTION
+         # NEW USER INIT
          detected_product = "Pending"
          incoming_lower = incoming_msg.lower()
          for key in PRODUCT_IMAGES.keys():
@@ -679,17 +637,17 @@ def bot():
                  detected_product = key
                  break
          
-         # ASSIGN AGENT ROUND-ROBIN
-         global AGENT_INDEX
-         current_agent = AGENTS[AGENT_INDEX % len(AGENTS)]
-         AGENT_INDEX += 1
+         # AGENT ASSIGNMENT
+         global global_agent_counter
+         current_agent = AGENTS[global_agent_counter % len(AGENTS)]
+         global_agent_counter += 1
          
          user_sessions[sender_phone] = {
              "step": "ask_language",
              "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
              "agent": current_agent,
-             "sent_images": [],
-             "history": [] # 🟢 Initialize History
+             "consultation_state": "none",
+             "history": []
          }
          msg = resp.message()
          msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
@@ -698,26 +656,22 @@ def bot():
     session = user_sessions[sender_phone]
     step = session["step"]
     
-    if "sent_images" not in session: session["sent_images"] = []
-    if "history" not in session: session["history"] = [] # Safety check
-
-    # 🧹 CLEAN SLATE / RESET COMMAND
-    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
-        if sender_phone in user_sessions:
-            del user_sessions[sender_phone]
+    # RESET
+    if incoming_msg.lower() in ["reset", "restart"]:
+        del user_sessions[sender_phone]
         msg = resp.message()
-        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
+        msg.body("🔄 Reset. Say Hi.")
         return Response(str(resp), mimetype="application/xml")
 
-    # 🛑 1. VOICE MESSAGE CHECK
+    # MEDIA CHECK
     if num_media > 0:
-        current_lang = session["data"].get("language", "English")
-        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
         msg = resp.message()
-        msg.body(warning_msg)
+        msg.body(VOICE_REPLIES.get(session["data"].get("language", "English"), VOICE_REPLIES["English"]))
         return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
+    # --- FLOW LOGIC ---
+    
+    # 1. LANGUAGE
     if step == "ask_language":
         selection = incoming_msg.strip()
         selected_lang = LANGUAGES.get(selection, "English") 
@@ -725,123 +679,190 @@ def bot():
             if val.lower() in selection.lower():
                 selected_lang = val
                 break
-        
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
         
         msg = resp.message()
-        # Reply based on selection
         if selected_lang == "Malayalam":
             msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
-        elif selected_lang == "Tamil":
-            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
-        elif selected_lang == "Hindi":
-            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
-        elif selected_lang == "Bengali":
-            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
         else:
             msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
-            
         return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 2: ASK NAME ---
+    # 2. NAME & PRODUCT ROUTING
     elif step == "ask_name":
         session["data"]["name"] = incoming_msg
-        save_to_google_sheet(session["data"]) # Save Immediately
-        session["step"] = "chat_active"
+        save_to_google_sheet(session["data"])
         
-        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
-        if session["data"].get("product") != "Pending":
-            current_product = session["data"]["product"]
-            current_name = session["data"]["name"]
-            current_lang = session["data"]["language"]
-            current_agent = session.get("agent")
-            
-            # Send Image First (Standalone)
-            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
-                 msg_media = resp.message()
-                 msg_media.media(PRODUCT_IMAGES[current_product])
-                 session["sent_images"].append(current_product)
-
-            # No history passed here as it's the first message about product
-            ai_reply = get_ai_reply(f"I am a new customer coming from an ad for {current_product}. Tell me about it using Strategy A (Warm & Explanatory).", product_context=current_product, user_name=current_name, language=current_lang, history=[], assigned_agent=current_agent)
-            
-            if ai_reply: 
-                # Add to history
-                session["history"].append({"role": "user", "text": f"Tell me about {current_product}"})
-                session["history"].append({"role": "model", "text": ai_reply})
-                
-                ai_reply = ai_reply.replace("**", "*")
-                chunks = split_message(ai_reply, limit=1000)
-                
-                for chunk in chunks:
-                    msg_txt = resp.message()
-                    msg_txt.body(chunk)
-            
+        # PRODUCT DETECTION CHECK
+        prod = session["data"]["product"]
+        
+        # AMBIGUITY CHECK (Generic "Staamigen")
+        if "staamigen" in prod and "malt" not in prod and "powder" not in prod:
+             session["step"] = "resolve_staamigen"
+             msg = resp.message()
+             msg.body("ഞങ്ങൾക്ക് Staamigen Malt (Men), Staamigen Powder (Teenagers) എന്നിവയുണ്ട്. ഏതാണ് താങ്കൾക്ക് വേണ്ടത്?")
+             return Response(str(resp), mimetype="application/xml")
+             
+        # AD LEAD (Product Known)
+        if prod != "Pending":
+            session["step"] = "consultation_active"
+            session["consultation_state"] = "intro"
+            # TRIGGER INTRO IMMEDIATELY
+            return run_consultation_flow(session, incoming_msg, resp)
         else:
-            # Regular Flow
-            user_lang = session["data"]["language"]
-            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
-            if user_lang == "Malayalam":
-                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
-            elif user_lang == "Tamil":
-                 welcome_text = f"நன்றி {incoming_msg}! ഇന്ന് ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
-            elif user_lang == "Bengali":
-                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
-            
+            # DIRECT MSG (Ask Product)
+            session["step"] = "ask_product_manual"
             msg = resp.message()
-            msg.body(welcome_text)
+            msg.body("നന്ദി! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (e.g., Sakhitone, Staamigen Malt, Junior Staamigen?)")
+            return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 3: MAIN CHAT ---
-    elif step == "chat_active":
-        user_text_lower = incoming_msg.lower()
-        
-        # 🟢 LANGUAGE SWITCHER TRIGGER
-        for lang_id, lang_name in LANGUAGES.items():
-             if incoming_msg.lower() == lang_name.lower():
-                 session["data"]["language"] = lang_name
-                 msg = resp.message()
-                 msg.body(f"Language changed to {lang_name}. ✅")
-                 return Response(str(resp), mimetype="application/xml")
+    # 3. RESOLVE AMBIGUITY
+    elif step == "resolve_staamigen":
+        if "malt" in incoming_msg.lower():
+            session["data"]["product"] = "staamigen malt"
+        elif "powder" in incoming_msg.lower():
+            session["data"]["product"] = "staamigen powder"
+        else:
+            # Default or ask again (Simple fallback for now)
+            session["data"]["product"] = "staamigen malt" 
+            
+        session["step"] = "consultation_active"
+        session["consultation_state"] = "intro"
+        return run_consultation_flow(session, incoming_msg, resp)
 
-        # Check for keywords & CONTEXT SWITCHING
-        for key, image_url in PRODUCT_IMAGES.items():
-            if key in user_text_lower:
-                # If product changes, update session
+    # 4. MANUAL PRODUCT ENTRY
+    elif step == "ask_product_manual":
+        # Check keywords
+        found = False
+        for key in PRODUCT_IMAGES.keys():
+            if key in incoming_msg.lower():
                 session["data"]["product"] = key
-                save_to_google_sheet(session["data"])
-                
-                if key not in session["sent_images"]:
-                    msg_media = resp.message()
-                    msg_media.media(image_url)
-                    session["sent_images"].append(key)
+                found = True
                 break
+        if not found:
+            session["data"]["product"] = "general" # Fallback
+            
+        save_to_google_sheet(session["data"])
+        session["step"] = "consultation_active"
+        session["consultation_state"] = "intro"
+        return run_consultation_flow(session, incoming_msg, resp)
 
-        current_product = session["data"].get("product")
-        current_name = session["data"].get("name", "Friend")
-        current_lang = session["data"].get("language", "English")
-        current_history = session.get("history", [])
-        current_agent = session.get("agent")
-        
-        # Call AI with HISTORY
-        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history, assigned_agent=current_agent)
-        
-        if ai_reply: 
-            # 🟢 UPDATE HISTORY
-            session["history"].append({"role": "user", "text": incoming_msg})
-            session["history"].append({"role": "model", "text": ai_reply})
-            
-            # Keep history short (last 6 items = 3 turns)
-            session["history"] = session["history"][-6:]
-            
-            ai_reply = ai_reply.replace("**", "*")
-            chunks = split_message(ai_reply, limit=1000)
-            
-            for chunk in chunks:
-                msg_txt = resp.message()
-                msg_txt.body(chunk)
+    # 5. CONSULTATION LOOP
+    elif step == "consultation_active":
+        return run_consultation_flow(session, incoming_msg, resp)
 
     return Response(str(resp), mimetype="application/xml")
+
+# --- 🧠 THE CONSULTATION ENGINE ---
+def run_consultation_flow(session, user_text, resp):
+    state = session["consultation_state"]
+    product = session["data"]["product"]
+    name = session["data"]["name"]
+    lang = session["data"]["language"]
+    
+    # ONLY TRIGGER FOR WEIGHT GAIN PRODUCTS (Sakhitone, Staamigen)
+    weight_products = ["sakhi", "malt", "powder", "staamigen", "gain", "strength"]
+    is_weight_flow = any(x in product for x in weight_products)
+    
+    if not is_weight_flow:
+        # Standard AI Chat for other products (Diabet, etc)
+        ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
+        msg = resp.message()
+        msg.body(ai_reply)
+        return Response(str(resp), mimetype="application/xml")
+
+    # --- WEIGHT GAIN FLOW LOGIC ---
+    
+    # PHASE 1: INTRO
+    if state == "intro":
+        msg = resp.message()
+        
+        # Send Image
+        for key, url in PRODUCT_IMAGES.items():
+            if key in product:
+                msg.media(url)
+                break
+        
+        intro_text = ""
+        if "sakhi" in product:
+            intro_text = M_SCRIPTS["sakhitone_intro"]
+        elif "powder" in product:
+            # Check Gender for Powder (Teenagers)
+            intro_text = M_SCRIPTS["powder_intro"]
+        else: # Default Malt
+            intro_text = M_SCRIPTS["staamigen_intro"]
+            
+        msg.body(intro_text)
+        
+        # Simulate Wait & Second Message
+        msg2 = resp.message()
+        msg2.body(M_SCRIPTS["ask_doubts"])
+        
+        # Simulate "No Response" logic by chaining the reality check
+        msg3 = resp.message()
+        msg3.body(f"{M_SCRIPTS['reality_check']}\n\n{M_SCRIPTS['collect_data']}")
+        
+        session["consultation_state"] = "waiting_for_measurements"
+        return Response(str(resp), mimetype="application/xml")
+
+    # PHASE 2: CALCULATE
+    elif state == "waiting_for_measurements":
+        h, w = parse_measurements(user_text)
+        
+        if h > 0 and w > 0:
+            rbw = h - 100
+            diff = rbw - w
+            
+            msg = resp.message()
+            
+            if w < rbw:
+                # Underweight
+                txt = M_SCRIPTS["underweight_msg"].format(name=name, diff=diff)
+                msg.body(txt)
+            else:
+                # Normal/Over
+                txt = M_SCRIPTS["normalweight_msg"].format(name=name)
+                msg.body(txt)
+                
+            # Ask Health Questions immediately
+            msg_health = resp.message()
+            if "sakhi" in product:
+                msg_health.body(M_SCRIPTS["women_health"])
+            elif "malt" in product:
+                msg_health.body(M_SCRIPTS["men_health"])
+            else:
+                msg_health.body("Do you have any digestion or allergy issues?") # Generic
+                
+            session["consultation_state"] = "health_check"
+            return Response(str(resp), mimetype="application/xml")
+        else:
+            # Parsing failed, ask AI or retry
+            ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
+            msg = resp.message()
+            msg.body(ai_reply)
+            return Response(str(resp), mimetype="application/xml")
+
+    # PHASE 3: CLOSING & SALES
+    elif state == "health_check":
+        # Answer doubts using AI then give closing advice
+        ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
+        
+        msg = resp.message()
+        msg.body(ai_reply)
+        
+        msg_close = resp.message()
+        msg_close.body(M_SCRIPTS["closing_advice"])
+        
+        session["consultation_state"] = "chat_open" # Flow complete
+        return Response(str(resp), mimetype="application/xml")
+        
+    # PHASE 4: OPEN CHAT
+    else:
+        ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
+        msg = resp.message()
+        msg.body(ai_reply)
+        return Response(str(resp), mimetype="application/xml")
 
 # 🟢 WAKE UP CALL FOR UPTIMEROBOT
 @app.route("/")
