@@ -442,17 +442,17 @@ Q15. How does it work? A: It gently kindles the "Digestive Fire." It makes the b
 Q16. Will he gain weight immediately? A: We don't want "balloon weight." We want "strong weight." You will see him becoming more active first, then firmer, then heavier.
 Q17. Does it help with height? A: It provides the essential fuel for bones to grow. If the nutrition reaches the bones, height will follow naturally.
 Q18. Can I give it with milk? A: Yes! Mixing it in warm milk makes a wonderful, healthy drink that is better than any chemical powder.
-19. What if he doesn't drink milk? A: No problem. He can lick it off a spoon like jam. It is delicious both ways.
-20. Is it vegetarian? A: Yes, 100% pure vegetarian.
-21. My child is 3 years old. How much? A: Just half (½) a teaspoon, twice a day. Tiny tummy needs a tiny dose.
-22. My child is 8 years old. How much? A: One full teaspoon, twice a day. He is growing fast and needs more support.
-23. When should I give it? A: After breakfast and after dinner. Let it work on the food he has eaten.
-24. How long should I give it? A: Give it for at least 2-3 months. Let the body build a strong habit of eating well.
-25. Can I stop it later? A: Yes. Once he is eating well and looking healthy, you can stop. He won't become dependent on it.
-26. What if I miss a day? A: Don't worry. Just continue with love the next day.
-27. Can I mix it in porridge? A: Yes, as long as the food is warm (not boiling hot).
-28. Does it expire? A: It has a natural shelf life (check bottle). Keep the lid tight to keep it fresh.
-29. Should I keep it in the fridge? A: Not necessary. A cool, dry place in your kitchen is fine.
+Q19. What if he doesn't drink milk? A: No problem. He can lick it off a spoon like jam. It is delicious both ways.
+Q20. Is it vegetarian? A: Yes, 100% pure vegetarian.
+Q21. My child is 3 years old. How much? A: Just half (½) a teaspoon, twice a day. Tiny tummy needs a tiny dose.
+Q22. My child is 8 years old. How much? A: One full teaspoon, twice a day. He is growing fast and needs more support.
+Q23. When should I give it? A: After breakfast and after dinner. Let it work on the food he has eaten.
+Q24. How long should I give it? A: Give it for at least 2-3 months. Let the body build a strong habit of eating well.
+Q25. Can I stop it later? A: Yes. Once he is eating well and looking healthy, you can stop. He won't become dependent on it.
+Q26. What if I miss a day? A: Don't worry. Just continue with love the next day.
+Q27. Can I mix it in porridge? A: Yes, as long as the food is warm (not boiling hot).
+Q28. Does it expire? A: It has a natural shelf life (check bottle). Keep the lid tight to keep it fresh.
+Q29. Should I keep it in the fridge? A: Not necessary. A cool, dry place in your kitchen is fine.
 30. Can I give it to my 1-year-old? A: No, dear. This is for children 2 years and older. Babies have different needs.
 31. What is the first change I will notice? A: The "Sparkle" in the eyes. He will look more active and less tired within a week.
 32. When will he ask for food? A: Usually within 7 to 10 days, parents tell us their child asked for a "second helping" for the first time.
@@ -560,293 +560,293 @@ Q18. Can I give it with milk? A: Yes! Mixing it in warm milk makes a wonderful, 
 
 # 🛠️ AUTO-DETECT MODEL AT STARTUP
 def get_working_model_name():
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            for model in data.get('models', []):
-                m_name = model['name'].replace("models/", "")
-                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
-                    print(f"✅ FOUND MODEL: {m_name}")
-                    return m_name
-            for model in data.get('models', []):
-                if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
-                    return model['name'].replace("models/", "")
-    except Exception as e:
-        print(f"⚠️ MODEL INIT ERROR: {e}")
-    return "gemini-1.5-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            for model in data.get('models', []):
+                m_name = model['name'].replace("models/", "")
+                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
+                    print(f"✅ FOUND MODEL: {m_name}")
+                    return m_name
+            for model in data.get('models', []):
+                if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
+                    return model['name'].replace("models/", "")
+    except Exception as e:
+        print(f"⚠️ MODEL INIT ERROR: {e}")
+    return "gemini-1.5-flash"
 
 # GLOBAL VARIABLE TO STORE MODEL NAME
 ACTIVE_MODEL_NAME = get_working_model_name()
 
 def save_to_google_sheet(user_data):
-    try:
-        phone_clean = user_data.get('phone', '').replace("+", "")
-        form_data = {
-            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-            FORM_FIELDS["phone"]: phone_clean, 
-            FORM_FIELDS["product"]: user_data.get("product", "Pending")
-        }
-        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
-        print(f"✅ DATA SAVED for {user_data.get('name')}")
-    except Exception as e:
-        print(f"❌ SAVE ERROR: {e}")
+    try:
+        phone_clean = user_data.get('phone', '').replace("+", "")
+        form_data = {
+            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+            FORM_FIELDS["phone"]: phone_clean, 
+            FORM_FIELDS["product"]: user_data.get("product", "Pending")
+        }
+        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
+        print(f"✅ DATA SAVED for {user_data.get('name')}")
+    except Exception as e:
+        print(f"❌ SAVE ERROR: {e}")
 
 # 🟢 AI FUNCTION (USES DETECTED MODEL + 12s TIMEOUT)
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
-    full_prompt = SYSTEM_PROMPT
-    
-    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
-    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
-    full_prompt += f"\nThe user has selected: **{language}**."
-    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
-    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
+    full_prompt = SYSTEM_PROMPT
+    
+    # --- LANGUAGE INSTRUCTION (SINGLE LANGUAGE) ---
+    full_prompt += f"\n\n*** LANGUAGE INSTRUCTION (CRITICAL) ***"
+    full_prompt += f"\nThe user has selected: **{language}**."
+    full_prompt += f"\nYou MUST reply ONLY in **{language}**."
+    full_prompt += f"\nDo NOT provide an English translation unless the language selected is English."
 
-    # 4. NATURAL NAME USAGE RULE
-    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
-    
-    if product_context:
-        full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
+    # 4. NATURAL NAME USAGE RULE
+    full_prompt += f"\n\n*** USER CONTEXT: The user's name is '{user_name}'. Use this name occasionally (once every 3-4 messages) to be friendly but NOT in every message. ***"
+    
+    if product_context:
+        full_prompt += f"\n*** PRODUCT CONTEXT: The user is asking about '{product_context}'. Focus your answers on this product. ***"
 
-    if assigned_agent:
-        full_prompt += f"\n\n*** ORDERING INSTRUCTION: If the user asks to order or buy, reply EXACTLY: 'To order contact our customer care: {assigned_agent['phone']} or click here: {assigned_agent['link']}'. DO NOT mention the agent's name. ***"
-    
-    # 🟢 INJECT SHORT-TERM MEMORY (HISTORY)
-    if history:
-        history_text = "\n".join([f"{msg['role']}: {msg['text']}" for msg in history])
-        full_prompt += f"\n\n*** CHAT HISTORY (Last 3 messages) ***\n{history_text}"
+    if assigned_agent:
+        full_prompt += f"\n\n*** ORDERING INSTRUCTION: If the user asks to order or buy, reply EXACTLY: 'To order contact our customer care: {assigned_agent['phone']} or click here: {assigned_agent['link']}'. DO NOT mention the agent's name. ***"
+    
+    # 🟢 INJECT SHORT-TERM MEMORY (HISTORY)
+    if history:
+        history_text = "\n".join([f"{msg['role']}: {msg['text']}" for msg in history])
+        full_prompt += f"\n\n*** CHAT HISTORY (Last 3 messages) ***\n{history_text}"
 
-    full_prompt += "\n\nUser Query: " + user_msg
-    
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
-    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
-    payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": 4000
-        }
-    }
-    
-    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
-    for attempt in range(1): 
-        try:
-            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
-            response = requests.post(url, json=payload, timeout=12) 
-            
-            if response.status_code == 200:
-                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return text
-            else:
-                print(f"❌ API ERROR: {response.status_code} - {response.text}")
-                return "Our servers are busy right now. Please try again later."
-        except Exception as e:
-            print(f"❌ TIMEOUT/ERROR: {e}")
-            return "Our servers are currently overwhelmed. Please try again in a moment."
+    full_prompt += "\n\nUser Query: " + user_msg
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
+    # 🔴 REDUCED TO 4000 TOKENS TO SPEED UP GENERATION
+    payload = {
+        "contents": [{"parts": [{"text": full_prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": 4000
+        }
+    }
+    
+    # 🔴 TIMEOUT REDUCED TO 12s TO PREVENT TWILIO TIMEOUT
+    for attempt in range(1): 
+        try:
+            print(f"🤖 AI Request ({ACTIVE_MODEL_NAME}) | User: {user_name} | Lang: {language}")
+            response = requests.post(url, json=payload, timeout=12) 
+            
+            if response.status_code == 200:
+                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return text
+            else:
+                print(f"❌ API ERROR: {response.status_code} - {response.text}")
+                return "Our servers are busy right now. Please try again later."
+        except Exception as e:
+            print(f"❌ TIMEOUT/ERROR: {e}")
+            return "Our servers are currently overwhelmed. Please try again in a moment."
 
 # ✂️ SPLITTER FUNCTION (UPDATED TO 1000 CHARS FOR SAFETY)
 def split_message(text, limit=1000):
-    chunks = []
-    while len(text) > limit:
-        split_at = text.rfind(' ', 0, limit)
-        if split_at == -1:
-            split_at = limit
-        chunks.append(text[:split_at])
-        text = text[split_at:].strip()
-    chunks.append(text)
-    return chunks
+    chunks = []
+    while len(text) > limit:
+        split_at = text.rfind(' ', 0, limit)
+        if split_at == -1:
+            split_at = limit
+        chunks.append(text[:split_at])
+        text = text[split_at:].strip()
+    chunks.append(text)
+    return chunks
 
 # GLOBAL AGENT COUNTER
 AGENT_INDEX = 0
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    incoming_msg = request.values.get("Body", "").strip()
-    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
-    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
-    
-    resp = MessagingResponse()
-    
-    # --- SESSION START ---
-    if sender_phone not in user_sessions:
-         # NEW USER -> ASK LANGUAGE FIRST
-         
-         # 🟢 AD-SMART DETECTION
-         detected_product = "Pending"
-         incoming_lower = incoming_msg.lower()
-         for key in PRODUCT_IMAGES.keys():
-             if key in incoming_lower:
-                 detected_product = key
-                 break
-         
-         # ASSIGN AGENT ROUND-ROBIN
-         global AGENT_INDEX
-         current_agent = AGENTS[AGENT_INDEX % len(AGENTS)]
-         AGENT_INDEX += 1
-         
-         user_sessions[sender_phone] = {
-             "step": "ask_language",
-             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
-             "agent": current_agent,
-             "sent_images": [],
-             "history": [] # 🟢 Initialize History
-         }
-         msg = resp.message()
-         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
-         return Response(str(resp), mimetype="application/xml")
+    incoming_msg = request.values.get("Body", "").strip()
+    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
+    num_media = int(request.values.get("NumMedia", 0)) # 🟢 DETECT MEDIA
+    
+    resp = MessagingResponse()
+    
+    # --- SESSION START ---
+    if sender_phone not in user_sessions:
+         # NEW USER -> ASK LANGUAGE FIRST
+         
+         # 🟢 AD-SMART DETECTION
+         detected_product = "Pending"
+         incoming_lower = incoming_msg.lower()
+         for key in PRODUCT_IMAGES.keys():
+             if key in incoming_lower:
+                 detected_product = key
+                 break
+         
+         # ASSIGN AGENT ROUND-ROBIN
+         global AGENT_INDEX
+         current_agent = AGENTS[AGENT_INDEX % len(AGENTS)]
+         AGENT_INDEX += 1
+         
+         user_sessions[sender_phone] = {
+             "step": "ask_language",
+             "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
+             "agent": current_agent,
+             "sent_images": [],
+             "history": [] # 🟢 Initialize History
+         }
+         msg = resp.message()
+         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
+         return Response(str(resp), mimetype="application/xml")
 
-    session = user_sessions[sender_phone]
-    step = session["step"]
-    
-    if "sent_images" not in session: session["sent_images"] = []
-    if "history" not in session: session["history"] = [] # Safety check
+    session = user_sessions[sender_phone]
+    step = session["step"]
+    
+    if "sent_images" not in session: session["sent_images"] = []
+    if "history" not in session: session["history"] = [] # Safety check
 
-    # 🧹 CLEAN SLATE / RESET COMMAND
-    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
-        if sender_phone in user_sessions:
-            del user_sessions[sender_phone]
-        msg = resp.message()
-        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
-        return Response(str(resp), mimetype="application/xml")
+    # 🧹 CLEAN SLATE / RESET COMMAND
+    if incoming_msg.lower() in ["reset", "restart", "clear", "start over"]:
+        if sender_phone in user_sessions:
+            del user_sessions[sender_phone]
+        msg = resp.message()
+        msg.body("🔄 Session Reset. Please say 'Hi' to start a new consultation. 🙏")
+        return Response(str(resp), mimetype="application/xml")
 
-    # 🛑 1. VOICE MESSAGE CHECK
-    if num_media > 0:
-        current_lang = session["data"].get("language", "English")
-        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
-        msg = resp.message()
-        msg.body(warning_msg)
-        return Response(str(resp), mimetype="application/xml")
+    # 🛑 1. VOICE MESSAGE CHECK
+    if num_media > 0:
+        current_lang = session["data"].get("language", "English")
+        warning_msg = VOICE_REPLIES.get(current_lang, VOICE_REPLIES["English"])
+        msg = resp.message()
+        msg.body(warning_msg)
+        return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
-    if step == "ask_language":
-        selection = incoming_msg.strip()
-        selected_lang = LANGUAGES.get(selection, "English") 
-        for key, val in LANGUAGES.items():
-            if val.lower() in selection.lower():
-                selected_lang = val
-                break
-        
-        session["data"]["language"] = selected_lang
-        session["step"] = "ask_name"
-        
-        msg = resp.message()
-        # Reply based on selection
-        if selected_lang == "Malayalam":
-            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
-        elif selected_lang == "Tamil":
-            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
-        elif selected_lang == "Hindi":
-            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
-        elif selected_lang == "Bengali":
-            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
-        else:
-            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
-            
-        return Response(str(resp), mimetype="application/xml")
+    # --- STEP 1: HANDLE LANGUAGE SELECTION ---
+    if step == "ask_language":
+        selection = incoming_msg.strip()
+        selected_lang = LANGUAGES.get(selection, "English") 
+        for key, val in LANGUAGES.items():
+            if val.lower() in selection.lower():
+                selected_lang = val
+                break
+        
+        session["data"]["language"] = selected_lang
+        session["step"] = "ask_name"
+        
+        msg = resp.message()
+        # Reply based on selection
+        if selected_lang == "Malayalam":
+            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
+        elif selected_lang == "Tamil":
+            msg.body("நன்றி! உங்கள் பெயர் என்ன? (What is your name?)")
+        elif selected_lang == "Hindi":
+            msg.body("धन्यवाद! आपका नाम क्या है? (What is your name?)")
+        elif selected_lang == "Bengali":
+            msg.body("ধন্যবাদ! আপনার নাম কি? (What is your name?)")
+        else:
+            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
+            
+        return Response(str(resp), mimetype="application/xml")
 
-    # --- STEP 2: ASK NAME ---
-    elif step == "ask_name":
-        session["data"]["name"] = incoming_msg
-        save_to_google_sheet(session["data"]) # Save Immediately
-        session["step"] = "chat_active"
-        
-        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
-        if session["data"].get("product") != "Pending":
-            current_product = session["data"]["product"]
-            current_name = session["data"]["name"]
-            current_lang = session["data"]["language"]
-            current_agent = session.get("agent")
-            
-            # Send Image First (Standalone)
-            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
-                 msg_media = resp.message()
-                 msg_media.media(PRODUCT_IMAGES[current_product])
-                 session["sent_images"].append(current_product)
+    # --- STEP 2: ASK NAME ---
+    elif step == "ask_name":
+        session["data"]["name"] = incoming_msg
+        save_to_google_sheet(session["data"]) # Save Immediately
+        session["step"] = "chat_active"
+        
+        # 🟢 AD-SMART LOGIC: SKIP "WHICH PRODUCT" IF DETECTED
+        if session["data"].get("product") != "Pending":
+            current_product = session["data"]["product"]
+            current_name = session["data"]["name"]
+            current_lang = session["data"]["language"]
+            current_agent = session.get("agent")
+            
+            # Send Image First (Standalone)
+            if current_product in PRODUCT_IMAGES and current_product not in session["sent_images"]:
+                 msg_media = resp.message()
+                 msg_media.media(PRODUCT_IMAGES[current_product])
+                 session["sent_images"].append(current_product)
 
-            # No history passed here as it's the first message about product
-            ai_reply = get_ai_reply(f"Tell me about {current_product}", product_context=current_product, user_name=current_name, language=current_lang, history=[], assigned_agent=current_agent)
-            
-            if ai_reply: 
-                # Add to history
-                session["history"].append({"role": "user", "text": f"Tell me about {current_product}"})
-                session["history"].append({"role": "model", "text": ai_reply})
-                
-                ai_reply = ai_reply.replace("**", "*")
-                chunks = split_message(ai_reply, limit=1000)
-                
-                for chunk in chunks:
-                    msg_txt = resp.message()
-                    msg_txt.body(chunk)
-            
-        else:
-            # Regular Flow
-            user_lang = session["data"]["language"]
-            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
-            if user_lang == "Malayalam":
-                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
-            elif user_lang == "Tamil":
-                 welcome_text = f"நன்றி {incoming_msg}! ഇന്ന് ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
-            elif user_lang == "Bengali":
-                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
-            
-            msg = resp.message()
-            msg.body(welcome_text)
+            # No history passed here as it's the first message about product
+            ai_reply = get_ai_reply(f"I am a new customer coming from an ad for {current_product}. Tell me about it using Strategy A (Warm & Explanatory).", product_context=current_product, user_name=current_name, language=current_lang, history=[], assigned_agent=current_agent)
+            
+            if ai_reply: 
+                # Add to history
+                session["history"].append({"role": "user", "text": f"Tell me about {current_product}"})
+                session["history"].append({"role": "model", "text": ai_reply})
+                
+                ai_reply = ai_reply.replace("**", "*")
+                chunks = split_message(ai_reply, limit=1000)
+                
+                for chunk in chunks:
+                    msg_txt = resp.message()
+                    msg_txt.body(chunk)
+            
+        else:
+            # Regular Flow
+            user_lang = session["data"]["language"]
+            welcome_text = f"Thank you, {incoming_msg}! Which product would you like to know about? (e.g., Staamigen, Sakhi Tone, Vrindha Tone?)"
+            if user_lang == "Malayalam":
+                 welcome_text = f"നന്ദി {incoming_msg}! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (Staamigen, Sakhi Tone?)"
+            elif user_lang == "Tamil":
+                 welcome_text = f"நன்றி {incoming_msg}! ഇന്ന് ഞാൻ നിങ്ങൾക്ക് എങ്ങനെയാണ് സഹായിക്കേണ്ടത്?"
+            elif user_lang == "Bengali":
+                 welcome_text = f"ধন্যবাদ {incoming_msg}! আপনি কোন পণ্য সম্পর্কে জানতে চান? (Staamigen, Sakhi Tone?)"
+            
+            msg = resp.message()
+            msg.body(welcome_text)
 
-    # --- STEP 3: MAIN CHAT ---
-    elif step == "chat_active":
-        user_text_lower = incoming_msg.lower()
-        
-        # 🟢 LANGUAGE SWITCHER TRIGGER
-        for lang_id, lang_name in LANGUAGES.items():
-             if incoming_msg.lower() == lang_name.lower():
-                 session["data"]["language"] = lang_name
-                 msg = resp.message()
-                 msg.body(f"Language changed to {lang_name}. ✅")
-                 return Response(str(resp), mimetype="application/xml")
+    # --- STEP 3: MAIN CHAT ---
+    elif step == "chat_active":
+        user_text_lower = incoming_msg.lower()
+        
+        # 🟢 LANGUAGE SWITCHER TRIGGER
+        for lang_id, lang_name in LANGUAGES.items():
+             if incoming_msg.lower() == lang_name.lower():
+                 session["data"]["language"] = lang_name
+                 msg = resp.message()
+                 msg.body(f"Language changed to {lang_name}. ✅")
+                 return Response(str(resp), mimetype="application/xml")
 
-        # Check for keywords & CONTEXT SWITCHING
-        for key, image_url in PRODUCT_IMAGES.items():
-            if key in user_text_lower:
-                # If product changes, update session
-                session["data"]["product"] = key
-                save_to_google_sheet(session["data"])
-                
-                if key not in session["sent_images"]:
-                    msg_media = resp.message()
-                    msg_media.media(image_url)
-                    session["sent_images"].append(key)
-                break
+        # Check for keywords & CONTEXT SWITCHING
+        for key, image_url in PRODUCT_IMAGES.items():
+            if key in user_text_lower:
+                # If product changes, update session
+                session["data"]["product"] = key
+                save_to_google_sheet(session["data"])
+                
+                if key not in session["sent_images"]:
+                    msg_media = resp.message()
+                    msg_media.media(image_url)
+                    session["sent_images"].append(key)
+                break
 
-        current_product = session["data"].get("product")
-        current_name = session["data"].get("name", "Friend")
-        current_lang = session["data"].get("language", "English")
-        current_history = session.get("history", [])
-        current_agent = session.get("agent")
-        
-        # Call AI with HISTORY
-        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history, assigned_agent=current_agent)
-        
-        if ai_reply: 
-            # 🟢 UPDATE HISTORY
-            session["history"].append({"role": "user", "text": incoming_msg})
-            session["history"].append({"role": "model", "text": ai_reply})
-            
-            # Keep history short (last 6 items = 3 turns)
-            session["history"] = session["history"][-6:]
-            
-            ai_reply = ai_reply.replace("**", "*")
-            chunks = split_message(ai_reply, limit=1000)
-            
-            for chunk in chunks:
-                msg_txt = resp.message()
-                msg_txt.body(chunk)
+        current_product = session["data"].get("product")
+        current_name = session["data"].get("name", "Friend")
+        current_lang = session["data"].get("language", "English")
+        current_history = session.get("history", [])
+        current_agent = session.get("agent")
+        
+        # Call AI with HISTORY
+        ai_reply = get_ai_reply(incoming_msg, product_context=current_product, user_name=current_name, language=current_lang, history=current_history, assigned_agent=current_agent)
+        
+        if ai_reply: 
+            # 🟢 UPDATE HISTORY
+            session["history"].append({"role": "user", "text": incoming_msg})
+            session["history"].append({"role": "model", "text": ai_reply})
+            
+            # Keep history short (last 6 items = 3 turns)
+            session["history"] = session["history"][-6:]
+            
+            ai_reply = ai_reply.replace("**", "*")
+            chunks = split_message(ai_reply, limit=1000)
+            
+            for chunk in chunks:
+                msg_txt = resp.message()
+                msg_txt.body(chunk)
 
-    return Response(str(resp), mimetype="application/xml")
+    return Response(str(resp), mimetype="application/xml")
 
 # 🟢 WAKE UP CALL FOR UPTIMEROBOT
 @app.route("/")
 def wake_up():
-    return "Bot is awake!", 200
+    return "Bot is awake!", 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000)
