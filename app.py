@@ -18,7 +18,7 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
-# 👥 AGENT ROTATION LIST (Names are hidden from customers)
+# 👥 AGENT ROTATION LIST (Names hidden from customer)
 AGENTS = [
     {"name": "Sreelekha", "phone": "+91 9895900809", "link": "https://wa.link/t45vpy"},
     {"name": "Savitha", "phone": "+91 9447225084", "link": "https://wa.link/nxzz8w"},
@@ -91,13 +91,13 @@ SYSTEM_PROMPT = """
    - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
 
 2. **USE THE KNOWLEDGE BASE:**
-   - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER but **SUMMARIZE IT** to be short.
+   - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER but **SUMMARIZE IT** to be short (2-3 sentences max).
    - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), **YOU ARE AUTHORIZED** to use your general medical knowledge to answer accurately.
    - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the **AGENT CONTACT DETAILS** provided in your specific instruction context. Say "To order contact our customer care:" followed by the phone number and link. **DO NOT** mention the agent's name. **DO NOT** show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
 
 3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
 4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
-5. **CONTEXT SWITCHING:** If the user asks about a NEW product, STOP talking about the old product and immediately answer about the NEW product.
+5. **CONTEXT SWITCHING:** If the user asks about a NEW product (e.g. they were talking about Sakhi Tone but now ask about Junior Staamigen), STOP talking about the old product and immediately answer about the NEW product.
 6. **VISUAL AIDS:** Assess if the user would understand the response better with a diagram. If yes, insert a tag like 
 
 [Image of X]
@@ -120,7 +120,7 @@ SYSTEM_PROMPT = """
 - **Muktanjan Pain Oil:** Contains Murivenna, Eucalyptus, and pain-relieving oils.
 - **Neelibringadi Hair Oil:** Contains Neeli, Bringaraj, Amla, and coconut oil.
 
---- 🛒 BUYING OPTIONS (Only provide if specifically asked) ---
+--- 🛒 BUYING OPTIONS (Only provide if specifically asked for these platforms) ---
 - **Official Website:** https://ayuralpha.in/
 - **Offline Medical Stores (Store Locator):** https://ayuralpha.in/pages/buy-offline
 - **Amazon:** https://www.amazon.in/stores/AlphaAyurveda/page/SEARCH
@@ -341,10 +341,10 @@ Q27. Is STAAMIGEN safe for teenagers? A: 100%. It is free from heavy metals, ste
 Q28. Can STAAMIGEN be used long-term? A: Yes. It can be part of their daily nutritional intake until they reach their growth goals.
 Q29. Does STAAMIGEN help immunity? A: Yes. A well-nourished body fights infections better. Parents often report fewer sick days from school.
 Q30. Is consultation important before use? A: Yes. We need to check for underlying issues like worms, severe anemia, or lactose intolerance.
-Q31. Can STAAMIGEN help picky eaters? A: Yes. Picky eating is often a sign of zinc deficiency. Improving nutrition often expands the variety of foods they will eat.
-Q32. Can STAAMIGEN increase energy levels? A: Yes. It optimizes glycogen storage, giving them sustained energy for sports and study.
-Q33. Can STAAMIGEN help concentration? A: Yes. Brain function depends on stable blood sugar and good digestion.
-Q34. Does physical activity matter for growth? A: Yes. Activity stimulates the release of growth hormones. Staamigen provides the fuel for that activity.
+31. Can STAAMIGEN help picky eaters? A: Yes. Picky eating is often a sign of zinc deficiency. Improving nutrition often expands the variety of foods they will eat.
+32. Can STAAMIGEN increase energy levels? A: Yes. It optimizes glycogen storage, giving them sustained energy for sports and study.
+33. Can STAAMIGEN help concentration? A: Yes. Brain function depends on stable blood sugar and good digestion.
+34. Does physical activity matter for growth? A: Yes. Activity stimulates the release of growth hormones. Staamigen provides the fuel for that activity.
 35. Can growth be forced quickly? A: No. You cannot force a plant to grow by pulling it. You can only water and fertilize it. Same with children.
 36. Can poor habits reduce results? A: Yes. Taking powder but sleeping at 2 AM will result in zero growth. Habits + Product = Success.
 37. Should parents monitor eating habits? A: Yes. Passive observation is better than nagging. Ensure the kitchen is stocked with healthy options.
@@ -442,7 +442,7 @@ Q26. What if I miss a day? A: Don't worry. Just continue with love the next day.
 Q27. Can I mix it in porridge? A: Yes, as long as the food is warm (not boiling hot).
 Q28. Does it expire? A: It has a natural shelf life (check bottle). Keep the lid tight to keep it fresh.
 Q29. Should I keep it in the fridge? A: Not necessary. A cool, dry place in your kitchen is fine.
-Q30. Can I give it to my 1-year-old? A: No, dear. This is for children 2 years and older. Babies have different needs.
+30. Can I give it to my 1-year-old? A: No, dear. This is for children 2 years and older. Babies have different needs.
 31. What is the first change I will notice? A: The "Sparkle" in the eyes. He will look more active and less tired within a week.
 32. When will he ask for food? A: Usually within 7 to 10 days, parents tell us their child asked for a "second helping" for the first time.
 33. Will his cheeks become chubby? A: Healthy cheeks, yes! He will fill out naturally and lose that "tired, pale" look.
@@ -831,6 +831,11 @@ def bot():
                 msg_txt.body(chunk)
 
     return Response(str(resp), mimetype="application/xml")
+
+# 🟢 WAKE UP CALL FOR UPTIMEROBOT
+@app.route("/")
+def wake_up():
+    return "Bot is awake!", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
