@@ -11,9 +11,8 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# FORM FIELDS
+# FORM FIELDS (Google Sheets)
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
-
 FORM_FIELDS = {
     "name": "entry.2005620554",
     "phone": "entry.1117261166",
@@ -29,7 +28,7 @@ AGENTS = [
 ]
 global_agent_counter = 0
 
-# SMART IMAGE LIBRARY
+# 🖼️ SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
     "kids": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -68,44 +67,96 @@ LANGUAGES = {
     "7": "Bengali"
 }
 
-# INTRO SCRIPTS (Bilingual Support Added)
-SCRIPTS = {
-    "Malayalam": {
-        "ask_product": "നന്ദി! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (e.g., Sakhitone, Staamigen Malt, Junior Staamigen?)",
-        "sakhitone_intro": "സ്ത്രീകൾക്ക് ശരീരഭാരവും ശരീരസൗന്ദര്യവും മെച്ചപ്പെടുത്താൻ സപ്പോർട്ട് ചെയ്യുന്ന സഖിടോണിനെ പറ്റിയാണ് താങ്കൾ അറിയാൻ ആഗ്രഹിക്കുന്നത് എന്ന് ഞങ്ങൾ മനസിലാക്കുന്നു.",
-        "staamigen_intro": "പുരുഷന്മാർക്ക് ശരീരഭാരവും മസിലും വർധിപ്പിക്കാൻ സഹായിക്കുന്ന സ്റ്റാമിജൻ മാൾട്ടിനെ പറ്റിയാണ് താങ്കൾ അറിയാൻ ആഗ്രഹിക്കുന്നത്.",
-        "powder_intro": "കൗമാരക്കാർക്ക് (Teenagers) ശരീരവളർച്ചയ്ക്കും തൂക്കം കൂടാനും സഹായിക്കുന്ന സ്റ്റാമിജൻ പൗഡറിനെ പറ്റിയാണ് താങ്കൾ അന്വേഷിക്കുന്നത്.",
-        "diabet_intro": "പ്രമേഹ രോഗികൾക്ക് ഷുഗർ നിയന്ത്രിക്കാനും ക്ഷീണം മാറ്റാനും സഹായിക്കുന്ന ആയുർ ഡയബറ്റിനെക്കുറിച്ചാണ് താങ്കൾ അന്വേഷിക്കുന്നത്.",
-        "saphala_intro": "പുരുഷന്മാർക്ക് ഉന്മേഷവും ആരോഗ്യവും വീണ്ടെടുക്കാൻ സഹായിക്കുന്ന സഫല ക്യാപ്‌സ്യൂളിനെക്കുറിച്ചാണ് താങ്കൾ അന്വേഷിക്കുന്നത്.",
-        "ask_doubts": "താങ്കളുടെ സംശയങ്ങൾ എന്താണെങ്കിലും ഇപ്പോൾ ആത്മവിശ്വാസത്തോടു കൂടി ഞങ്ങളോട് ചോദിച്ചോളൂ.",
-        "collect_data": "കൂടുതൽ കൃത്യമായ നിർദ്ദേശങ്ങൾക്കായി ദയവായി താങ്കളുടെ **പ്രായം, ഉയരം, ഭാരം (Age, Height, Weight)** എന്നിവ പറയുക.",
-        "switch_confirm": "നിങ്ങൾക്ക് ഭാഷ മലയാളത്തിലേക്ക് മാറ്റണോ? (അതെ/അല്ല)"
-    },
+# 🌐 UI TRANSLATION DICTIONARY
+UI_STRINGS = {
     "English": {
+        "ask_name": "Great! You selected English.\nMay I know your *Name*?",
         "ask_product": "Thank you! Which product would you like to know about? (e.g., Sakhitone, Staamigen Malt, Junior Staamigen?)",
-        "sakhitone_intro": "We understand you are looking for Sakhi Tone, which helps women improve body weight and figure naturally.",
-        "staamigen_intro": "You are inquiring about Staamigen Malt, designed to help men build muscle and healthy weight.",
-        "powder_intro": "You are asking about Staamigen Powder, formulated for Teenagers to support growth and healthy weight.",
-        "diabet_intro": "You are asking about Ayur Diabet, which helps manage sugar levels and reduce diabetic fatigue.",
-        "saphala_intro": "You are asking about Saphala Capsule, a premium vitalizer for men's strength and energy.",
-        "ask_doubts": "Please feel free to ask any specific doubts you have about this product.",
-        "collect_data": "For better advice, please tell me your **Age, Height, and Weight**.",
-        "switch_confirm": "Do you want to switch language to English? (Yes/No)"
+        "confirm_switch": "Do you want me to talk in English from now? (Yes/No)",
+        "intro_prefix": "You are inquiring about"
+    },
+    "Malayalam": {
+        "ask_name": "നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)",
+        "ask_product": "നന്ദി! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (e.g., Sakhitone, Staamigen Malt, Junior Staamigen?)",
+        "confirm_switch": "നിങ്ങൾക്ക് ഭാഷ മലയാളത്തിലേക്ക് മാറ്റണോ? (അതെ/അല്ല)",
+        "intro_prefix": "താങ്കൾ അന്വേഷിക്കുന്നത്"
+    },
+    "Tamil": {
+        "ask_name": "நன்றி! உங்கள் பெயர் என்ன? (What is your name?)",
+        "ask_product": "நன்றி! எந்த தயாரிப்பு பற்றி நீங்கள் அறிய விரும்புகிறீர்கள்? (e.g., Sakhitone, Staamigen Malt?)",
+        "confirm_switch": "நீங்கள் தமிழுக்கு மாற விரும்புகிறீர்களா? (ஆம்/இல்லை)",
+        "intro_prefix": "நீங்கள் விசாரிப்பது"
+    },
+    "Hindi": {
+        "ask_name": "धन्यवाद! आपका शुभ नाम क्या है?",
+        "ask_product": "धन्यवाद! आप किस उत्पाद के बारे में जानना चाहते हैं? (e.g., Sakhitone, Staamigen Malt?)",
+        "confirm_switch": "क्या आप हिंदी में बात करना चाहते हैं? (हाँ/नहीं)",
+        "intro_prefix": "आप पूछताछ कर रहे हैं"
+    },
+    "Kannada": {
+        "ask_name": "ಧನ್ಯವಾದ! ನಿಮ್ಮ ಹೆಸರೇನು?",
+        "ask_product": "ಧನ್ಯವಾದ! ನೀವು ಯಾವ ಉತ್ಪನ್ನದ ಬಗ್ಗೆ ತಿಳಿಯಲು ಬಯಸುತ್ತೀರಿ?",
+        "confirm_switch": "ನೀವು ಕನ್ನಡಕ್ಕೆ ಬದಲಾಯಿಸಲು ಬಯಸುವಿರಾ?",
+        "intro_prefix": "ನೀವು ಕೇಳುತ್ತಿದ್ದೀರಿ"
+    },
+    "Telugu": {
+        "ask_name": "ధన్యవాదాలు! మీ పేరు ఏమిటి?",
+        "ask_product": "ధన్యవాదాలు! మీరు ఏ ఉత్పత్తి గురించి తెలుసుకోవాలనుకుంటున్నారు?",
+        "confirm_switch": "మీరు తెలుగుకు మారాలనుకుంటున్నారా?",
+        "intro_prefix": "మీరు అడుగుతున్నారు"
+    },
+    "Bengali": {
+        "ask_name": "ধন্যবাদ! আপনার নাম কি?",
+        "ask_product": "ধন্যবাদ! আপনি কোন পণ্য সম্পর্কে জানতে চান?",
+        "confirm_switch": "আপনি কি বাংলায় কথা বলতে চান?",
+        "intro_prefix": "আপনি জিজ্ঞাসা করছেন"
     }
 }
 
-# VOICE REJECTION MESSAGES
+# --- PRODUCT INTRO SCRIPTS (Bilingual Support) ---
+PRODUCT_INTROS = {
+    "sakhitone": {
+        "English": "Sakhi Tone, specifically designed to help women improve body weight and figure naturally.",
+        "Malayalam": "സ്ത്രീകൾക്ക് ശരീരഭാരവും ശരീരസൗന്ദര്യവും മെച്ചപ്പെടുത്താൻ സപ്പോർട്ട് ചെയ്യുന്ന സഖിടോണിനെ പറ്റിയാണ്.",
+        "Tamil": "பெண்களின் உடல் எடை மற்றும் தோற்றத்தை மேம்படுத்த உதவும் சகி டோன் பற்றி.",
+        "Hindi": "सखी टोन के बारे में, जो महिलाओं को वजन और फिगर बढ़ाने में मदद करता है।"
+    },
+    "staamigen": {
+        "English": "Staamigen Malt, designed to help men build muscle and healthy weight.",
+        "Malayalam": "പുരുഷന്മാർക്ക് ശരീരഭാരവും മസിലും വർധിപ്പിക്കാൻ സഹായിക്കുന്ന സ്റ്റാമിജൻ മാൾട്ടിനെ പറ്റിയാണ്.",
+        "Tamil": "ஆண்களுக்கு தசை மற்றும் எடையை அதிகரிக்க உதவும் ஸ்டாமிஜென் மால்ட் பற்றி.",
+        "Hindi": "स्टैमिजेन माल्ट के बारे में, जो पुरुषों को वजन बढ़ाने में मदद करता है।"
+    },
+    "gain": {
+        "English": "Ayurdan Gain Plus, an appetite restorer to help you eat well and build a healthy body.",
+        "Malayalam": "വിശപ്പ് വർധിപ്പിക്കാനും അതുവഴി ശരീരഭാരം കൂട്ടാനും സഹായിക്കുന്ന ആയുർദാൻ ഗെയിൻ പ്ലസിനെക്കുറിച്ചാണ്.",
+        "Tamil": "பசியைத் தூண்டி, உடல் எடையை அதிகரிக்க உதவும் ஆயுர்தான் கெயின் பிளஸ் பற்றி."
+    }
+}
+
+# VOICE REJECTION
 VOICE_REPLIES = {
     "English": "Sorry, I cannot listen to voice notes. Please type your message. 🙏",
     "Malayalam": "ക്ഷമിക്കണം, എനിക്ക് വോയിസ് മെസേജ് കേൾക്കാൻ കഴിയില്ല. ദയവായി ടൈപ്പ് ചെയ്യാമോ? 🙏",
-    "Tamil": "മன்னிக்கவும், என்னால் ஆடியோ கேட்க முடியாது. தயவுசெய்து டைப் செய்யவும். 🙏",
+    "Tamil": "மன்னிக்கவும், என்னால் ஆடியோ கேட்க முடியாது. தயவுசெய்து டைப் செய்யவும். 🙏",
     "Hindi": "क्षमा करें, मैं वॉयस नोट नहीं सुन सकता। कृपया टाइप करें। 🙏",
     "Kannada": "ಕ್ಷಮಿಸಿ, ನಾನು ಧ್ವನಿ ಸಂದೇಶಗಳನ್ನು ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ. 🙏",
     "Telugu": "క్షమించండి, నేను వాయిస్ మెసేజ్ వినలేను. దయచేసి టైప్ చేయండి. 🙏",
     "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
-# THE SUPER-BRAIN
+# --- MALAYALAM SCRIPTS (Legacy/Fallback) ---
+M_SCRIPTS = {
+    "ask_doubts": "താങ്കളുടെ സംശയങ്ങൾ എന്താണെങ്കിലും ഇപ്പോൾ ആത്മവിശ്വാസത്തോടു കൂടി ഞങ്ങളോട് ചോദിച്ചോളൂ.",
+    "collect_data": "കൂടുതൽ കൃത്യമായ നിർദ്ദേശങ്ങൾക്കായി ദയവായി താങ്കളുടെ **പ്രായം, ഉയരം, ഭാരം (Age, Height, Weight)** എന്നിവ പറയുക.",
+    "underweight_msg": "{name}, നിങ്ങൾക്ക് ആവശ്യമുള്ളതിലും {diff}kg കുറവാണെന്ന കാര്യം താങ്കൾ മനസ്സിലാക്കിയിട്ടുണ്ടോ? ഇത്രയും kg കുറയാൻ ഉള്ള കാരണം എന്താണെന്നാണ് താങ്കൾ മനസ്സിലാക്കുന്നത്?",
+    "normalweight_msg": "{name}, നിങ്ങൾ തന്ന വിവരങ്ങൾ പ്രകാരം താങ്കൾക്ക് ഉയരത്തിനൊത്ത ശരീരഭാരം ആണല്ലോ! അപ്പോൾ എന്താണ് നേരിടുന്ന മറ്റ് ബുദ്ധിമുട്ടുകൾ എന്ന് ഞങ്ങളോട് പറയാമോ?",
+    "women_health": "നിങ്ങൾക്ക് white discharge, PCOD, Thyroid, Gastric issues, Diabetes, Ulcer പോലത്തെ എന്തെങ്കിലും ബുദ്ധിമുട്ടുകളുണ്ടോ?",
+    "men_health": "നിങ്ങൾക്ക് Thyroid, Diabetes, Ulcer പോലത്തെ എന്തെങ്കിലും ബുദ്ധിമുട്ടുകളോ, മദ്യപാനം, പുകവലി മറ്റും പോലെയുള്ള ദുഃശീലങ്ങൾ ഉണ്ടോ?",
+    "closing_advice": "ആരോഗ്യകരമായി ശരീര ഭാരം വർധിപ്പിക്കാൻ ആഗ്രഹിക്കുന്ന ഒരാൾക്ക് ഒരു മാസം 3 മുതൽ 4 കിലോഗ്രാം വരെയാണ് പാർശ്വഫലങ്ങൾ ഒന്നുമില്ലാതെ വർധിപ്പിക്കാൻ കഴിയുന്നത്. നമ്മൾ കഴിക്കുന്ന ഭക്ഷണം ഉപയോഗിച്ച് ശരീരഭാരം കൂടുമ്പോഴാണ് അത് സ്ഥിരമായി നിലനിൽക്കുന്നത് എന്ന് തിരിച്ചറിയണം."
+}
+
+# THE SUPER-BRAIN (FULL KNOWLEDGE BASE)
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Assistant (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, Concise.
@@ -115,7 +166,6 @@ SYSTEM_PROMPT = """
    - **MAX LENGTH:** 2-3 sentences.
 2. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for user to ask.
 3. **CONTEXT ISOLATION:** - If talking about [PRODUCT A], answer based ONLY on [PRODUCT A].
-   - If user asks a general question (e.g. "Price?"), assume they mean [PRODUCT A].
    - Do NOT mention other products unless explicitly asked.
 4. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
 5. **NO WALL OF TEXT:** Break info into small chunks.
@@ -830,13 +880,13 @@ Q90. Is consistency important? A: Yes. You must take it every day to train your 
 
 Section J: Final Conviction
 Q91. What is the guarantee? A: The guarantee is biological. If you stimulate Agni, hunger must happen. It is natural law.
-Q92. Why is this better than a powder? A: Convenience. You can carry it in your pocket to the office or college.
-Q93. Can I buy it online? A: Yes, available on all major platforms.
-Q94. Is it a "magic pill"? A: No. It is a "logic pill." It fixes the logic of your digestion.
-Q95. Will I become a bodybuilder? A: You will become a healthier version of yourself. Bodybuilding requires gym + this.
-Q96. Will my face look chubby? A: Your face will look healthy and filled out, not swollen.
-Q97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
-Q98. How do I know it's working? A: You will start looking at the clock waiting for lunch time!
+92. Why is this better than a powder? A: Convenience. You can carry it in your pocket to the office or college.
+93. Can I buy it online? A: Yes, available on all major platforms.
+94. Is it a "magic pill"? A: No. It is a "logic pill." It fixes the logic of your digestion.
+95. Will I become a bodybuilder? A: You will become a healthier version of yourself. Bodybuilding requires gym + this.
+96. Will my face look chubby? A: Your face will look healthy and filled out, not swollen.
+97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
+98. How do I know it's working? A: You will start looking at the clock waiting for lunch time!
 99. Is it made in India? A: Yes, proudly.
 100. Why should I trust Ayurdan Gain Plus? A: Because we don't force your body; we help your body do what it naturally wants to do—Eat, Digest, and Grow Beautiful.
 
@@ -906,7 +956,13 @@ def save_to_google_sheet(user_data):
         print(f"❌ SAVE ERROR: {e}")
 
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
-    full_prompt = SYSTEM_PROMPT + f"\n\nUser: {user_name}, Lang: {language}. Query: {user_msg}"
+    # INJECT PRODUCT CONTEXT STRONGLY
+    context_instruction = ""
+    if product_context and product_context != "Pending":
+        context_instruction = f"IMPORTANT: The user is asking about '{product_context}'. Answer ONLY about '{product_context}' unless they explicitly ask for another product."
+
+    full_prompt = SYSTEM_PROMPT + f"\n\n{context_instruction}\nUser: {user_name}\nLanguage: {language}\nQuery: {user_msg}"
+    
     if assigned_agent:
         full_prompt += f"\nORDER LINK: {assigned_agent['link']} (Phone: {assigned_agent['phone']})"
     
@@ -922,27 +978,20 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
         return "Server busy. Please try again."
 
 def parse_measurements(text):
-    # Extract numbers for logic (Simple Regex)
     height_cm = 0
     weight_kg = 0
-    
-    # Try find height (cm)
     cm_match = re.search(r'(\d{2,3})\s*cm', text.lower())
     if cm_match:
         height_cm = int(cm_match.group(1))
     else:
-        # Try ft
         ft_match = re.search(r'(\d)\.(\d+)', text)
         if ft_match:
             feet = int(ft_match.group(1))
             inches = int(ft_match.group(2))
             height_cm = int((feet * 30.48) + (inches * 2.54))
-            
-    # Try find weight
     kg_match = re.search(r'(\d{2,3})\s*kg', text.lower())
     if kg_match:
         weight_kg = int(kg_match.group(1))
-        
     return height_cm, weight_kg
 
 @app.route("/bot", methods=["POST"])
@@ -954,7 +1003,6 @@ def bot():
     resp = MessagingResponse()
     
     if sender_phone not in user_sessions:
-         # NEW USER INIT
          detected_product = "Pending"
          incoming_lower = incoming_msg.lower()
          for key in PRODUCT_IMAGES.keys():
@@ -962,7 +1010,6 @@ def bot():
                  detected_product = key
                  break
          
-         # AGENT ASSIGNMENT
          global global_agent_counter
          current_agent = AGENTS[global_agent_counter % len(AGENTS)]
          global_agent_counter += 1
@@ -979,8 +1026,9 @@ def bot():
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
+    step = session["step"]
     
-    # 🔄 DYNAMIC LANGUAGE SWITCHER 🔄
+    # 🔄 DYNAMIC LANGUAGE SWITCHER
     if session.get("step") == "confirm_lang":
         if "yes" in incoming_msg.lower() or "ok" in incoming_msg.lower():
             session["data"]["language"] = session.get("pending_lang")
@@ -989,10 +1037,8 @@ def bot():
             msg.body(f"✅ Language changed to {session['data']['language']}. How can I help you?")
             return Response(str(resp), mimetype="application/xml")
         else:
-            session["step"] = "consultation_active" # Cancel switch
-            # Fall through to normal processing
+            session["step"] = "consultation_active"
 
-    # Check for language switch request
     for lang_name in LANGUAGES.values():
         if lang_name.lower() in incoming_msg.lower() and lang_name != session["data"]["language"]:
             session["pending_lang"] = lang_name
@@ -1001,22 +1047,18 @@ def bot():
             msg.body(f"Do you want me to talk in {lang_name} from now? (Yes/No)")
             return Response(str(resp), mimetype="application/xml")
 
-    # 🔄 SMART PRODUCT CONTEXT SWITCHER 🔄
+    # 🔄 SMART PRODUCT CONTEXT SWITCHER
     incoming_lower = incoming_msg.lower()
     current_product_key = session["data"].get("product", "")
     
-    # Only switch if current product is NOT mentioned in the message
     if current_product_key not in incoming_lower:
         for key in PRODUCT_IMAGES.keys():
             if key in incoming_lower and key != current_product_key:
-                # Found a NEW product keyword
                 session["data"]["product"] = key
                 session["step"] = "consultation_active"
                 session["consultation_state"] = "intro"
                 return run_consultation_flow(session, incoming_msg, resp)
 
-    step = session["step"]
-    
     # RESET
     if incoming_msg.lower() in ["reset", "restart"]:
         del user_sessions[sender_phone]
@@ -1037,17 +1079,16 @@ def bot():
         selection = incoming_msg.strip()
         selected_lang = LANGUAGES.get(selection, "English") 
         for key, val in LANGUAGES.items():
-            if val.lower() in selection.lower():
+            if val.lower() in selection.lower() or key in selection:
                 selected_lang = val
                 break
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
         
+        # FIX: Reply in the selected language using Dictionary
         msg = resp.message()
-        if selected_lang == "Malayalam":
-            msg.body("നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)")
-        else:
-            msg.body(f"Great! You selected {selected_lang}.\nMay I know your *Name*?")
+        msg_text = UI_STRINGS.get(selected_lang, UI_STRINGS["English"])["ask_name"]
+        msg.body(msg_text)
         return Response(str(resp), mimetype="application/xml")
 
     # 2. NAME & PRODUCT ROUTING
@@ -1055,27 +1096,27 @@ def bot():
         session["data"]["name"] = incoming_msg
         save_to_google_sheet(session["data"])
         
-        # PRODUCT DETECTION CHECK
         prod = session["data"]["product"]
         
-        # AMBIGUITY CHECK (Generic "Staamigen")
+        # AMBIGUITY CHECK
         if "staamigen" in prod and "malt" not in prod and "powder" not in prod:
              session["step"] = "resolve_staamigen"
              msg = resp.message()
-             msg.body("ഞങ്ങൾക്ക് Staamigen Malt (Men), Staamigen Powder (Teenagers) എന്നിവയുണ്ട്. ഏതാണ് താങ്കൾക്ക് വേണ്ടത്?")
+             msg.body("We have Staamigen Malt (Men) & Staamigen Powder (Teenagers). Which one?")
              return Response(str(resp), mimetype="application/xml")
              
-        # AD LEAD (Product Known)
+        # AD LEAD
         if prod != "Pending":
             session["step"] = "consultation_active"
             session["consultation_state"] = "intro"
-            # TRIGGER INTRO IMMEDIATELY
             return run_consultation_flow(session, incoming_msg, resp)
         else:
-            # DIRECT MSG (Ask Product)
+            # DIRECT MSG - FIX: Ask in correct language
             session["step"] = "ask_product_manual"
             msg = resp.message()
-            msg.body("നന്ദി! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (e.g., Sakhitone, Staamigen Malt, Junior Staamigen?)")
+            lang = session["data"]["language"]
+            msg_text = UI_STRINGS.get(lang, UI_STRINGS["English"])["ask_product"]
+            msg.body(msg_text)
             return Response(str(resp), mimetype="application/xml")
 
     # 3. RESOLVE AMBIGUITY
@@ -1085,7 +1126,6 @@ def bot():
         elif "powder" in incoming_msg.lower():
             session["data"]["product"] = "staamigen powder"
         else:
-            # Default or ask again (Simple fallback for now)
             session["data"]["product"] = "staamigen malt" 
             
         session["step"] = "consultation_active"
@@ -1094,7 +1134,6 @@ def bot():
 
     # 4. MANUAL PRODUCT ENTRY
     elif step == "ask_product_manual":
-        # Check keywords
         found = False
         for key in PRODUCT_IMAGES.keys():
             if key in incoming_msg.lower():
@@ -1102,7 +1141,7 @@ def bot():
                 found = True
                 break
         if not found:
-            session["data"]["product"] = "general" # Fallback
+            session["data"]["product"] = "general" 
             
         save_to_google_sheet(session["data"])
         session["step"] = "consultation_active"
@@ -1122,19 +1161,16 @@ def run_consultation_flow(session, user_text, resp):
     name = session["data"]["name"]
     lang = session["data"]["language"]
     
-    # ONLY TRIGGER FOR WEIGHT GAIN PRODUCTS (Sakhitone, Staamigen)
+    # ONLY TRIGGER FOR WEIGHT GAIN PRODUCTS
     weight_products = ["sakhi", "malt", "powder", "staamigen", "gain", "strength"]
     is_weight_flow = any(x in product for x in weight_products)
     
     if not is_weight_flow:
-        # Standard AI Chat for other products (Diabet, etc)
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
         msg = resp.message()
         msg.body(ai_reply)
         return Response(str(resp), mimetype="application/xml")
 
-    # --- WEIGHT GAIN FLOW LOGIC ---
-    
     # PHASE 1: INTRO (Step-by-Step Fix)
     if state == "intro":
         msg = resp.message()
@@ -1145,38 +1181,35 @@ def run_consultation_flow(session, user_text, resp):
                 msg.media(url)
                 break
         
+        # Send Dynamic Intro Text based on Language
+        # AI will generate a polite intro if specific script is missing
         intro_text = ""
         if "sakhi" in product:
-            intro_text = M_SCRIPTS["sakhitone_intro"]
-        elif "powder" in product:
-            # Check Gender for Powder (Teenagers)
-            intro_text = M_SCRIPTS["powder_intro"]
-        else: # Default Malt
-            intro_text = M_SCRIPTS["staamigen_intro"]
+            intro_text = PRODUCT_INTROS["sakhitone"].get(lang, PRODUCT_INTROS["sakhitone"]["English"])
+        elif "malt" in product:
+            intro_text = PRODUCT_INTROS["staamigen"].get(lang, PRODUCT_INTROS["staamigen"]["English"])
+        else:
+            # Fallback to AI for intro
+            intro_text = get_ai_reply("Give a 1 sentence intro about " + product, product, name, lang, [], None)
             
         msg.body(intro_text)
-        
-        # STOP HERE. Wait for user to ask. 
         
         session["consultation_state"] = "waiting_for_doubts"
         return Response(str(resp), mimetype="application/xml")
 
-    # PHASE 2: HANDLE DOUBTS & MOVE TO MEASUREMENTS
+    # PHASE 2: HANDLE DOUBTS
     elif state == "waiting_for_doubts":
-        # Check if user gave measurements directly
         h, w = parse_measurements(user_text)
         if h > 0 and w > 0:
-             # Skip to calculation if they gave numbers
              return calculate_bmi_reply(h, w, name, product, resp, session)
         
-        # Otherwise, answer their doubt concisely
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
         msg = resp.message()
         msg.body(ai_reply)
         
-        # Gently nudge for data after answering
-        msg2 = resp.message()
-        msg2.body(M_SCRIPTS["collect_data"])
+        # Ask for measurements only if not given
+        # msg2 = resp.message()
+        # msg2.body("To give you the best dosage, tell me your Age, Height & Weight.")
         
         session["consultation_state"] = "waiting_for_measurements"
         return Response(str(resp), mimetype="application/xml")
@@ -1188,24 +1221,17 @@ def run_consultation_flow(session, user_text, resp):
         if h > 0 and w > 0:
             return calculate_bmi_reply(h, w, name, product, resp, session)
         else:
-            # Parsing failed, answer doubt instead
             ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
             msg = resp.message()
             msg.body(ai_reply)
             return Response(str(resp), mimetype="application/xml")
 
-    # PHASE 4: CLOSING & SALES
+    # PHASE 4: CLOSING
     elif state == "health_check":
-        # Answer doubts using AI then give closing advice
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
-        
         msg = resp.message()
         msg.body(ai_reply)
-        
-        msg_close = resp.message()
-        msg_close.body(M_SCRIPTS["closing_advice"])
-        
-        session["consultation_state"] = "chat_open" # Flow complete
+        session["consultation_state"] = "chat_open"
         return Response(str(resp), mimetype="application/xml")
         
     # PHASE 5: OPEN CHAT
@@ -1222,27 +1248,23 @@ def calculate_bmi_reply(h, w, name, product, resp, session):
     msg = resp.message()
     
     if w < rbw:
-        # Underweight
-        txt = M_SCRIPTS["underweight_msg"].format(name=name, diff=diff)
+        txt = f"{name}, You are underweight by {diff}kg. We need to fix your metabolism."
         msg.body(txt)
     else:
-        # Normal/Over
-        txt = M_SCRIPTS["normalweight_msg"].format(name=name)
+        txt = f"{name}, Your weight is normal. You can use this for fitness."
         msg.body(txt)
         
-    # Ask Health Questions immediately
     msg_health = resp.message()
     if "sakhi" in product:
-        msg_health.body(M_SCRIPTS["women_health"])
+        msg_health.body("Do you have thyroid or period issues?")
     elif "malt" in product:
-        msg_health.body(M_SCRIPTS["men_health"])
+        msg_health.body("Do you smoke or have gastric issues?")
     else:
-        msg_health.body("Do you have any digestion or allergy issues?") # Generic
+        msg_health.body("Any other health issues?")
         
     session["consultation_state"] = "health_check"
     return Response(str(resp), mimetype="application/xml")
 
-# 🟢 WAKE UP CALL FOR UPTIMEROBOT
 @app.route("/")
 def wake_up():
     return "Bot is awake!", 200
