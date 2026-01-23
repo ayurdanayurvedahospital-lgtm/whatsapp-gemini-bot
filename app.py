@@ -94,18 +94,16 @@ M_SCRIPTS = {
     "closing_advice": "ആരോഗ്യകരമായി ശരീര ഭാരം വർധിപ്പിക്കാൻ ആഗ്രഹിക്കുന്ന ഒരാൾക്ക് ഒരു മാസം 3 മുതൽ 4 കിലോഗ്രാം വരെയാണ് പാർശ്വഫലങ്ങൾ ഒന്നുമില്ലാതെ വർധിപ്പിക്കാൻ കഴിയുന്നത്. നമ്മൾ കഴിക്കുന്ന ഭക്ഷണം ഉപയോഗിച്ച് ശരീരഭാരം കൂടുമ്പോഴാണ് അത് സ്ഥിരമായി നിലനിൽക്കുന്നത് എന്ന് തിരിച്ചറിയണം."
 }
 
-# THE SUPER-BRAIN (UPDATED FOR BRIEF RESPONSES)
+# THE SUPER-BRAIN (UPDATED)
 SYSTEM_PROMPT = """
 **Role:** Alpha Ayurveda Assistant (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, Concise.
 
 **⚠️ CRITICAL RULES FOR AI RESPONSE (STRICTLY FOLLOW):**
 1. **ANTI-VERBOSITY RULE:** Do NOT dump information. Answer **ONLY** the specific question asked.
-   - *Example:* If user asks "Can thyroid patients take this?", reply *only* about Thyroid. Do not add dosage, price, or diet advice unless asked.
    - Keep answers strictly under 3 sentences.
 2. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
-3. **CONTEXT ISOLATION:** - If the user is asking about **Sakhi Tone**, do NOT mention Staamigen.
-   - If the user switches to **Staamigen**, instantly forget Sakhi Tone and answer only about Staamigen.
+3. **CONTEXT ISOLATION:** - If talking about **Sakhi Tone**, and user asks "Can I take this for Diabetes?", answer based on Sakhi Tone's rules for diabetes. DO NOT talk about Ayur Diabet product unless explicitly asked "Do you have a product for diabetes?".
 4. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
 5. **NO WALL OF TEXT:** Break information into small, digestible chunks.
 
@@ -643,7 +641,7 @@ Q26. Can it help mood swings? A: Yes. Stable energy improves mood.
 Q27. Does it help screen-time fatigue? A: Indirectly, yes, by improving stamina.
 Q28. Can it help lack of motivation? A: Yes. Energy brings motivation.
 Q29. Will it disturb sleep? A: No. It usually improves sleep quality.
-Q30. Can it help morning tiredness? A: Yes.
+30. Can it help morning tiredness? A: Yes.
 
 Section D: Sports, Fitness & Energy
 Q31. Can sports students use Staamigen Powder? A: Yes. It supports stamina and recovery.
@@ -719,7 +717,7 @@ Q6. Is it hormonal? A: No. It works on the digestive system, not the hormonal sy
 Q7. Is it habit-forming? A: No. Once your appetite is reset, you can stop taking it.
 Q8. Is it GMP certified? A: Yes, manufactured under strict quality standards.
 Q9. Is it AYUSH compliant? A: Yes, it follows Ayurvedic texts and regulations.
-Q10. Can both men and women use it? A: Yes, the digestive system is the same for both genders.
+10. Can both men and women use it? A: Yes, the digestive system is the same for both genders.
 
 Section B: The "Beauty & Health" Connection
 Q11. Will this help me look better? A: Yes. When you eat properly, your skin gets nutrients, your face fills out, and you look healthier and more beautiful.
@@ -970,16 +968,40 @@ def bot():
 
     session = user_sessions[sender_phone]
     
-    # 🔄 DYNAMIC PRODUCT CONTEXT SWITCHER 🔄
-    # If user mentions a NEW product, switch immediately.
-    incoming_lower = incoming_msg.lower()
-    for key in PRODUCT_IMAGES.keys():
-        if key in incoming_lower and key != session["data"].get("product"):
-            session["data"]["product"] = key
+    # 🔄 DYNAMIC LANGUAGE SWITCHER 🔄
+    if session["step"] == "confirm_lang":
+        if "yes" in incoming_msg.lower() or "ok" in incoming_msg.lower():
+            session["data"]["language"] = session.get("pending_lang")
             session["step"] = "consultation_active"
-            session["consultation_state"] = "intro"
-            # Reset flow for new product
-            return run_consultation_flow(session, incoming_msg, resp)
+            msg = resp.message()
+            msg.body(f"✅ Language changed to {session['data']['language']}. How can I help you?")
+            return Response(str(resp), mimetype="application/xml")
+        else:
+            session["step"] = "consultation_active" # Cancel switch
+            # Fall through to normal processing
+
+    # Check for language switch request
+    for lang_name in LANGUAGES.values():
+        if lang_name.lower() in incoming_msg.lower() and lang_name != session["data"]["language"]:
+            session["pending_lang"] = lang_name
+            session["step"] = "confirm_lang"
+            msg = resp.message()
+            msg.body(f"Do you want me to talk in {lang_name} from now? (Yes/No)")
+            return Response(str(resp), mimetype="application/xml")
+
+    # 🔄 SMART PRODUCT CONTEXT SWITCHER 🔄
+    incoming_lower = incoming_msg.lower()
+    current_product_key = session["data"].get("product", "")
+    
+    # Only switch if current product is NOT mentioned in the message
+    if current_product_key not in incoming_lower:
+        for key in PRODUCT_IMAGES.keys():
+            if key in incoming_lower and key != current_product_key:
+                # Found a NEW product keyword
+                session["data"]["product"] = key
+                session["step"] = "consultation_active"
+                session["consultation_state"] = "intro"
+                return run_consultation_flow(session, incoming_msg, resp)
 
     step = session["step"]
     
@@ -998,7 +1020,7 @@ def bot():
 
     # --- FLOW LOGIC ---
     
-    # 1. LANGUAGE
+    # 1. LANGUAGE SELECTION
     if step == "ask_language":
         selection = incoming_msg.strip()
         selected_lang = LANGUAGES.get(selection, "English") 
@@ -1081,7 +1103,7 @@ def bot():
 
     return Response(str(resp), mimetype="application/xml")
 
-# --- 🧠 THE CONSULTATION ENGINE (UPDATED FOR STEP-BY-STEP) ---
+# --- 🧠 THE CONSULTATION ENGINE ---
 def run_consultation_flow(session, user_text, resp):
     state = session["consultation_state"]
     product = session["data"]["product"]
@@ -1123,7 +1145,6 @@ def run_consultation_flow(session, user_text, resp):
         msg.body(intro_text)
         
         # STOP HERE. Wait for user to ask. 
-        # We removed the auto-spam of "Ask Doubts" + "Reality Check".
         
         session["consultation_state"] = "waiting_for_doubts"
         return Response(str(resp), mimetype="application/xml")
