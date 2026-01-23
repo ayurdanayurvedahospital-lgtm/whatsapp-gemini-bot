@@ -20,7 +20,7 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
-# 👥 AGENT ROTATION LIST (Names hidden from customer)
+# 👥 AGENT ROTATION LIST
 AGENTS = [
     {"name": "Sreelekha", "phone": "+91 9895900809", "link": "https://wa.link/t45vpy"},
     {"name": "Savitha", "phone": "+91 9447225084", "link": "https://wa.link/nxzz8w"},
@@ -79,7 +79,7 @@ VOICE_REPLIES = {
     "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
-# --- MALAYALAM SCRIPTS (New Logic Added Here) ---
+# --- MALAYALAM SCRIPTS ---
 M_SCRIPTS = {
     "sakhitone_intro": "സ്ത്രീകൾക്ക് ശരീരഭാരവും ശരീരസൗന്ദര്യവും മെച്ചപ്പെടുത്താൻ സപ്പോർട്ട് ചെയ്യുന്ന സഖിടോണിനെ പറ്റിയാണ് താങ്കൾ അറിയാൻ ആഗ്രഹിക്കുന്നത് എന്ന് ഞങ്ങൾ മനസിലാക്കുന്നു.",
     "staamigen_intro": "പുരുഷന്മാർക്ക് ശരീരഭാരവും മസിലും വർധിപ്പിക്കാൻ സഹായിക്കുന്ന സ്റ്റാമിജൻ മാൾട്ടിനെ പറ്റിയാണ് താങ്കൾ അറിയാൻ ആഗ്രഹിക്കുന്നത്.",
@@ -94,42 +94,22 @@ M_SCRIPTS = {
     "closing_advice": "ആരോഗ്യകരമായി ശരീര ഭാരം വർധിപ്പിക്കാൻ ആഗ്രഹിക്കുന്ന ഒരാൾക്ക് ഒരു മാസം 3 മുതൽ 4 കിലോഗ്രാം വരെയാണ് പാർശ്വഫലങ്ങൾ ഒന്നുമില്ലാതെ വർധിപ്പിക്കാൻ കഴിയുന്നത്. നമ്മൾ കഴിക്കുന്ന ഭക്ഷണം ഉപയോഗിച്ച് ശരീരഭാരം കൂടുമ്പോഴാണ് അത് സ്ഥിരമായി നിലനിൽക്കുന്നത് എന്ന് തിരിച്ചറിയണം."
 }
 
-# THE SUPER-BRAIN (FULL KNOWLEDGE BASE INTEGRATED)
+# THE SUPER-BRAIN (UPDATED FOR BRIEF RESPONSES)
 SYSTEM_PROMPT = """
-**Role:** Alpha Ayurveda Assistant (backed by Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
-**Tone:** Empathetic, Authoritative, "The Expert Coach".
+**Role:** Alpha Ayurveda Assistant (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
+**Tone:** Empathetic, Authoritative, Concise.
 
-**⚠️ CRITICAL RULES:**
-1. **IDENTIFY THE USER & ADAPT TONE:**
-   - **Teens/Kids (Junior):** "Parent Coach" (Warmth, Reassurance, Sparkle in Eyes).
-   - **Teens/Young Adults (Staamigen Powder):** "Confidence Coach" (Supportive, Scientific, Non-Judgmental, "Fuel Efficiency"). See Section 10.
-   - **Men (Staamigen Malt):** "Strength Partner" (Logical, Systems-based, "Digestive Power Tool", No Pity). See Section 9.
-   - **Men (Saphala Capsule):** "Performance Partner" (Dignified, Internal Battery, Vitality, Stress Relief).
-   - **Adults (Gain Plus):** "Appetite & Beauty Coach" (Focus on Hunger Signal, Beauty from Nutrition, Logic: "No Hunger = No Food"). See Section 11.
-   - **Women (Sakhi Tone):** "Care Partner" (Gentle, Respectful, "Sisterly"). See Section 8.
-   - **Diabetics (Ayurdiabet):** "Quality of Life Partner" (Scientific, Empathetic, Cellular Starvation).
+**⚠️ CRITICAL RULES FOR AI RESPONSE (STRICTLY FOLLOW):**
+1. **ANTI-VERBOSITY RULE:** Do NOT dump information. Answer **ONLY** the specific question asked.
+   - *Example:* If user asks "Can thyroid patients take this?", reply *only* about Thyroid. Do not add dosage, price, or diet advice unless asked.
+   - Keep answers strictly under 3 sentences.
+2. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
+3. **CONTEXT ISOLATION:** - If the user is asking about **Sakhi Tone**, do NOT mention Staamigen.
+   - If the user switches to **Staamigen**, instantly forget Sakhi Tone and answer only about Staamigen.
+4. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
+5. **NO WALL OF TEXT:** Break information into small, digestible chunks.
 
-2. **USE THE KNOWLEDGE BASE:**
-   - IF the user asks a question found in the "COMPLETE KNOWLEDGE BASE" below, YOU MUST USE THAT EXACT ANSWER.
-   - **EXCEPTION (GENERAL KNOWLEDGE):** If the user asks a GENERAL AYURVEDIC QUESTION not in the file (e.g., "What is Shatavari?", "Benefits of Ashwagandha"), **YOU ARE AUTHORIZED** to use your general medical knowledge to answer accurately and professionally.
-   - **RESTRICTION (ORDERING):** If the user asks "How to order?", ONLY provide the ordering instructions (Name, Address, Pincode). **DO NOT** show the "Store List" unless the user specifically asks for "stores", "shops", or "offline availability".
-
-3. **SINGLE LANGUAGE:** You MUST reply **ONLY** in the **Selected Language**. Do NOT provide an English translation unless the selected language is English.
-4. **NATURAL NAME USAGE:** Do NOT use the user's name in every single message. Use it only when greeting or occasionally (once every 3-4 messages) to sound natural.
-5. **CONTEXT SWITCHING:** If the user asks about a NEW product (e.g. they were talking about Sakhi Tone but now ask about Junior Staamigen), STOP talking about the old product and immediately answer about the NEW product.
-6. **VISUAL AIDS:** Assess if the user would understand the response better with a diagram. If yes, insert a tag like 
-
-[Image of X]
- (e.g., 
-
-[Image of digestive system]
-) immediately before or after the relevant text. Be economical; do not overuse.
-7. **CONCISENESS (VERY IMPORTANT):** Keep responses **SHORT** (max 2-3 sentences per concept). Answer ONLY what is asked. Do NOT volunteer extra information unless it is a critical safety warning.
-
-*** 🔍 COMPLETE KNOWLEDGE BASE (DO NOT SUMMARIZE) ***
-
---- SECTION 1: [REMOVED - DUPLICATES CLEANED] ---
-(See Section 8 for complete Sakhi Tone Manual & Section 9 for Staamigen Malt Manual).
+*** 🔍 COMPLETE KNOWLEDGE BASE ***
 
 --- SECTION 2: VRINDHA TONE (White Discharge) ---
 Q49: How long should I use Vrindha Tone for White Discharge? A49: Usage depends on the severity and duration of the illness. If it's not chronic, 2 to 4 bottles are sufficient. Chronic cases require doctor consultation. One bottle lasts up to 7 days.
@@ -264,9 +244,6 @@ Q30. Is it safe with thyroid medication? A: Yes. Keep a 1-hour gap.
 98. How soon does it ship? A: Immediate dispatch.
 99. Is it discreet? A: Yes.
 100. Are you sure it works? A: We have thousands of repeat customers who have regained their confidence. You will too.
-
---- SECTION 6: [REMOVED - DUPLICATE] ---
-(Moved to Section 10 for complete Teen/Young Adult context).
 
 --- SECTION 7: JUNIOR STAAMIGEN (Emotional/Parent Guide Q&A) ---
 Q1. Why doesn't my child want to eat? A: A child never starves on purpose. If they refuse food, it means their internal "Hunger Switch" is turned off.
@@ -666,7 +643,7 @@ Q26. Can it help mood swings? A: Yes. Stable energy improves mood.
 Q27. Does it help screen-time fatigue? A: Indirectly, yes, by improving stamina.
 Q28. Can it help lack of motivation? A: Yes. Energy brings motivation.
 Q29. Will it disturb sleep? A: No. It usually improves sleep quality.
-30. Can it help morning tiredness? A: Yes.
+Q30. Can it help morning tiredness? A: Yes.
 
 Section D: Sports, Fitness & Energy
 Q31. Can sports students use Staamigen Powder? A: Yes. It supports stamina and recovery.
@@ -992,6 +969,18 @@ def bot():
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
+    
+    # 🔄 DYNAMIC PRODUCT CONTEXT SWITCHER 🔄
+    # If user mentions a NEW product, switch immediately.
+    incoming_lower = incoming_msg.lower()
+    for key in PRODUCT_IMAGES.keys():
+        if key in incoming_lower and key != session["data"].get("product"):
+            session["data"]["product"] = key
+            session["step"] = "consultation_active"
+            session["consultation_state"] = "intro"
+            # Reset flow for new product
+            return run_consultation_flow(session, incoming_msg, resp)
+
     step = session["step"]
     
     # RESET
@@ -1092,7 +1081,7 @@ def bot():
 
     return Response(str(resp), mimetype="application/xml")
 
-# --- 🧠 THE CONSULTATION ENGINE ---
+# --- 🧠 THE CONSULTATION ENGINE (UPDATED FOR STEP-BY-STEP) ---
 def run_consultation_flow(session, user_text, resp):
     state = session["consultation_state"]
     product = session["data"]["product"]
@@ -1112,7 +1101,7 @@ def run_consultation_flow(session, user_text, resp):
 
     # --- WEIGHT GAIN FLOW LOGIC ---
     
-    # PHASE 1: INTRO
+    # PHASE 1: INTRO (Step-by-Step Fix)
     if state == "intro":
         msg = resp.message()
         
@@ -1133,55 +1122,46 @@ def run_consultation_flow(session, user_text, resp):
             
         msg.body(intro_text)
         
-        # Simulate Wait & Second Message
-        msg2 = resp.message()
-        msg2.body(M_SCRIPTS["ask_doubts"])
+        # STOP HERE. Wait for user to ask. 
+        # We removed the auto-spam of "Ask Doubts" + "Reality Check".
         
-        # Simulate "No Response" logic by chaining the reality check
-        msg3 = resp.message()
-        msg3.body(f"{M_SCRIPTS['reality_check']}\n\n{M_SCRIPTS['collect_data']}")
+        session["consultation_state"] = "waiting_for_doubts"
+        return Response(str(resp), mimetype="application/xml")
+
+    # PHASE 2: HANDLE DOUBTS & MOVE TO MEASUREMENTS
+    elif state == "waiting_for_doubts":
+        # Check if user gave measurements directly
+        h, w = parse_measurements(user_text)
+        if h > 0 and w > 0:
+             # Skip to calculation if they gave numbers
+             return calculate_bmi_reply(h, w, name, product, resp, session)
+        
+        # Otherwise, answer their doubt concisely
+        ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
+        msg = resp.message()
+        msg.body(ai_reply)
+        
+        # Gently nudge for data after answering
+        msg2 = resp.message()
+        msg2.body(M_SCRIPTS["collect_data"])
         
         session["consultation_state"] = "waiting_for_measurements"
         return Response(str(resp), mimetype="application/xml")
 
-    # PHASE 2: CALCULATE
+    # PHASE 3: CALCULATE
     elif state == "waiting_for_measurements":
         h, w = parse_measurements(user_text)
         
         if h > 0 and w > 0:
-            rbw = h - 100
-            diff = rbw - w
-            
-            msg = resp.message()
-            
-            if w < rbw:
-                # Underweight
-                txt = M_SCRIPTS["underweight_msg"].format(name=name, diff=diff)
-                msg.body(txt)
-            else:
-                # Normal/Over
-                txt = M_SCRIPTS["normalweight_msg"].format(name=name)
-                msg.body(txt)
-                
-            # Ask Health Questions immediately
-            msg_health = resp.message()
-            if "sakhi" in product:
-                msg_health.body(M_SCRIPTS["women_health"])
-            elif "malt" in product:
-                msg_health.body(M_SCRIPTS["men_health"])
-            else:
-                msg_health.body("Do you have any digestion or allergy issues?") # Generic
-                
-            session["consultation_state"] = "health_check"
-            return Response(str(resp), mimetype="application/xml")
+            return calculate_bmi_reply(h, w, name, product, resp, session)
         else:
-            # Parsing failed, ask AI or retry
+            # Parsing failed, answer doubt instead
             ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
             msg = resp.message()
             msg.body(ai_reply)
             return Response(str(resp), mimetype="application/xml")
 
-    # PHASE 3: CLOSING & SALES
+    # PHASE 4: CLOSING & SALES
     elif state == "health_check":
         # Answer doubts using AI then give closing advice
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
@@ -1195,12 +1175,39 @@ def run_consultation_flow(session, user_text, resp):
         session["consultation_state"] = "chat_open" # Flow complete
         return Response(str(resp), mimetype="application/xml")
         
-    # PHASE 4: OPEN CHAT
+    # PHASE 5: OPEN CHAT
     else:
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
         msg = resp.message()
         msg.body(ai_reply)
         return Response(str(resp), mimetype="application/xml")
+
+def calculate_bmi_reply(h, w, name, product, resp, session):
+    rbw = h - 100
+    diff = rbw - w
+    
+    msg = resp.message()
+    
+    if w < rbw:
+        # Underweight
+        txt = M_SCRIPTS["underweight_msg"].format(name=name, diff=diff)
+        msg.body(txt)
+    else:
+        # Normal/Over
+        txt = M_SCRIPTS["normalweight_msg"].format(name=name)
+        msg.body(txt)
+        
+    # Ask Health Questions immediately
+    msg_health = resp.message()
+    if "sakhi" in product:
+        msg_health.body(M_SCRIPTS["women_health"])
+    elif "malt" in product:
+        msg_health.body(M_SCRIPTS["men_health"])
+    else:
+        msg_health.body("Do you have any digestion or allergy issues?") # Generic
+        
+    session["consultation_state"] = "health_check"
+    return Response(str(resp), mimetype="application/xml")
 
 # 🟢 WAKE UP CALL FOR UPTIMEROBOT
 @app.route("/")
