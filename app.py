@@ -26,7 +26,8 @@ AGENTS = [
     {"name": "Sreelakshmi", "phone": "+91 8304945580", "link": "https://wa.link/i4d2yf"},
     {"name": "Rekha", "phone": "+91 9526530800", "link": "https://wa.link/t4huis"}
 ]
-global_agent_counter = 0
+# global_agent_counter = 0  <-- PAUSED (Agent 1 Forced)
+current_agent = AGENTS[0] 
 
 # 🖼️ SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
@@ -162,14 +163,15 @@ SYSTEM_PROMPT = """
 **Tone:** Empathetic, Authoritative, Concise.
 
 **⚠️ CRITICAL RULES FOR AI RESPONSE (STRICTLY FOLLOW):**
-1. **CRYSTAL CLEAR & CONCISE RULE:** - Your answers must be direct and impossible to misunderstand. 
-   - **Do NOT be vague.** - If a detailed explanation is required (e.g., for "How does it work?"), **summarize it into ONE single, powerful paragraph** without losing the medical/Ayurvedic logic. 
-   - Do NOT use bullet points unless absolutely necessary for a list.
+1. **ANTI-VERBOSITY RULE:** Answer **ONLY** the specific question asked. Do NOT dump extra info.
+   - If a detailed explanation is needed, **summarize it into ONE clear paragraph** without losing logic.
 2. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
 3. **CONTEXT ISOLATION:** - If talking about [PRODUCT A], answer based ONLY on [PRODUCT A].
    - If user asks a general question (e.g., "Price?", "Side effects?"), answer ONLY for the CURRENT product.
    - Do NOT mention other products unless explicitly asked.
 4. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
+5. **MEDICAL DISCLAIMER:** If the user asks about specific diseases (Thyroid, Diabetes, PCOD, etc.), strictly append this to your answer: 
+   *(Note: I am an AI Assistant. Please consult a doctor for medical diagnosis.)*
 
 *** 🔍 COMPLETE KNOWLEDGE BASE ***
 
@@ -193,6 +195,7 @@ Q62: My child has low IQ. Will this help? A62: If the issue is due to nutritiona
 Q63: My 7-year-old has constant allergy, cough, and sneezing. Can they take this? A63: Certainly. It is excellent for boosting immunity.
 Q64: How does Junior Staamigen Malt work? A64: It regulates digestion and appetite. Complete absorption of nutrients from food boosts immunity and supports age-appropriate growth.
 Q65: My child doesn't have growth appropriate for their age. Can they use this? A65: If the lack of growth is due to not eating, this will help them eat well and improve physical growth.
+**Q18/Q19 (Dosage Method):** **IMPORTANT:** It is best consumed directly. There is no problem if you wish to mix it with milk or water, but consuming it directly is the main method.
 
 --- SECTION 4: AYUR DIABET POWDER (Diabetes) ---
 Q66: Will Ayur Diabet Powder reduce sugar levels? A66: It helps manage sugar levels. Those taking other medicines should only reduce their dosage under a doctor's instruction.
@@ -334,7 +337,7 @@ Q23. When should I give it? A: After breakfast and after dinner. Let it work on 
 Q24. How long should I give it? A: Give it for at least 2-3 months. Let the body build a strong habit of eating well.
 Q25. Can I stop it later? A: Yes. Once he is eating well and looking healthy, you can stop. He won't become dependent on it.
 Q26. What if I miss a day? A: Don't worry. Just continue with love the next day.
-Q27. Can I mix it in porridge? A: Yes, as long as the food is warm (not boiling hot).
+Q27. Can I mix it in porridge? A: It is better to eat directly.
 Q28. Does it expire? A: It has a natural shelf life (check bottle). Keep the lid tight to keep it fresh.
 Q29. Should I keep it in the fridge? A: Not necessary. A cool, dry place in your kitchen is fine.
 30. Can I give it to my 1-year-old? A: No, dear. This is for children 2 years and older. Babies have different needs.
@@ -448,8 +451,7 @@ Q20. Is it good for older women (Menopause/45+)? A: Yes. It helps combat the fat
 
 Section C: Dosage & Usage
 Q21. What is the dosage? A: 15g (approximately 1 tablespoon) twice daily.
-Q22. What is the best vehicle (Anupana)? A: Warm milk is the absolute best for absorption.
-Q23. Can I take it with water? A: Yes, warm water is fine if you cannot drink milk, but milk improves the "building" quality.
+**Q22/Q23 (Consumption Method):** **IMPORTANT:** It is best consumed directly. There is no problem if you wish to mix it with milk or water, but consuming it directly is the main method.
 Q24. Should I take it before or after food? A: Always take it after food.
 Q25. Can I increase the dose for faster results? A: No. Consistency is more important than quantity. Stick to the recommended dose.
 Q26. If I miss a dose, what should I do? A: Don't worry. Just continue normally the next time. Do not double the dose.
@@ -481,6 +483,7 @@ Q47. "I have PCOS. Can I take it?" A: Response: Sakhi Tone is generally safe, bu
 Q48. "Will it increase bust size?" A: Response: It promotes overall healthy tissue growth in the female body, enhancing natural curves, but it is not a "bust enlargement" chemical.
 Q49. "I am getting married soon. Is it good?" A: Response: It is perfect for brides-to-be to get that natural wedding glow and energy.
 Q50. "Is it really safe?" A: Response: 100%. It is Ayurvedic and quality-tested product from 100 years legacy hospital.
+**Q101 (Result Guarantee):** If you do not have any underlying health issues that prevent weight gain, results are guaranteed.
 
 Section F: Advanced & General Knowledge
 Q51. Is this an Ayurvedic Rasayana? A: Yes, it acts as a Rasayana (Rejuvenator) for the female body.
@@ -573,8 +576,7 @@ Q20. Can it replace food? A: No. It makes food work. You must eat more food when
 
 Section C: Dosage & Usage
 Q21. What is the dosage? A: 15 g (approx. 1 tablespoon) twice daily.
-Q22. Should I take it with milk or water? A: Milk is best because milk protein helps with weight gain.
-Q23. Morning or night? A: Both. Consistency keeps the metabolic levels stable.
+**Q22/Q23 (Consumption):** **IMPORTANT:** It is best consumed directly. There is no problem if you wish to mix it with milk or water, but consuming it directly is the main method.
 Q24. Can I increase the dose for faster results? A: No need. Your body can only absorb a certain amount per day. Stick to the limit.
 Q25. Can I skip food if I take it? A: Never. If you take this and don't eat, you will feel extremely hungry and weak. Fuel the engine.
 Q26. Can I mix it with a banana shake? A: Yes, that is an excellent combination for weight gain.
@@ -605,7 +607,7 @@ Q46. "Will it affect my liver?" A: Response: "No. In fact, many herbs in it supp
 Q47. "I’m 30+, is it too late to gain weight?" A: Response: "No. Metabolism slows down as you age, so it might actually be easier now with the right support."
 Q48. "Does it affect sexual health?" A: Response: "Indirectly, yes. Increased strength, blood flow, and stamina usually improve sexual vitality as well."
 Q49. "Is it safe?" A: Response: "Yes, 100% safe and tested."
-Q50. "Does it really work?" A: Response: "Thousands of repeat users prove it. But it works only if you eat."
+**Q50 (Guarantee):** If you do not have any underlying health issues that prevent weight gain, results are guaranteed.
 
 Section F: Advanced & General Knowledge
 Q51. Is it Ayurvedic? A: Yes, fully Ayurvedic.
@@ -787,13 +789,13 @@ Section B: The "Beauty & Health" Connection
 Q11. Will this help me look better? A: Yes. When you eat properly, your skin gets nutrients, your face fills out, and you look healthier and more beautiful.
 Q12. Will it improve my skin glow? A: Indirectly, yes. Good food intake leads to good blood quality, which leads to glowing skin.
 Q13. Will it help fill out my hollow cheeks? A: Yes. Cheeks become hollow due to lack of nutrition. Eating better will fill them out.
-Q14. Does it help hair growth? A: Yes. Hair needs proteins and vitamins from food. By helping you eat more, it supports hair health.
-Q15. Will I just get fat? A: No. If you eat healthy, nutritious food, you will gain healthy weight, not just fat.
-Q16. Does it help with "looking weak"? A: Yes. It restores the vitality that comes from good nutrition.
-Q17. Is it better than beauty creams? A: Creams work from the outside. Good food works from the inside. Gain Plus helps you get that inside nutrition.
-Q18. Will my eyes look brighter? A: Proper nutrition often clears up tired, dull eyes.
-Q19. Does it help with dark circles? A: Dark circles are often a sign of nutritional deficiency or fatigue. Eating well helps reduce them.
-Q20. Will I feel more confident? A: Yes. A healthy body and good appetite give a sense of well-being and confidence.
+14. Does it help hair growth? A: Yes. Hair needs proteins and vitamins from food. By helping you eat more, it supports hair health.
+15. Will I just get fat? A: No. If you eat healthy, nutritious food, you will gain healthy weight, not just fat.
+16. Does it help with "looking weak"? A: Yes. It restores the vitality that comes from good nutrition.
+17. Is it better than beauty creams? A: Creams work from the outside. Good food works from the inside. Gain Plus helps you get that inside nutrition.
+18. Will my eyes look brighter? A: Proper nutrition often clears up tired, dull eyes.
+19. Does it help with dark circles? A: Dark circles are often a sign of nutritional deficiency or fatigue. Eating well helps reduce them.
+20. Will I feel more confident? A: Yes. A healthy body and good appetite give a sense of well-being and confidence.
 
 Section C: Appetite & Digestion Mechanism
 Q21. How does it actually work? A: It stimulates the production of digestive juices in the stomach, creating a natural feeling of hunger.
@@ -811,13 +813,13 @@ Section D: Usage & Dosage
 Q31. What is the exact dosage? A: One capsule in the morning, one at night.
 Q32. Can I take it after food? A: It is much less effective after food. Please take it before food.
 Q33. Can I take two capsules at once? A: No. Spread them out to keep the metabolism active all day.
-Q34. Can I take it with milk? A: Water is preferred for the capsule. Drink milk after your meal as food.
+34. Can I take it with milk? A: Water is preferred for the capsule. Drink milk after your meal as food.
 35. How long should I take it? A: A course of 1 to 3 months is recommended to permanently reset the appetite.
-Q36. Can I take it while traveling? A: Yes, capsules are very easy to carry during travel.
-Q37. Do I need to keep it in the fridge? A: No, just a cool, dry place.
-Q38. Can I open the capsule and eat the powder? A: It acts best when the capsule dissolves in the stomach, so swallow it whole.
-Q39. Can I take it with other medicines? A: Keep a 1-hour gap between this and other allopathic medicines.
-Q40. What if I miss a dose? A: Just take the next dose on time. Do not double up.
+36. Can I take it while traveling? A: Yes, capsules are very easy to carry during travel.
+37. Do I need to keep it in the fridge? A: No, just a cool, dry place.
+38. Can I open the capsule and eat the powder? A: It acts best when the capsule dissolves in the stomach, so swallow it whole.
+39. Can I take it with other medicines? A: Keep a 1-hour gap between this and other allopathic medicines.
+40. What if I miss a dose? A: Just take the next dose on time. Do not double up.
 
 Section E: Ideal Users & Scenarios
 Q41. Can gym-goers take it? A: Yes. Bulking requires eating a lot of calories. This helps them eat that extra food.
@@ -828,17 +830,17 @@ Q45. Can I take it if I am recovering from a fever? A: Excellent choice. It help
 Q46. Is it suitable for very thin people? A: Yes, they are the primary users.
 Q47. Is it suitable for people who are just slightly underweight? A: Yes, it helps reach the ideal weight.
 Q48. Can smokers take it? A: Smoking kills appetite. This helps fight that, but quitting smoking is best.
-49. Can I take it if I have a fast metabolism? A: Yes. It ensures you eat enough to keep up with your metabolism.
-50. Is it good for vegetarians? A: Yes, the capsule and contents are vegetarian.
+Q49. Can I take it if I have a fast metabolism? A: Yes. It ensures you eat enough to keep up with your metabolism.
+Q50. Is it good for vegetarians? A: Yes, the capsule and contents are vegetarian.
 
 Section F: Safety & Medical
 Q51. Does it have side effects? A: No known side effects when used as directed.
 Q52. Can diabetics take it? A: Yes, generally safe as it contains no sugar, but consult a doctor to be sure.
-53. Can people with High BP take it? A: Generally yes, but consult a doctor.
-54. Does it affect the liver? A: No. Ayurvedic herbs usually support liver health.
-55. Does it affect the kidneys? A: No.
-56. Is it safe for the heart? A: Yes.
-57. Can pregnant women take it? A: No. Pregnant women should always consult their gynecologist before taking any supplement.
+Q53. Can people with High BP take it? A: Generally yes, but consult a doctor.
+Q54. Does it affect the liver? A: No. Ayurvedic herbs usually support liver health.
+Q55. Does it affect the kidneys? A: No.
+Q56. Is it safe for the heart? A: Yes.
+Q57. Can pregnant women take it? A: No. Pregnant women should always consult their gynecologist before taking any supplement.
 58. Can breastfeeding mothers take it? A: Consult a doctor first.
 59. Does it cause drowsiness? A: No. It gives energy through food, not sleepiness.
 60. Is it safe for long-term use? A: Yes, it is a herbal preparation.
@@ -881,12 +883,12 @@ Q90. Is consistency important? A: Yes. You must take it every day to train your 
 
 Section J: Final Conviction
 Q91. What is the guarantee? A: The guarantee is biological. If you stimulate Agni, hunger must happen. It is natural law.
-92. Why is this better than a powder? A: Convenience. You can carry it in your pocket to the office or college.
-93. Can I buy it online? A: Yes, available on all major platforms.
-94. Is it a "magic pill"? A: No. It is a "logic pill." It fixes the logic of your digestion.
-95. Will I become a bodybuilder? A: You will become a healthier version of yourself. Bodybuilding requires gym + this.
-96. Will my face look chubby? A: Your face will look healthy and filled out, not swollen.
-97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
+Q92. Why is this better than a powder? A: Convenience. You can carry it in your pocket to the office or college.
+Q93. Can I buy it online? A: Yes, available on all major platforms.
+Q94. Is it a "magic pill"? A: No. It is a "logic pill." It fixes the logic of your digestion.
+Q95. Will I become a bodybuilder? A: You will become a healthier version of yourself. Bodybuilding requires gym + this.
+Q96. Will my face look chubby? A: Your face will look healthy and filled out, not swollen.
+Q97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
 98. How do I know it's working? A: You will start looking at the clock waiting for lunch time!
 99. Is it made in India? A: Yes, proudly.
 100. Why should I trust Ayurdan Gain Plus? A: Because we don't force your body; we help your body do what it naturally wants to do—Eat, Digest, and Grow Beautiful.
@@ -1011,9 +1013,9 @@ def bot():
                  detected_product = key
                  break
          
-         global global_agent_counter
-         current_agent = AGENTS[global_agent_counter % len(AGENTS)]
-         global_agent_counter += 1
+         # global global_agent_counter  <-- DISABLED ROTATION
+         current_agent = AGENTS[0] # <-- FORCED AGENT 1
+         # global_agent_counter += 1
          
          user_sessions[sender_phone] = {
              "step": "ask_language",
