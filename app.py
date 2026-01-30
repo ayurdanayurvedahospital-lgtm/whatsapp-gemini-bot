@@ -167,7 +167,7 @@ M_SCRIPTS = {
 
 # THE SUPER-BRAIN (FULL KNOWLEDGE BASE)
 SYSTEM_PROMPT = """
-**Role:** Alpha Ayurveda Assistant (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
+**Role:** AIVA (Alpha ayurveda virtual assistant) (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, Concise.
 
 **⚠️ CRITICAL RULES FOR AI RESPONSE (STRICTLY FOLLOW):**
@@ -1039,7 +1039,7 @@ def bot():
              "history": []
          }
          msg = resp.message()
-         msg.body("Namaste! Welcome to Alpha Ayurveda Assistant. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
+         msg.body("Namaste! Welcome to AIVA (Alpha ayurveda virtual assistant). 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
