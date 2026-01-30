@@ -1016,8 +1016,9 @@ def bot():
                  break
 
          global global_agent_counter
-         current_agent = AGENTS[global_agent_counter % len(AGENTS)]
-         global_agent_counter += 1
+         current_agent = AGENTS[0] # Forced Agent 1 (Sreelekha)
+         # current_agent = AGENTS[global_agent_counter % len(AGENTS)]
+         # global_agent_counter += 1
 
          user_sessions[sender_phone] = {
              "step": "ask_language",
