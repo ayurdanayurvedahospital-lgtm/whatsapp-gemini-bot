@@ -1,7 +1,7 @@
 import os
 import re
-import time
 import requests
+import threading
 import logging
 from flask import Flask, request, Response
 from twilio.twiml.messaging_response import MessagingResponse
@@ -10,6 +10,15 @@ from twilio.twiml.messaging_response import MessagingResponse
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# GLOBAL SESSION FOR CONNECTION POOLING
+http_session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
+http_session.mount('https://', adapter)
+http_session.mount('http://', adapter)
+
+if not API_KEY:
+    logging.warning("GEMINI_API_KEY not set!")
 
 # FORM FIELDS (Google Sheets)
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
@@ -26,8 +35,7 @@ AGENTS = [
     {"name": "Sreelakshmi", "phone": "+91 8304945580", "link": "https://wa.link/i4d2yf"},
     {"name": "Rekha", "phone": "+91 9526530800", "link": "https://wa.link/t4huis"}
 ]
-# global_agent_counter = 0  <-- PAUSED (Agent 1 Forced)
-current_agent = AGENTS[0] 
+global_agent_counter = 0
 
 # 🖼️ SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
@@ -170,7 +178,7 @@ SYSTEM_PROMPT = """
    - If user asks a general question (e.g., "Price?", "Side effects?"), answer ONLY for the CURRENT product.
    - Do NOT mention other products unless explicitly asked.
 4. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
-5. **MEDICAL DISCLAIMER:** If the user asks about specific diseases (Thyroid, Diabetes, PCOD, etc.), strictly append this to your answer: 
+5. **MEDICAL DISCLAIMER:** If the user asks about specific diseases (Thyroid, Diabetes, PCOD, etc.), strictly append this to your answer:
    *(Note: I am an AI Assistant. Please consult a doctor for medical diagnosis.)*
 
 *** 🔍 COMPLETE KNOWLEDGE BASE ***
@@ -515,8 +523,8 @@ Q76. Does it help with stamina? A: Yes. You won't get breathless as easily.
 Q77. Can I take it with multivitamin tablets? A: Yes, but Sakhi Tone is a natural multivitamin in itself!
 Q78. Is it available in other countries? A: Avilable middle east countries.
 Q79. Can I give it to my elderly mother? A: Yes, it is very good for geriatric care and strength.
-Q80. Does it contain chemical preservatives? A: We use permitted class II preservatives only if necessary, but mostly rely on natural preservation techniques.
-Q81. Will it make me sleepy or drowsy during the day? A: No. It gives energy, not drowsiness.
+80. Does it contain chemical preservatives? A: We use permitted class II preservatives only if necessary, but mostly rely on natural preservation techniques.
+81. Will it make me sleepy or drowsy during the day? A: No. It gives energy, not drowsiness.
 82. Can I take it if I am trying to conceive? A: Yes. A healthy, nourished body is better prepared for pregnancy. Stop once pregnancy is confirmed.
 83. How do I store it? A: Store in a cool, dry place. Do not use a wet spoon.
 84. Why is the color or texture sometimes different? A: Natural herbal ingredients change slightly with seasons. It proves it is natural!
@@ -664,7 +672,7 @@ Q89. Does it cause acidity? A: Take it after food to prevent acidity.
 --- SECTION 10: STAAMIGEN POWDER (Teen/Young Adult - Staff & Full 70 Q&A) ---
 **Target Age:** 13–19 (Teenagers), 20–25 (College), 26–30 (Gym Beginners).
 **Mission:** Confidence, Focus, Energy, Healthy Weight.
-**Internal Motto:** We don't just fix weight; we fix the "Fuel Efficiency" of the body to build confidence.
+**Internal Motto:** We do not just fix weight; we fix the "Fuel Efficiency" of the body to build confidence.
 
 **PART 1: PSYCHOLOGY & CONSULTATION GUIDELINES**
 1. **The Real Problem:** Teens don't say "I'm unhealthy." They feel "I eat but nothing happens," "I can't focus," or "I feel weaker than friends."
@@ -831,7 +839,7 @@ Q46. Is it suitable for very thin people? A: Yes, they are the primary users.
 Q47. Is it suitable for people who are just slightly underweight? A: Yes, it helps reach the ideal weight.
 Q48. Can smokers take it? A: Smoking kills appetite. This helps fight that, but quitting smoking is best.
 Q49. Can I take it if I have a fast metabolism? A: Yes. It ensures you eat enough to keep up with your metabolism.
-Q50. Is it good for vegetarians? A: Yes, the capsule and contents are vegetarian.
+50. Is it good for vegetarians? A: Yes, the capsule and contents are vegetarian.
 
 Section F: Safety & Medical
 Q51. Does it have side effects? A: No known side effects when used as directed.
@@ -853,9 +861,9 @@ Q64. Can I take it with daily vitamins? A: Yes.
 Q65. Do I need to follow a special diet? A: No special diet, just eat more of whatever healthy food you like.
 Q66. Should I drink more water? A: Yes. Digestion requires water.
 Q67. Can I eat junk food? A: Try to eat nutritious food for beauty and strength. Junk food only gives belly fat.
-Q68. Can I take it with Ayurvedic Arishtams? A: Yes.
-Q69. Can I take it with homeopathic medicine? A: Keep a gap of 1 hour.
-Q70. Is it better than chemical syrups? A: Yes. Chemical syrups often cause extreme drowsiness. This does not.
+68. Can I take it with Ayurvedic Arishtams? A: Yes.
+69. Can I take it with homeopathic medicine? A: Keep a gap of 1 hour.
+70. Is it better than chemical syrups? A: Yes. Chemical syrups often cause extreme drowsiness. This does not.
 
 Section H: Objections & Doubts
 Q71. "I don't like swallowing tablets." A: The capsule is small and smooth. It is much easier than eating a spoonful of bitter paste.
@@ -930,7 +938,7 @@ Q97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
 def get_working_model_name():
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
     try:
-        response = requests.get(url, timeout=5)
+        response = http_session.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
             for model in data.get('models', []):
@@ -941,22 +949,26 @@ def get_working_model_name():
                 if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
                     return model['name'].replace("models/", "")
     except Exception as e:
-        print(f"⚠️ MODEL INIT ERROR: {e}")
+        logging.error(f"⚠️ MODEL INIT ERROR: {e}")
     return "gemini-1.5-flash"
 
 ACTIVE_MODEL_NAME = get_working_model_name()
 
-def save_to_google_sheet(user_data):
+def _send_to_sheet_task(data):
     try:
-        phone_clean = user_data.get('phone', '').replace("+", "")
-        form_data = {
-            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-            FORM_FIELDS["phone"]: phone_clean, 
-            FORM_FIELDS["product"]: user_data.get("product", "Pending")
-        }
-        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
+        http_session.post(GOOGLE_FORM_URL, data=data, timeout=8)
     except Exception as e:
-        print(f"❌ SAVE ERROR: {e}")
+        logging.error(f"❌ SAVE ERROR: {e}")
+
+def save_to_google_sheet(user_data):
+    phone_clean = user_data.get('phone', '').replace("+", "")
+    form_data = {
+        FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+        FORM_FIELDS["phone"]: phone_clean,
+        FORM_FIELDS["product"]: user_data.get("product", "Pending")
+    }
+    # Run in background thread to improve response time
+    threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
 
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
     # INJECT PRODUCT CONTEXT STRONGLY
@@ -965,19 +977,20 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
         context_instruction = f"IMPORTANT: The user is asking about '{product_context}'. Answer ONLY about '{product_context}' unless they explicitly ask for another product."
 
     full_prompt = SYSTEM_PROMPT + f"\n\n{context_instruction}\nUser: {user_name}\nLanguage: {language}\nQuery: {user_msg}"
-    
+
     if assigned_agent:
         full_prompt += f"\nORDER LINK: {assigned_agent['link']} (Phone: {assigned_agent['phone']})"
-    
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
-    
+
     try:
-        response = requests.post(url, json=payload, timeout=12)
+        response = http_session.post(url, json=payload, timeout=12)
         if response.status_code == 200:
             return response.json()["candidates"][0]["content"]["parts"][0]["text"]
         return "Sorry, I am thinking... please ask again."
-    except:
+    except Exception as e:
+        logging.error(f"AI Error: {e}")
         return "Server busy. Please try again."
 
 def parse_measurements(text):
@@ -1002,9 +1015,9 @@ def bot():
     incoming_msg = request.values.get("Body", "").strip()
     sender_phone = request.values.get("From", "").replace("whatsapp:", "")
     num_media = int(request.values.get("NumMedia", 0))
-    
+
     resp = MessagingResponse()
-    
+
     if sender_phone not in user_sessions:
          detected_product = "Pending"
          incoming_lower = incoming_msg.lower()
@@ -1012,11 +1025,12 @@ def bot():
              if key in incoming_lower:
                  detected_product = key
                  break
-         
-         # global global_agent_counter  <-- DISABLED ROTATION
-         current_agent = AGENTS[0] # <-- FORCED AGENT 1
+
+         global global_agent_counter
+         current_agent = AGENTS[0] # Forced Agent 1 (Sreelekha)
+         # current_agent = AGENTS[global_agent_counter % len(AGENTS)]
          # global_agent_counter += 1
-         
+
          user_sessions[sender_phone] = {
              "step": "ask_language",
              "data": {"wa_number": sender_phone, "phone": sender_phone, "language": "English", "product": detected_product},
@@ -1030,7 +1044,7 @@ def bot():
 
     session = user_sessions[sender_phone]
     step = session["step"]
-    
+
     # 🔄 DYNAMIC LANGUAGE SWITCHER
     if session.get("step") == "confirm_lang":
         if "yes" in incoming_msg.lower() or "ok" in incoming_msg.lower():
@@ -1053,7 +1067,7 @@ def bot():
     # 🔄 SMART PRODUCT CONTEXT SWITCHER
     incoming_lower = incoming_msg.lower()
     current_product_key = session["data"].get("product", "")
-    
+
     if current_product_key not in incoming_lower:
         for key in PRODUCT_IMAGES.keys():
             if key in incoming_lower and key != current_product_key:
@@ -1076,18 +1090,18 @@ def bot():
         return Response(str(resp), mimetype="application/xml")
 
     # --- FLOW LOGIC ---
-    
+
     # 1. LANGUAGE SELECTION
     if step == "ask_language":
         selection = incoming_msg.strip()
-        selected_lang = LANGUAGES.get(selection, "English") 
+        selected_lang = LANGUAGES.get(selection, "English")
         for key, val in LANGUAGES.items():
             if val.lower() in selection.lower() or key in selection:
                 selected_lang = val
                 break
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
-        
+
         # FIX: Reply in the selected language using Dictionary
         msg = resp.message()
         msg_text = UI_STRINGS.get(selected_lang, UI_STRINGS["English"])["ask_name"]
@@ -1098,16 +1112,16 @@ def bot():
     elif step == "ask_name":
         session["data"]["name"] = incoming_msg
         save_to_google_sheet(session["data"])
-        
+
         prod = session["data"]["product"]
-        
+
         # AMBIGUITY CHECK
         if "staamigen" in prod and "malt" not in prod and "powder" not in prod:
              session["step"] = "resolve_staamigen"
              msg = resp.message()
              msg.body("We have Staamigen Malt (Men) & Staamigen Powder (Teenagers). Which one?")
              return Response(str(resp), mimetype="application/xml")
-             
+
         # AD LEAD
         if prod != "Pending":
             session["step"] = "consultation_active"
@@ -1129,8 +1143,8 @@ def bot():
         elif "powder" in incoming_msg.lower():
             session["data"]["product"] = "staamigen powder"
         else:
-            session["data"]["product"] = "staamigen malt" 
-            
+            session["data"]["product"] = "staamigen malt"
+
         session["step"] = "consultation_active"
         session["consultation_state"] = "intro"
         return run_consultation_flow(session, incoming_msg, resp)
@@ -1144,8 +1158,8 @@ def bot():
                 found = True
                 break
         if not found:
-            session["data"]["product"] = "general" 
-            
+            session["data"]["product"] = "general"
+
         save_to_google_sheet(session["data"])
         session["step"] = "consultation_active"
         session["consultation_state"] = "intro"
@@ -1163,11 +1177,11 @@ def run_consultation_flow(session, user_text, resp):
     product = session["data"]["product"]
     name = session["data"]["name"]
     lang = session["data"]["language"]
-    
+
     # ONLY TRIGGER FOR WEIGHT GAIN PRODUCTS
     weight_products = ["sakhi", "malt", "powder", "staamigen", "gain", "strength"]
     is_weight_flow = any(x in product for x in weight_products)
-    
+
     if not is_weight_flow:
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
         msg = resp.message()
@@ -1177,13 +1191,13 @@ def run_consultation_flow(session, user_text, resp):
     # PHASE 1: INTRO (Step-by-Step Fix)
     if state == "intro":
         msg = resp.message()
-        
+
         # Send Image
         for key, url in PRODUCT_IMAGES.items():
             if key in product:
                 msg.media(url)
                 break
-        
+
         # Send Dynamic Intro Text based on Language
         # AI will generate a polite intro if specific script is missing
         intro_text = ""
@@ -1194,9 +1208,9 @@ def run_consultation_flow(session, user_text, resp):
         else:
             # Fallback to AI for intro
             intro_text = get_ai_reply("Give a 1 sentence intro about " + product, product, name, lang, [], None)
-            
+
         msg.body(intro_text)
-        
+
         session["consultation_state"] = "waiting_for_doubts"
         return Response(str(resp), mimetype="application/xml")
 
@@ -1205,22 +1219,22 @@ def run_consultation_flow(session, user_text, resp):
         h, w = parse_measurements(user_text)
         if h > 0 and w > 0:
              return calculate_bmi_reply(h, w, name, product, resp, session)
-        
+
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
         msg = resp.message()
         msg.body(ai_reply)
-        
+
         # Ask for measurements only if not given
         # msg2 = resp.message()
         # msg2.body("To give you the best dosage, tell me your Age, Height & Weight.")
-        
-        session["consultation_state"] = "waiting_for_measurements"
+
+        # session["consultation_state"] = "waiting_for_measurements"
         return Response(str(resp), mimetype="application/xml")
 
     # PHASE 3: CALCULATE
     elif state == "waiting_for_measurements":
         h, w = parse_measurements(user_text)
-        
+
         if h > 0 and w > 0:
             return calculate_bmi_reply(h, w, name, product, resp, session)
         else:
@@ -1236,7 +1250,7 @@ def run_consultation_flow(session, user_text, resp):
         msg.body(ai_reply)
         session["consultation_state"] = "chat_open"
         return Response(str(resp), mimetype="application/xml")
-        
+
     # PHASE 5: OPEN CHAT
     else:
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
@@ -1247,16 +1261,16 @@ def run_consultation_flow(session, user_text, resp):
 def calculate_bmi_reply(h, w, name, product, resp, session):
     rbw = h - 100
     diff = rbw - w
-    
+
     msg = resp.message()
-    
+
     if w < rbw:
         txt = f"{name}, You are underweight by {diff}kg. We need to fix your metabolism."
         msg.body(txt)
     else:
         txt = f"{name}, Your weight is normal. You can use this for fitness."
         msg.body(txt)
-        
+
     msg_health = resp.message()
     if "sakhi" in product:
         msg_health.body("Do you have thyroid or period issues?")
@@ -1264,7 +1278,7 @@ def calculate_bmi_reply(h, w, name, product, resp, session):
         msg_health.body("Do you smoke or have gastric issues?")
     else:
         msg_health.body("Any other health issues?")
-        
+
     session["consultation_state"] = "health_check"
     return Response(str(resp), mimetype="application/xml")
 
