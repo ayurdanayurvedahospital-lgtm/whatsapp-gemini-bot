@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+import threading
 import logging
 from flask import Flask, request, Response
 from twilio.twiml.messaging_response import MessagingResponse
@@ -9,6 +10,12 @@ from twilio.twiml.messaging_response import MessagingResponse
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# GLOBAL SESSION FOR CONNECTION POOLING
+http_session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
+http_session.mount('https://', adapter)
+http_session.mount('http://', adapter)
 
 if not API_KEY:
     logging.warning("GEMINI_API_KEY not set!")
@@ -931,7 +938,7 @@ Q97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
 def get_working_model_name():
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={API_KEY}"
     try:
-        response = requests.get(url, timeout=5)
+        response = http_session.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
             for model in data.get('models', []):
@@ -947,17 +954,21 @@ def get_working_model_name():
 
 ACTIVE_MODEL_NAME = get_working_model_name()
 
-def save_to_google_sheet(user_data):
+def _send_to_sheet_task(data):
     try:
-        phone_clean = user_data.get('phone', '').replace("+", "")
-        form_data = {
-            FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-            FORM_FIELDS["phone"]: phone_clean,
-            FORM_FIELDS["product"]: user_data.get("product", "Pending")
-        }
-        requests.post(GOOGLE_FORM_URL, data=form_data, timeout=8)
+        http_session.post(GOOGLE_FORM_URL, data=data, timeout=8)
     except Exception as e:
         logging.error(f"❌ SAVE ERROR: {e}")
+
+def save_to_google_sheet(user_data):
+    phone_clean = user_data.get('phone', '').replace("+", "")
+    form_data = {
+        FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+        FORM_FIELDS["phone"]: phone_clean,
+        FORM_FIELDS["product"]: user_data.get("product", "Pending")
+    }
+    # Run in background thread to improve response time
+    threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
 
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
     # INJECT PRODUCT CONTEXT STRONGLY
@@ -974,7 +985,7 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
 
     try:
-        response = requests.post(url, json=payload, timeout=12)
+        response = http_session.post(url, json=payload, timeout=12)
         if response.status_code == 200:
             return response.json()["candidates"][0]["content"]["parts"][0]["text"]
         return "Sorry, I am thinking... please ask again."
