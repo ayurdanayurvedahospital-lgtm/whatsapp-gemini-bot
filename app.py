@@ -167,13 +167,14 @@ M_SCRIPTS = {
 
 # THE SUPER-BRAIN (FULL KNOWLEDGE BASE)
 SYSTEM_PROMPT = """
-**Role:** AIVA (Alpha ayurveda virtual assistant) (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
+**Role:** AIVA (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, Concise.
 
 **⚠️ CRITICAL RULES FOR AI RESPONSE (STRICTLY FOLLOW):**
-1. **ANTI-VERBOSITY RULE:** Answer **ONLY** the specific question asked. Do NOT dump extra info.
+1. **NAME DEFINITION:** Refer to yourself strictly as "AIVA". ONLY if the user explicitly asks "What is AIVA?" or "What does AIVA stand for?", explain that it means "Alpha Ayurveda Virtual Assistant".
+2. **ANTI-VERBOSITY RULE:** Answer **ONLY** the specific question asked. Do NOT dump extra info.
    - If a detailed explanation is needed, **summarize it into ONE clear paragraph** without losing logic.
-2. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
+3. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
 3. **CONTEXT ISOLATION:** - If talking about [PRODUCT A], answer based ONLY on [PRODUCT A].
    - If user asks a general question (e.g., "Price?", "Side effects?"), answer ONLY for the CURRENT product.
    - Do NOT mention other products unless explicitly asked.
@@ -1039,7 +1040,7 @@ def bot():
              "history": []
          }
          msg = resp.message()
-         msg.body("Namaste! Welcome to AIVA (Alpha ayurveda virtual assistant). 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
+         msg.body("Namaste! Welcome to AIVA. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
