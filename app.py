@@ -1178,17 +1178,10 @@ def run_consultation_flow(session, user_text, resp):
     name = session["data"]["name"]
     lang = session["data"]["language"]
 
-    # ONLY TRIGGER FOR WEIGHT GAIN PRODUCTS
     weight_products = ["sakhi", "malt", "powder", "staamigen", "gain", "strength"]
     is_weight_flow = any(x in product for x in weight_products)
 
-    if not is_weight_flow:
-        ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
-        msg = resp.message()
-        msg.body(ai_reply)
-        return Response(str(resp), mimetype="application/xml")
-
-    # PHASE 1: INTRO (Step-by-Step Fix)
+    # PHASE 1: INTRO (Universal for ALL products)
     if state == "intro":
         msg = resp.message()
 
@@ -1211,7 +1204,19 @@ def run_consultation_flow(session, user_text, resp):
 
         msg.body(intro_text)
 
-        session["consultation_state"] = "waiting_for_doubts"
+        # DECIDE NEXT STATE
+        if is_weight_flow:
+            session["consultation_state"] = "waiting_for_doubts"
+        else:
+            session["consultation_state"] = "chat_open"
+
+        return Response(str(resp), mimetype="application/xml")
+
+    # FOR NON-WEIGHT FLOWS (General Chat)
+    if not is_weight_flow:
+        ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
+        msg = resp.message()
+        msg.body(ai_reply)
         return Response(str(resp), mimetype="application/xml")
 
     # PHASE 2: HANDLE DOUBTS
