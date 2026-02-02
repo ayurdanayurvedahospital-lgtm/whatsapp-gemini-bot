@@ -73,7 +73,8 @@ LANGUAGES = {
     "4": "Hindi",
     "5": "Kannada",
     "6": "Telugu",
-    "7": "Bengali"
+    "7": "Bengali",
+    "8": "Other"
 }
 
 # 🌐 UI TRANSLATION DICTIONARY
@@ -119,6 +120,12 @@ UI_STRINGS = {
         "ask_product": "ধন্যবাদ! আপনি কোন পণ্য সম্পর্কে জানতে চান?",
         "confirm_switch": "আপনি কি বাংলায় কথা বলতে চান?",
         "intro_prefix": "আপনি জিজ্ঞাসা করছেন"
+    },
+    "Other": {
+        "ask_name": "Great! Please type your name.",
+        "ask_product": "Which product would you like to know about?",
+        "confirm_switch": "Do you want to switch language?",
+        "intro_prefix": "You are asking about"
     }
 }
 
@@ -1041,7 +1048,7 @@ def bot():
              "history": []
          }
          msg = resp.message()
-         msg.body("Namaste! Welcome to AIVA. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n\n*(Reply with 1, 2, 3...)*")
+         msg.body("Namaste! Welcome to AIVA. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n8️⃣ Any Other Language\n\n*(Reply with 1, 2, 3...)*")
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
@@ -1098,9 +1105,16 @@ def bot():
         selection = incoming_msg.strip()
         selected_lang = LANGUAGES.get(selection, "English")
         for key, val in LANGUAGES.items():
-            if val.lower() in selection.lower() or key in selection:
+            if val.lower() in selection.lower() or key == selection:
                 selected_lang = val
                 break
+
+        if selected_lang == "Other":
+             session["step"] = "ask_custom_lang"
+             msg = resp.message()
+             msg.body("Please type your preferred language (e.g., Gujarati, Marathi, Punjabi):")
+             return Response(str(resp), mimetype="application/xml")
+
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
 
@@ -1108,6 +1122,14 @@ def bot():
         msg = resp.message()
         msg_text = UI_STRINGS.get(selected_lang, UI_STRINGS["English"])["ask_name"]
         msg.body(msg_text)
+        return Response(str(resp), mimetype="application/xml")
+
+    # 1.5 CUSTOM LANGUAGE INPUT
+    elif step == "ask_custom_lang":
+        session["data"]["language"] = incoming_msg
+        session["step"] = "ask_name"
+        msg = resp.message()
+        msg.body(f"Okay! I will try to speak in {incoming_msg}. May I know your name?")
         return Response(str(resp), mimetype="application/xml")
 
     # 2. NAME & PRODUCT ROUTING
