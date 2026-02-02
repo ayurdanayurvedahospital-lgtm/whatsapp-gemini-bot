@@ -996,6 +996,33 @@ def translate_text(text, target_language):
         logging.error(f"Translation Error: {e}")
         return text
 
+def detect_language_change(text):
+    prompt = f"""
+    Analyze the user's message.
+    Does the user explicitly ask to change the conversation language?
+    (e.g., "Speak in French", "Change to German", "Talk in Spanish").
+
+    If YES, return ONLY the English name of the target language (e.g., French, German, Spanish).
+    If NO, return 'NO'.
+
+    User Message: "{text}"
+    """
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    try:
+        response = http_session.post(url, json=payload, timeout=5)
+        if response.status_code == 200:
+            result = response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # Cleanup in case the model is chatty
+            if "NO" in result.upper() and len(result) < 10: return "NO"
+            return result
+        return "NO"
+    except Exception as e:
+        logging.error(f"Lang Detect Error: {e}")
+        return "NO"
+
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
     # INJECT PRODUCT CONTEXT STRONGLY
     context_instruction = ""
@@ -1114,6 +1141,21 @@ def bot():
 
             msg.body(confirm_msg)
             return Response(str(resp), mimetype="application/xml")
+
+    # 🧠 AI LANGUAGE DETECTION
+    detected_lang = detect_language_change(incoming_msg)
+    if detected_lang != "NO" and detected_lang.lower() != session["data"]["language"].lower():
+        session["pending_lang"] = detected_lang
+        session["previous_step"] = session["step"]
+        session["step"] = "confirm_lang"
+        msg = resp.message()
+
+        # Ask in the target language
+        base_msg = f"Do you want to switch to {detected_lang}? (Yes/No)"
+        confirm_msg = translate_text(base_msg, detected_lang)
+
+        msg.body(confirm_msg)
+        return Response(str(resp), mimetype="application/xml")
 
     # 🔄 SMART PRODUCT CONTEXT SWITCHER
     incoming_lower = incoming_msg.lower()
