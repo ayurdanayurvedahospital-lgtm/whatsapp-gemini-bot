@@ -979,6 +979,23 @@ def save_to_google_sheet(user_data):
     # Run in background thread to improve response time
     threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
 
+def translate_text(text, target_language):
+    if target_language == "English": return text
+
+    prompt = f"Translate the following sentence to {target_language}. Return ONLY the translated text, nothing else.\n\nSentence: {text}"
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    try:
+        response = http_session.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return text # Fallback to English
+    except Exception as e:
+        logging.error(f"Translation Error: {e}")
+        return text
+
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
     # INJECT PRODUCT CONTEXT STRONGLY
     context_instruction = ""
@@ -1089,7 +1106,12 @@ def bot():
             msg = resp.message()
 
             # Ask in the target language
-            confirm_msg = UI_STRINGS.get(lang_name, UI_STRINGS["English"]).get("confirm_switch", f"Do you want to switch to {lang_name}? (Yes/No)")
+            if lang_name in UI_STRINGS:
+                confirm_msg = UI_STRINGS[lang_name]["confirm_switch"]
+            else:
+                base_msg = UI_STRINGS["English"]["confirm_switch"]
+                confirm_msg = translate_text(base_msg, lang_name)
+
             msg.body(confirm_msg)
             return Response(str(resp), mimetype="application/xml")
 
@@ -1115,7 +1137,11 @@ def bot():
     # MEDIA CHECK
     if num_media > 0:
         msg = resp.message()
-        msg.body(VOICE_REPLIES.get(session["data"].get("language", "English"), VOICE_REPLIES["English"]))
+        lang = session["data"].get("language", "English")
+        if lang in VOICE_REPLIES:
+            msg.body(VOICE_REPLIES[lang])
+        else:
+            msg.body(translate_text(VOICE_REPLIES["English"], lang))
         return Response(str(resp), mimetype="application/xml")
 
     # --- FLOW LOGIC ---
@@ -1149,7 +1175,11 @@ def bot():
         session["data"]["language"] = incoming_msg
         session["step"] = "ask_name"
         msg = resp.message()
-        msg.body(f"Okay! I will try to speak in {incoming_msg}. May I know your name?")
+
+        base_msg = f"Okay! I will try to speak in {incoming_msg}. May I know your name?"
+        translated_msg = translate_text(base_msg, incoming_msg)
+        msg.body(translated_msg)
+
         return Response(str(resp), mimetype="application/xml")
 
     # 2. NAME & PRODUCT ROUTING
@@ -1176,7 +1206,12 @@ def bot():
             session["step"] = "ask_product_manual"
             msg = resp.message()
             lang = session["data"]["language"]
-            msg_text = UI_STRINGS.get(lang, UI_STRINGS["English"])["ask_product"]
+
+            if lang in UI_STRINGS:
+                msg_text = UI_STRINGS[lang]["ask_product"]
+            else:
+                msg_text = translate_text(UI_STRINGS["English"]["ask_product"], lang)
+
             msg.body(msg_text)
             return Response(str(resp), mimetype="application/xml")
 
@@ -1239,9 +1274,15 @@ def run_consultation_flow(session, user_text, resp):
         # AI will generate a polite intro if specific script is missing
         intro_text = ""
         if "sakhi" in product:
-            intro_text = PRODUCT_INTROS["sakhitone"].get(lang, PRODUCT_INTROS["sakhitone"]["English"])
+            if lang in PRODUCT_INTROS["sakhitone"]:
+                intro_text = PRODUCT_INTROS["sakhitone"][lang]
+            else:
+                intro_text = translate_text(PRODUCT_INTROS["sakhitone"]["English"], lang)
         elif "malt" in product:
-            intro_text = PRODUCT_INTROS["staamigen"].get(lang, PRODUCT_INTROS["staamigen"]["English"])
+            if lang in PRODUCT_INTROS["staamigen"]:
+                intro_text = PRODUCT_INTROS["staamigen"][lang]
+            else:
+                intro_text = translate_text(PRODUCT_INTROS["staamigen"]["English"], lang)
         else:
             # Fallback to AI for intro
             intro_text = get_ai_reply("Give a 1 sentence intro about " + product, product, name, lang, [], None)
@@ -1310,23 +1351,26 @@ def run_consultation_flow(session, user_text, resp):
 def calculate_bmi_reply(h, w, name, product, resp, session):
     rbw = h - 100
     diff = rbw - w
+    lang = session["data"]["language"]
 
     msg = resp.message()
 
     if w < rbw:
         txt = f"{name}, You are underweight by {diff}kg. We need to fix your metabolism."
-        msg.body(txt)
     else:
         txt = f"{name}, Your weight is normal. You can use this for fitness."
-        msg.body(txt)
+
+    msg.body(translate_text(txt, lang))
 
     msg_health = resp.message()
     if "sakhi" in product:
-        msg_health.body("Do you have thyroid or period issues?")
+        h_txt = "Do you have thyroid or period issues?"
     elif "malt" in product:
-        msg_health.body("Do you smoke or have gastric issues?")
+        h_txt = "Do you smoke or have gastric issues?"
     else:
-        msg_health.body("Any other health issues?")
+        h_txt = "Any other health issues?"
+
+    msg_health.body(translate_text(h_txt, lang))
 
     session["consultation_state"] = "health_check"
     return Response(str(resp), mimetype="application/xml")
