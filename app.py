@@ -1056,21 +1056,41 @@ def bot():
 
     # 🔄 DYNAMIC LANGUAGE SWITCHER
     if session.get("step") == "confirm_lang":
+        prev_step = session.get("previous_step", "consultation_active")
         if "yes" in incoming_msg.lower() or "ok" in incoming_msg.lower():
             session["data"]["language"] = session.get("pending_lang")
-            session["step"] = "consultation_active"
+            session["step"] = prev_step
             msg = resp.message()
-            msg.body(f"✅ Language changed to {session['data']['language']}. How can I help you?")
+            # Try to reply in new language
+            new_lang = session["data"]["language"]
+            confirm_text = f"✅ Language changed to {new_lang}."
+            if new_lang == "Malayalam": confirm_text = "✅ ഭാഷ മലയാളത്തിലേക്ക് മാറ്റി."
+            elif new_lang == "Hindi": confirm_text = "✅ भाषा हिंदी में बदल दी गई है।"
+            elif new_lang == "Tamil": confirm_text = "✅ மொழி தமிழுக்கு மாற்றப்பட்டது."
+
+            msg.body(confirm_text)
+
+            # If returning to flow, re-trigger the last prompt logic?
+            # Ideally we just wait for next input or repeat last prompt.
+            # For now, just confirming change. User has to reply again to continue flow.
             return Response(str(resp), mimetype="application/xml")
         else:
-            session["step"] = "consultation_active"
+            session["step"] = prev_step
+            msg = resp.message()
+            msg.body("Okay, continuing in the current language.")
+            return Response(str(resp), mimetype="application/xml")
 
     for lang_name in LANGUAGES.values():
+        if lang_name == "Other": continue
         if lang_name.lower() in incoming_msg.lower() and lang_name != session["data"]["language"]:
             session["pending_lang"] = lang_name
+            session["previous_step"] = session["step"]
             session["step"] = "confirm_lang"
             msg = resp.message()
-            msg.body(f"Do you want me to talk in {lang_name} from now? (Yes/No)")
+
+            # Ask in the target language
+            confirm_msg = UI_STRINGS.get(lang_name, UI_STRINGS["English"]).get("confirm_switch", f"Do you want to switch to {lang_name}? (Yes/No)")
+            msg.body(confirm_msg)
             return Response(str(resp), mimetype="application/xml")
 
     # 🔄 SMART PRODUCT CONTEXT SWITCHER
