@@ -979,6 +979,23 @@ def save_to_google_sheet(user_data):
     # Run in background thread to improve response time
     threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
 
+def translate_text(text, target_language):
+    if target_language == "English": return text
+
+    prompt = f"Translate the following sentence to {target_language}. Return ONLY the translated text, nothing else.\n\nSentence: {text}"
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ACTIVE_MODEL_NAME}:generateContent?key={API_KEY}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    try:
+        response = http_session.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return text # Fallback to English
+    except Exception as e:
+        logging.error(f"Translation Error: {e}")
+        return text
+
 def get_ai_reply(user_msg, product_context=None, user_name="Customer", language="English", history=[], assigned_agent=None):
     # INJECT PRODUCT CONTEXT STRONGLY
     context_instruction = ""
@@ -1149,7 +1166,11 @@ def bot():
         session["data"]["language"] = incoming_msg
         session["step"] = "ask_name"
         msg = resp.message()
-        msg.body(f"Okay! I will try to speak in {incoming_msg}. May I know your name?")
+
+        base_msg = f"Okay! I will try to speak in {incoming_msg}. May I know your name?"
+        translated_msg = translate_text(base_msg, incoming_msg)
+        msg.body(translated_msg)
+
         return Response(str(resp), mimetype="application/xml")
 
     # 2. NAME & PRODUCT ROUTING
@@ -1176,7 +1197,12 @@ def bot():
             session["step"] = "ask_product_manual"
             msg = resp.message()
             lang = session["data"]["language"]
-            msg_text = UI_STRINGS.get(lang, UI_STRINGS["English"])["ask_product"]
+
+            if lang in UI_STRINGS:
+                msg_text = UI_STRINGS[lang]["ask_product"]
+            else:
+                msg_text = translate_text(UI_STRINGS["English"]["ask_product"], lang)
+
             msg.body(msg_text)
             return Response(str(resp), mimetype="application/xml")
 
