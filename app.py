@@ -185,7 +185,7 @@ SYSTEM_PROMPT = """
 **Tone:** Empathetic, Authoritative, Concise.
 
 **⚠️ CRITICAL RULES FOR AI RESPONSE (STRICTLY FOLLOW):**
-1. **NAME DEFINITION:** Refer to yourself strictly as "AIVA". ONLY if the user explicitly asks "What is AIVA?" or "What does AIVA stand for?", explain that it means "Alpha Ayurveda Virtual Assistant".
+1. **NAME DEFINITION:** Do NOT start every message with "AIVA here" or "I am AIVA". Only mention your name if explicitly asked. ONLY if the user explicitly asks "What is AIVA?" or "What does AIVA stand for?", explain that it means "Alpha Ayurveda Virtual Assistant".
 2. **ANTI-VERBOSITY RULE:** Answer **ONLY** the specific question asked. Do NOT dump extra info.
    - If a detailed explanation is needed, **summarize it into ONE clear paragraph** without losing logic.
 3. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
@@ -1099,7 +1099,7 @@ def bot():
              "history": []
          }
          msg = resp.message()
-         msg.body("Namaste! Welcome to AIVA. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n8️⃣ Any Other Language\n\n*(Reply with 1, 2, 3...)*")
+         msg.body("Namaste! Welcome to AIVA, your AI virtual Assistant from Ayurdan Ayurveda Hospital. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n8️⃣ Any Other Language\n\n*(Reply with 1, 2, 3...)*")
          return Response(str(resp), mimetype="application/xml")
 
     session = user_sessions[sender_phone]
