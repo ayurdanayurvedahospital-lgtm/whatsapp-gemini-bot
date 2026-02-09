@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+from urllib3.util.retry import Retry
 import threading
 import logging
 from flask import Flask, request, Response
@@ -13,7 +14,13 @@ API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # GLOBAL SESSION FOR CONNECTION POOLING
 http_session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["POST"]
+)
+adapter = requests.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=retry_strategy)
 http_session.mount('https://', adapter)
 http_session.mount('http://', adapter)
 
@@ -1012,7 +1019,7 @@ def detect_language_change(text):
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
     try:
-        response = http_session.post(url, json=payload, timeout=5)
+        response = http_session.post(url, json=payload, timeout=14)
         if response.status_code == 200:
             result = response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
             # Cleanup in case the model is chatty
@@ -1038,7 +1045,7 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
 
     try:
-        response = http_session.post(url, json=payload, timeout=12)
+        response = http_session.post(url, json=payload, timeout=14)
         if response.status_code == 200:
             return response.json()["candidates"][0]["content"]["parts"][0]["text"]
         return "Sorry, I am thinking... please ask again."
