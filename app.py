@@ -1066,12 +1066,14 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
 def get_best_product_match(incoming_msg):
     incoming_lower = incoming_msg.lower()
 
-    # Specific keywords we want to prioritize
-    # e.g., if user says "Staamigen Powder", we want "powder", not "staamigen"
-    # "malt" -> "staamigen malt"
-    specific_keywords = ["malt", "powder", "junior", "kids", "sakhi", "diabet", "gain", "hair", "pain"]
+    # Priority Levels for Keywords
+    # High Priority: Unique Product Lines (matches these first)
+    high_priority = ["diabet", "sugar", "hair", "pain", "muktanjan", "junior", "kids", "sakhi", "vrindha", "vrinda", "white", "kanya", "period", "gain", "strength", "saphala", "neeli", "gas"]
 
-    # Find all matches
+    # Medium Priority: Specific Variants (matches these if no high priority found)
+    medium_priority = ["malt", "powder"]
+
+    # Find all matches from the known keys
     matches = []
     for key in PRODUCT_IMAGES.keys():
         if key in incoming_lower:
@@ -1080,17 +1082,17 @@ def get_best_product_match(incoming_msg):
     if not matches:
         return "Pending"
 
-    # If multiple matches, check if any is a 'specific' keyword
-    best_match = None
+    # 1. Check for High Priority Matches first
     for m in matches:
-        if any(s in m for s in specific_keywords):
-            best_match = m
-            break
+        if any(h in m for h in high_priority):
+            return m
 
-    if best_match:
-        return best_match
+    # 2. Check for Medium Priority Matches (only if no high priority matched)
+    for m in matches:
+        if any(med in m for med in medium_priority):
+            return m
 
-    # Default to the first match found
+    # 3. Fallback to whatever matched (e.g., just "staamigen")
     return matches[0]
 
 def parse_measurements(text):
@@ -1283,6 +1285,12 @@ def bot():
 
     # 2. NAME & PRODUCT ROUTING
     elif step == "ask_name":
+        # Basic validation for Name
+        if len(incoming_msg) < 2 or incoming_msg.isdigit():
+             msg = resp.message()
+             msg.body("Please enter a valid name to continue.")
+             return Response(str(resp), mimetype="application/xml")
+
         session["data"]["name"] = incoming_msg
         save_to_google_sheet(session["data"])
 
@@ -1329,13 +1337,10 @@ def bot():
 
     # 4. MANUAL PRODUCT ENTRY
     elif step == "ask_product_manual":
-        found = False
-        for key in PRODUCT_IMAGES.keys():
-            if key in incoming_msg.lower():
-                session["data"]["product"] = key
-                found = True
-                break
-        if not found:
+        best_match = get_best_product_match(incoming_msg)
+        if best_match != "Pending":
+            session["data"]["product"] = best_match
+        else:
             session["data"]["product"] = "general"
 
         save_to_google_sheet(session["data"])
