@@ -1283,12 +1283,6 @@ def bot():
 
     # 2. NAME & PRODUCT ROUTING
     elif step == "ask_name":
-        # Basic validation for Name
-        if len(incoming_msg) < 2 or incoming_msg.isdigit():
-             msg = resp.message()
-             msg.body("Please enter a valid name to continue.")
-             return Response(str(resp), mimetype="application/xml")
-
         session["data"]["name"] = incoming_msg
         save_to_google_sheet(session["data"])
 
@@ -1335,10 +1329,13 @@ def bot():
 
     # 4. MANUAL PRODUCT ENTRY
     elif step == "ask_product_manual":
-        best_match = get_best_product_match(incoming_msg)
-        if best_match != "Pending":
-            session["data"]["product"] = best_match
-        else:
+        found = False
+        for key in PRODUCT_IMAGES.keys():
+            if key in incoming_msg.lower():
+                session["data"]["product"] = key
+                found = True
+                break
+        if not found:
             session["data"]["product"] = "general"
 
         save_to_google_sheet(session["data"])
