@@ -191,6 +191,7 @@ SYSTEM_PROMPT = '''
 6. **DELIVERY RULE:** If a user asks about availability in ANY specific country (e.g., "Is it available in Dubai?", "USA?", "UK?"), ALWAYS reply: "Yes, we have worldwide delivery available." (Do NOT mention GCC or Middle East specific limitations).
 7. **MEDICAL DISCLAIMER:** If the user asks about specific diseases (Thyroid, Diabetes, PCOD, etc.), strictly append this to your answer:
    *(Note: I am an AI Assistant. Please consult our doctors at Ayurdan Ayurveda Hospital for a personalized diagnosis and to clarify your concerns.)*
+8. **GEMINI UPGRADE:** You are running on Gemini 2.5 Flash. Your responses must be instantaneous and concise.
 
 **🧠 SALES PSYCHOLOGY & LINK RESTRICTION (MUST FOLLOW):**
 1. **INDIRECT PERSUASION:** Do not just give dry facts. Use psychological triggers to make the user visualize the benefit.
@@ -964,14 +965,14 @@ def get_working_model_name():
             data = response.json()
             for model in data.get('models', []):
                 m_name = model['name'].replace("models/", "")
-                if "flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
+                if "gemini-2.5-flash" in m_name and "generateContent" in model.get('supportedGenerationMethods', []):
                     return m_name
             for model in data.get('models', []):
                 if "gemini" in model['name'] and "generateContent" in model.get('supportedGenerationMethods', []):
                     return model['name'].replace("models/", "")
     except Exception as e:
         logging.error(f"⚠️ MODEL INIT ERROR: {e}")
-    return "gemini-1.5-flash"
+    return "gemini-2.5-flash"
 
 ACTIVE_MODEL_NAME = get_working_model_name()
 
@@ -1200,7 +1201,7 @@ def handle_audio_message(file_url, sender_phone):
 
         # 2. Upload to Gemini
         logging.info("Uploading audio to Gemini...")
-        myfile = genai.upload_file(local_filename)
+        myfile = genai.upload_file(local_filename, mime_type='audio/ogg')
 
         # 3. Wait for Processing
         while myfile.state.name == "PROCESSING":
@@ -1213,7 +1214,7 @@ def handle_audio_message(file_url, sender_phone):
         logging.info("Audio processed. Generating response...")
 
         # 4. Generate Response
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         # Create a chat session to follow instructions "Call chat_session.send_message()"
         # We inject the SYSTEM_PROMPT as history to maintain persona
