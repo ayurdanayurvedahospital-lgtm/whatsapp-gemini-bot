@@ -756,7 +756,7 @@ Q46. Can it be taken with protein powder? A: Yes.
 Q47. What if a dose is missed? A: Continue normally.
 Q48. Can dosage be increased for faster results? A: No. Consistency matters more.
 49. Minimum duration of use? A: 3 months.
-Q50. Maximum duration? A: 6 months or as advised.
+50. Maximum duration? A: 6 months or as advised.
 
 Section F: Safety & Parent Questions
 Q51. Is it safe for 13-year-olds? A: Yes, under proper guidance.
@@ -886,13 +886,13 @@ Section H: Objections & Doubts
 Q71. "I don't like swallowing tablets." A: The capsule is small and smooth. It is much easier than eating a spoonful of bitter paste.
 Q72. "I tried everything, nothing works." A: You likely tried to force food. This product fixes the root cause—the hunger signal. Give it a try.
 Q73. "Will I lose the weight when I stop?" A: Not if you keep eating well. Your stomach capacity will have increased naturally.
-74. "Is it expensive?" A: Think of it as an investment. Wasting food because you can't eat it is more expensive.
-75. "I don't trust Ayurveda." A: This is GMP certified, modern Ayurveda. It is science-backed.
-76. "Why not just eat more?" A: If you could, you would have already. Your body is physically preventing you. This helps you overcome that physical block.
-77. "Will it heat my body?" A: It stimulates digestion, which produces mild heat. Just drink water and you will be fine.
-78. "Can I give it to my 10-year-old child?" A: This specific dosage is for adults (18+). Consult a doctor for children.
-79. "Does it contain lead or metals?" A: No. It is tested for safety.
-80. "Is the packaging discreet?" A: Yes.
+Q74. "Is it expensive?" A: Think of it as an investment. Wasting food because you can't eat it is more expensive.
+Q75. "I don't trust Ayurveda." A: This is GMP certified, modern Ayurveda. It is science-backed.
+Q76. "Why not just eat more?" A: If you could, you would have already. Your body is physically preventing you. This helps you overcome that physical block.
+Q77. "Will it heat my body?" A: It stimulates digestion, which produces mild heat. Just drink water and you will be fine.
+Q78. "Can I give it to my 10-year-old child?" A: This specific dosage is for adults (18+). Consult a doctor for children.
+Q79. "Does it contain lead or metals?" A: No. It is tested for safety.
+Q80. "Is the packaging discreet?" A: Yes.
 
 Section I: Lifestyle Integration
 Q81. Should I exercise? A: Light exercise increases hunger even more. It is a good idea.
