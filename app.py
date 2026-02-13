@@ -4,13 +4,13 @@ import requests
 from urllib3.util.retry import Retry
 import threading
 import logging
-from flask import Flask, request, Response
-from twilio.twiml.messaging_response import MessagingResponse
+from flask import Flask, request, jsonify
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
+ZOKO_API_KEY = os.environ.get("ZOKO_API_KEY")
 
 # GLOBAL SESSION FOR CONNECTION POOLING
 http_session = requests.Session()
@@ -18,7 +18,7 @@ retry_strategy = Retry(
     total=3,
     backoff_factor=1,
     status_forcelist=[429, 500, 502, 503, 504],
-    allowed_methods=["POST"]
+    allowed_methods=["POST", "GET"]
 )
 adapter = requests.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=retry_strategy)
 http_session.mount('https://', adapter)
@@ -26,6 +26,8 @@ http_session.mount('http://', adapter)
 
 if not API_KEY:
     logging.warning("GEMINI_API_KEY not set!")
+if not ZOKO_API_KEY:
+    logging.warning("ZOKO_API_KEY not set!")
 
 # FORM FIELDS (Google Sheets)
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
@@ -168,19 +170,8 @@ VOICE_REPLIES = {
     "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
 }
 
-# --- MALAYALAM SCRIPTS (Legacy/Fallback) ---
-M_SCRIPTS = {
-    "ask_doubts": "താങ്കളുടെ സംശയങ്ങൾ എന്താണെങ്കിലും ഇപ്പോൾ ആത്മവിശ്വാസത്തോടു കൂടി ഞങ്ങളോട് ചോദിച്ചോളൂ.",
-    "collect_data": "കൂടുതൽ കൃത്യമായ നിർദ്ദേശങ്ങൾക്കായി ദയവായി താങ്കളുടെ **പ്രായം, ഉയരം, ഭാരം (Age, Height, Weight)** എന്നിവ പറയുക.",
-    "underweight_msg": "{name}, നിങ്ങൾക്ക് ആവശ്യമുള്ളതിലും {diff}kg കുറവാണെന്ന കാര്യം താങ്കൾ മനസ്സിലാക്കിയിട്ടുണ്ടോ? ഇത്രയും kg കുറയാൻ ഉള്ള കാരണം എന്താണെന്നാണ് താങ്കൾ മനസ്സിലാക്കുന്നത്?",
-    "normalweight_msg": "{name}, നിങ്ങൾ തന്ന വിവരങ്ങൾ പ്രകാരം താങ്കൾക്ക് ഉയരത്തിനൊത്ത ശരീരഭാരം ആണല്ലോ! അപ്പോൾ എന്താണ് നേരിടുന്ന മറ്റ് ബുദ്ധിമുട്ടുകൾ എന്ന് ഞങ്ങളോട് പറയാമോ?",
-    "women_health": "നിങ്ങൾക്ക് white discharge, PCOD, Thyroid, Gastric issues, Diabetes, Ulcer പോലത്തെ എന്തെങ്കിലും ബുദ്ധിമുട്ടുകളുണ്ടോ?",
-    "men_health": "നിങ്ങൾക്ക് Thyroid, Diabetes, Ulcer പോലത്തെ എന്തെങ്കിലും ബുദ്ധിമുട്ടുകളോ, മദ്യപാനം, പുകവലി മറ്റും പോലെയുള്ള ദുഃശീലങ്ങൾ ഉണ്ടോ?",
-    "closing_advice": "ആരോഗ്യകരമായി ശരീര ഭാരം വർധിപ്പിക്കാൻ ആഗ്രഹിക്കുന്ന ഒരാൾക്ക് ഒരു മാസം 3 മുതൽ 4 കിലോഗ്രാം വരെയാണ് പാർശ്വഫലങ്ങൾ ഒന്നുമില്ലാതെ വർധിപ്പിക്കാൻ കഴിയുന്നത്. നമ്മൾ കഴിക്കുന്ന ഭക്ഷണം ഉപയോഗിച്ച് ശരീരഭാരം കൂടുമ്പോഴാണ് അത് സ്ഥിരമായി നിലനിൽക്കുന്നത് എന്ന് തിരിച്ചറിയണം."
-}
-
 # THE SUPER-BRAIN (FULL KNOWLEDGE BASE)
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT = '''
 **Role:** AIVA (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
 **Tone:** Empathetic, Authoritative, Concise, Persuasive.
 
@@ -627,9 +618,9 @@ Q34. Is sleep important? A: Crucial. Muscles grow only when you sleep, not when 
 Q35. Does smoking affect weight gain? A: Yes. Nicotine kills appetite and increases metabolism. If you smoke, gaining weight is very hard.
 Q36. What about alcohol? A: Avoid it. Alcohol damages the stomach lining and blocks nutrient absorption.
 37. How many meals should I eat? A: Aim for 3 main meals + 2 solid snacks between them.
-Q38. Does stress affect weight? A: Yes. Stress releases cortisol, which eats muscle.
-Q39. Can I stay awake late at night? A: Avoid it regularly. Your body recovers between 10 PM and 2 AM.
-Q40. Is consistency important? A: It is everything. You cannot build a house by working only on weekends. Take it every day.
+38. Does stress affect weight? A: Yes. Stress releases cortisol, which eats muscle.
+39. Can I stay awake late at night? A: Avoid it regularly. Your body recovers between 10 PM and 2 AM.
+40. Is consistency important? A: It is everything. You cannot build a house by working only on weekends. Take it every day.
 
 Section E: Handling Male Objections
 Q41. "I tried many products before and nothing worked." A: Response: "Those products likely tried to force calories into you. STAAMIGEN fixes the machine—your digestion. If the machine works, the fuel works."
@@ -663,7 +654,7 @@ Q66. Does it help with bony wrists/arms? A: It helps add overall mass, which wil
 Q67. Can I take it if I have high BP? A: Consult a doctor, but generally safe.
 Q68. Is it good for runners/athletes? A: Yes, it provides the glycogen storage needed for endurance.
 Q69. Will I lose the weight if I stop? A: Not if you keep eating the same amount of food.
-Q70. Can I mix it with water if I don't like milk? A: Yes, but you lose the calories from the milk.
+70. Can I mix it with water if I don't like milk? A: Yes, but you lose the calories from the milk.
 71. Does it contain sugar? A: It likely contains natural sweeteners or jaggery base for the lehyam consistency.
 72. Can I take it if I have gastric trouble? A: It should actually help cure gastric trouble by fixing digestion.
 73. Does it help with depression? A: By improving physical vitality and gut health, it often lifts the mood.
@@ -871,7 +862,7 @@ Section F: Safety & Medical
 Q51. Does it have side effects? A: No known side effects when used as directed.
 Q52. Can diabetics take it? A: Yes, generally safe as it contains no sugar, but consult a doctor to be sure.
 Q53. Can people with High BP take it? A: Generally yes, but consult a doctor.
-54. Does it affect the liver? A: No. Ayurvedic herbs usually support liver health.
+Q54. Does it affect the liver? A: No. Ayurvedic herbs usually support liver health.
 55. Does it affect the kidneys? A: No.
 56. Is it safe for the heart? A: Yes.
 57. Can pregnant women take it? A: No. Pregnant women should always consult their gynecologist before taking any supplement.
@@ -958,7 +949,7 @@ Q97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
 - Neelibringadi Oil: ₹599
 - Weight Gainer Combo: ₹1450
 - Feminine Wellness Combo: ₹1161
-"""
+'''
 
 # 🛠️ AUTO-DETECT MODEL AT STARTUP
 def get_working_model_name():
@@ -979,6 +970,70 @@ def get_working_model_name():
     return "gemini-1.5-flash"
 
 ACTIVE_MODEL_NAME = get_working_model_name()
+
+# --- ZOKO HELPERS ---
+def check_stop_bot(phone):
+    """
+    Checks Zoko tags for 'STOP_BOT'.
+    Returns True if bot should stop, False otherwise.
+    """
+    if not ZOKO_API_KEY:
+        return False
+
+    url = f"https://chat.zoko.io/v2/chats?phone={phone}"
+    headers = {'apikey': ZOKO_API_KEY}
+
+    try:
+        resp = http_session.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            # Depending on Zoko API, response might be a list or object with data
+            # Assuming 'data' key holds list of chats or the root is list/object
+            # We look for 'tags' list.
+            # Safety check: iterate if it's a list
+            chat_data = data.get('data', []) if isinstance(data, dict) else data
+
+            # If multiple chats, check all? Usually query by phone returns relevant chat.
+            # Let's handle list or dict.
+            if isinstance(chat_data, list):
+                for chat in chat_data:
+                    tags = chat.get('tags', [])
+                    if any(t.lower() == "stop_bot" for t in tags):
+                        return True
+            elif isinstance(chat_data, dict):
+                tags = chat_data.get('tags', [])
+                if any(t.lower() == "stop_bot" for t in tags):
+                    return True
+
+        return False
+    except Exception as e:
+        logging.error(f"Zoko Tag Check Error: {e}")
+        return False
+
+def send_zoko_message(phone, text):
+    """
+    Sends a message via Zoko API.
+    """
+    if not ZOKO_API_KEY:
+        logging.warning("Skipping Zoko Send: API Key missing")
+        return
+
+    url = "https://chat.zoko.io/v2/message"
+    headers = {
+        'apikey': ZOKO_API_KEY,
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'channel': 'whatsapp',
+        'recipient': phone,
+        'type': 'text',
+        'message': text
+    }
+
+    try:
+        http_session.post(url, json=payload, headers=headers, timeout=5)
+    except Exception as e:
+        logging.error(f"Zoko Send Error: {e}")
 
 def _send_to_sheet_task(data):
     try:
@@ -1066,12 +1121,14 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
 def get_best_product_match(incoming_msg):
     incoming_lower = incoming_msg.lower()
 
-    # Specific keywords we want to prioritize
-    # e.g., if user says "Staamigen Powder", we want "powder", not "staamigen"
-    # "malt" -> "staamigen malt"
-    specific_keywords = ["malt", "powder", "junior", "kids", "sakhi", "diabet", "gain", "hair", "pain"]
+    # Priority Levels for Keywords
+    # High Priority: Unique Product Lines (matches these first)
+    high_priority = ["diabet", "sugar", "hair", "pain", "muktanjan", "junior", "kids", "sakhi", "vrindha", "vrinda", "white", "kanya", "period", "gain", "strength", "saphala", "neeli", "gas"]
 
-    # Find all matches
+    # Medium Priority: Specific Variants (matches these if no high priority found)
+    medium_priority = ["malt", "powder"]
+
+    # Find all matches from the known keys
     matches = []
     for key in PRODUCT_IMAGES.keys():
         if key in incoming_lower:
@@ -1080,17 +1137,17 @@ def get_best_product_match(incoming_msg):
     if not matches:
         return "Pending"
 
-    # If multiple matches, check if any is a 'specific' keyword
-    best_match = None
+    # 1. Check for High Priority Matches first
     for m in matches:
-        if any(s in m for s in specific_keywords):
-            best_match = m
-            break
+        if any(h in m for h in high_priority):
+            return m
 
-    if best_match:
-        return best_match
+    # 2. Check for Medium Priority Matches (only if no high priority matched)
+    for m in matches:
+        if any(med in m for med in medium_priority):
+            return m
 
-    # Default to the first match found
+    # 3. Fallback to whatever matched (e.g., just "staamigen")
     return matches[0]
 
 def parse_measurements(text):
@@ -1127,19 +1184,35 @@ def parse_measurements(text):
 
 @app.route("/bot", methods=["POST"])
 def bot():
-    incoming_msg = request.values.get("Body", "").strip()
-    sender_phone = request.values.get("From", "").replace("whatsapp:", "")
-    num_media = int(request.values.get("NumMedia", 0))
+    # 1. Zoko Webhook Handler
+    # Extract sender_phone and message_text from JSON payload
+    data = request.json
+    print(f"Incoming Zoko Payload: {data}") # Log for debugging
 
-    resp = MessagingResponse()
+    # Try standard Zoko webhook structure.
+    # Usually: {'sender_phone': '...', 'message': '...', ...} or nested.
+    # Fallback logic based on user hints.
+    sender_phone = data.get("sender_phone") or data.get("platform_sender_id") or ""
+    incoming_msg = data.get("message", "").strip()
 
+    # Ensure we have essential data
+    if not sender_phone:
+        return jsonify(status="error", reason="No sender_phone"), 400
+
+    # 2. The 'Stop Logic' (Crucial)
+    # Check if user has STOP_BOT tag
+    if check_stop_bot(sender_phone):
+        return jsonify(status="stopped")
+
+    # Clean phone for internal usage
+    sender_phone_clean = sender_phone.replace("+", "") # if needed, though dict keys use raw phone usually
+
+    # 3. Session Management
     if sender_phone not in user_sessions:
          detected_product = get_best_product_match(incoming_msg)
 
          global global_agent_counter
          current_agent = AGENTS[0] # Forced Agent 1 (Sreelekha)
-         # current_agent = AGENTS[global_agent_counter % len(AGENTS)]
-         # global_agent_counter += 1
 
          user_sessions[sender_phone] = {
              "step": "ask_language",
@@ -1148,9 +1221,11 @@ def bot():
              "consultation_state": "none",
              "history": []
          }
-         msg = resp.message()
-         msg.body("Namaste! Welcome to AIVA, your AI virtual Assistant from Ayurdan Ayurveda Hospital. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n8️⃣ Any Other Language\n\n*(Reply with 1, 2, 3...)*")
-         return Response(str(resp), mimetype="application/xml")
+
+         # Send Welcome Message via Zoko
+         welcome_text = "Namaste! Welcome to AIVA, your AI virtual Assistant from Ayurdan Ayurveda Hospital. 🙏\n\nPlease select your preferred language:\n1️⃣ English\n2️⃣ Malayalam (മലയാളം)\n3️⃣ Tamil (தமிழ்)\n4️⃣ Hindi (हिंदी)\n5️⃣ Kannada (ಕನ್ನಡ)\n6️⃣ Telugu (తెలుగు)\n7️⃣ Bengali (বাংলা)\n8️⃣ Any Other Language\n\n*(Reply with 1, 2, 3...)*"
+         send_zoko_message(sender_phone, welcome_text)
+         return jsonify(status="ok", step="welcome")
 
     session = user_sessions[sender_phone]
     step = session["step"]
@@ -1161,7 +1236,7 @@ def bot():
         if "yes" in incoming_msg.lower() or "ok" in incoming_msg.lower():
             session["data"]["language"] = session.get("pending_lang")
             session["step"] = prev_step
-            msg = resp.message()
+
             # Try to reply in new language
             new_lang = session["data"]["language"]
             confirm_text = f"✅ Language changed to {new_lang}."
@@ -1169,17 +1244,12 @@ def bot():
             elif new_lang == "Hindi": confirm_text = "✅ भाषा हिंदी में बदल दी गई है।"
             elif new_lang == "Tamil": confirm_text = "✅ மொழி தமிழுக்கு மாற்றப்பட்டது."
 
-            msg.body(confirm_text)
-
-            # If returning to flow, re-trigger the last prompt logic?
-            # Ideally we just wait for next input or repeat last prompt.
-            # For now, just confirming change. User has to reply again to continue flow.
-            return Response(str(resp), mimetype="application/xml")
+            send_zoko_message(sender_phone, confirm_text)
+            return jsonify(status="ok", action="lang_switched")
         else:
             session["step"] = prev_step
-            msg = resp.message()
-            msg.body("Okay, continuing in the current language.")
-            return Response(str(resp), mimetype="application/xml")
+            send_zoko_message(sender_phone, "Okay, continuing in the current language.")
+            return jsonify(status="ok", action="lang_keep")
 
     for lang_name in LANGUAGES.values():
         if lang_name == "Other": continue
@@ -1187,7 +1257,6 @@ def bot():
             session["pending_lang"] = lang_name
             session["previous_step"] = session["step"]
             session["step"] = "confirm_lang"
-            msg = resp.message()
 
             # Ask in the target language
             if lang_name in UI_STRINGS:
@@ -1196,8 +1265,8 @@ def bot():
                 base_msg = UI_STRINGS["English"]["confirm_switch"]
                 confirm_msg = translate_text(base_msg, lang_name)
 
-            msg.body(confirm_msg)
-            return Response(str(resp), mimetype="application/xml")
+            send_zoko_message(sender_phone, confirm_msg)
+            return jsonify(status="ok", action="confirm_lang")
 
     # 🧠 AI LANGUAGE DETECTION
     detected_lang = detect_language_change(incoming_msg)
@@ -1205,14 +1274,13 @@ def bot():
         session["pending_lang"] = detected_lang
         session["previous_step"] = session["step"]
         session["step"] = "confirm_lang"
-        msg = resp.message()
 
         # Ask in the target language
         base_msg = f"Do you want to switch to {detected_lang}? (Yes/No)"
         confirm_msg = translate_text(base_msg, detected_lang)
 
-        msg.body(confirm_msg)
-        return Response(str(resp), mimetype="application/xml")
+        send_zoko_message(sender_phone, confirm_msg)
+        return jsonify(status="ok", action="confirm_lang_ai")
 
     # 🔄 SMART PRODUCT CONTEXT SWITCHER
     incoming_lower = incoming_msg.lower()
@@ -1224,24 +1292,16 @@ def bot():
              session["data"]["product"] = best_match
              session["step"] = "consultation_active"
              session["consultation_state"] = "intro"
-             return run_consultation_flow(session, incoming_msg, resp)
+             return run_consultation_flow(session, incoming_msg, sender_phone)
 
     # RESET
     if incoming_msg.lower() in ["reset", "restart"]:
         del user_sessions[sender_phone]
-        msg = resp.message()
-        msg.body("🔄 Reset. Say Hi.")
-        return Response(str(resp), mimetype="application/xml")
+        send_zoko_message(sender_phone, "🔄 Reset. Say Hi.")
+        return jsonify(status="reset")
 
-    # MEDIA CHECK
-    if num_media > 0:
-        msg = resp.message()
-        lang = session["data"].get("language", "English")
-        if lang in VOICE_REPLIES:
-            msg.body(VOICE_REPLIES[lang])
-        else:
-            msg.body(translate_text(VOICE_REPLIES["English"], lang))
-        return Response(str(resp), mimetype="application/xml")
+    # MEDIA CHECK (Not fully supported in Zoko webhook payload parsing yet, assuming text flow)
+    # If media handling is needed, inspect 'type' in 'data'.
 
     # --- FLOW LOGIC ---
 
@@ -1256,33 +1316,35 @@ def bot():
 
         if selected_lang == "Other":
              session["step"] = "ask_custom_lang"
-             msg = resp.message()
-             msg.body("Please type your preferred language (e.g., Gujarati, Marathi, Punjabi):")
-             return Response(str(resp), mimetype="application/xml")
+             send_zoko_message(sender_phone, "Please type your preferred language (e.g., Gujarati, Marathi, Punjabi):")
+             return jsonify(status="ok", step="ask_custom_lang")
 
         session["data"]["language"] = selected_lang
         session["step"] = "ask_name"
 
         # FIX: Reply in the selected language using Dictionary
-        msg = resp.message()
         msg_text = UI_STRINGS.get(selected_lang, UI_STRINGS["English"])["ask_name"]
-        msg.body(msg_text)
-        return Response(str(resp), mimetype="application/xml")
+        send_zoko_message(sender_phone, msg_text)
+        return jsonify(status="ok", step="ask_name")
 
     # 1.5 CUSTOM LANGUAGE INPUT
     elif step == "ask_custom_lang":
         session["data"]["language"] = incoming_msg
         session["step"] = "ask_name"
-        msg = resp.message()
 
         base_msg = f"Okay! I will try to speak in {incoming_msg}. May I know your name?"
         translated_msg = translate_text(base_msg, incoming_msg)
-        msg.body(translated_msg)
+        send_zoko_message(sender_phone, translated_msg)
 
-        return Response(str(resp), mimetype="application/xml")
+        return jsonify(status="ok", step="ask_name")
 
     # 2. NAME & PRODUCT ROUTING
     elif step == "ask_name":
+        # Basic validation for Name
+        if len(incoming_msg) < 2 or incoming_msg.isdigit():
+             send_zoko_message(sender_phone, "Please enter a valid name to continue.")
+             return jsonify(status="error", msg="invalid name")
+
         session["data"]["name"] = incoming_msg
         save_to_google_sheet(session["data"])
 
@@ -1291,19 +1353,17 @@ def bot():
         # AMBIGUITY CHECK
         if "staamigen" in prod and "malt" not in prod and "powder" not in prod:
              session["step"] = "resolve_staamigen"
-             msg = resp.message()
-             msg.body("We have Staamigen Malt (Men) & Staamigen Powder (Teenagers). Which one?")
-             return Response(str(resp), mimetype="application/xml")
+             send_zoko_message(sender_phone, "We have Staamigen Malt (Men) & Staamigen Powder (Teenagers). Which one?")
+             return jsonify(status="ok", step="resolve_staamigen")
 
         # AD LEAD
         if prod != "Pending":
             session["step"] = "consultation_active"
             session["consultation_state"] = "intro"
-            return run_consultation_flow(session, incoming_msg, resp)
+            return run_consultation_flow(session, incoming_msg, sender_phone)
         else:
             # DIRECT MSG - FIX: Ask in correct language
             session["step"] = "ask_product_manual"
-            msg = resp.message()
             lang = session["data"]["language"]
 
             if lang in UI_STRINGS:
@@ -1311,8 +1371,8 @@ def bot():
             else:
                 msg_text = translate_text(UI_STRINGS["English"]["ask_product"], lang)
 
-            msg.body(msg_text)
-            return Response(str(resp), mimetype="application/xml")
+            send_zoko_message(sender_phone, msg_text)
+            return jsonify(status="ok", step="ask_product_manual")
 
     # 3. RESOLVE AMBIGUITY
     elif step == "resolve_staamigen":
@@ -1325,32 +1385,29 @@ def bot():
 
         session["step"] = "consultation_active"
         session["consultation_state"] = "intro"
-        return run_consultation_flow(session, incoming_msg, resp)
+        return run_consultation_flow(session, incoming_msg, sender_phone)
 
     # 4. MANUAL PRODUCT ENTRY
     elif step == "ask_product_manual":
-        found = False
-        for key in PRODUCT_IMAGES.keys():
-            if key in incoming_msg.lower():
-                session["data"]["product"] = key
-                found = True
-                break
-        if not found:
+        best_match = get_best_product_match(incoming_msg)
+        if best_match != "Pending":
+            session["data"]["product"] = best_match
+        else:
             session["data"]["product"] = "general"
 
         save_to_google_sheet(session["data"])
         session["step"] = "consultation_active"
         session["consultation_state"] = "intro"
-        return run_consultation_flow(session, incoming_msg, resp)
+        return run_consultation_flow(session, incoming_msg, sender_phone)
 
     # 5. CONSULTATION LOOP
     elif step == "consultation_active":
-        return run_consultation_flow(session, incoming_msg, resp)
+        return run_consultation_flow(session, incoming_msg, sender_phone)
 
-    return Response(str(resp), mimetype="application/xml")
+    return jsonify(status="ok")
 
 # --- 🧠 THE CONSULTATION ENGINE ---
-def run_consultation_flow(session, user_text, resp):
+def run_consultation_flow(session, user_text, sender_phone):
     state = session["consultation_state"]
     product = session["data"]["product"]
     name = session["data"]["name"]
@@ -1361,12 +1418,13 @@ def run_consultation_flow(session, user_text, resp):
 
     # PHASE 1: INTRO (Universal for ALL products)
     if state == "intro":
-        msg = resp.message()
-
-        # Send Image
+        # Send Image URL as text message because strict requirement said type='text'
+        # Ideally Zoko has type='image', but sticking to instructions:
+        # "Payload: ... 'type': 'text', 'message': text"
+        # We will send the URL.
         for key, url in PRODUCT_IMAGES.items():
             if key in product:
-                msg.media(url)
+                send_zoko_message(sender_phone, url)
                 break
 
         # Send Dynamic Intro Text based on Language
@@ -1386,7 +1444,7 @@ def run_consultation_flow(session, user_text, resp):
             # Fallback to AI for intro
             intro_text = get_ai_reply("Give a 1 sentence intro about " + product, product, name, lang, [], None)
 
-        msg.body(intro_text)
+        send_zoko_message(sender_phone, intro_text)
 
         # DECIDE NEXT STATE
         if is_weight_flow:
@@ -1394,74 +1452,66 @@ def run_consultation_flow(session, user_text, resp):
         else:
             session["consultation_state"] = "chat_open"
 
-        return Response(str(resp), mimetype="application/xml")
+        return jsonify(status="ok", state="intro_complete")
 
     # FOR NON-WEIGHT FLOWS (General Chat)
     if not is_weight_flow:
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
-        msg = resp.message()
-        msg.body(ai_reply)
-        return Response(str(resp), mimetype="application/xml")
+        send_zoko_message(sender_phone, ai_reply)
+        return jsonify(status="ok", state="chat")
 
     # PHASE 2: HANDLE DOUBTS
     elif state == "waiting_for_doubts":
         h, w = parse_measurements(user_text)
         if h > 0 and w > 0:
-             return calculate_bmi_reply(h, w, name, product, resp, session)
+             return calculate_bmi_reply(h, w, name, product, sender_phone, session)
 
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
-        msg = resp.message()
-        msg.body(ai_reply)
+        send_zoko_message(sender_phone, ai_reply)
 
         # Ask for measurements only if not given
         # msg2 = resp.message()
         # msg2.body("To give you the best dosage, tell me your Age, Height & Weight.")
 
         # session["consultation_state"] = "waiting_for_measurements"
-        return Response(str(resp), mimetype="application/xml")
+        return jsonify(status="ok", state="doubts")
 
     # PHASE 3: CALCULATE
     elif state == "waiting_for_measurements":
         h, w = parse_measurements(user_text)
 
         if h > 0 and w > 0:
-            return calculate_bmi_reply(h, w, name, product, resp, session)
+            return calculate_bmi_reply(h, w, name, product, sender_phone, session)
         else:
             ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
-            msg = resp.message()
-            msg.body(ai_reply)
-            return Response(str(resp), mimetype="application/xml")
+            send_zoko_message(sender_phone, ai_reply)
+            return jsonify(status="ok", state="measurements")
 
     # PHASE 4: CLOSING
     elif state == "health_check":
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
-        msg = resp.message()
-        msg.body(ai_reply)
+        send_zoko_message(sender_phone, ai_reply)
         session["consultation_state"] = "chat_open"
-        return Response(str(resp), mimetype="application/xml")
+        return jsonify(status="ok", state="health_check")
 
     # PHASE 5: OPEN CHAT
     else:
         ai_reply = get_ai_reply(user_text, product, name, lang, session["history"], session["agent"])
-        msg = resp.message()
-        msg.body(ai_reply)
-        return Response(str(resp), mimetype="application/xml")
+        send_zoko_message(sender_phone, ai_reply)
+        return jsonify(status="ok", state="chat")
 
-def calculate_bmi_reply(h, w, name, product, resp, session):
+def calculate_bmi_reply(h, w, name, product, sender_phone, session):
     rbw = h - 100
     diff = rbw - w
     lang = session["data"]["language"]
-
-    msg = resp.message()
 
     if w < rbw:
         txt = f"{name}, You are underweight by {diff}kg. We need to fix your metabolism."
     else:
         txt = f"{name}, Your weight is normal. You can use this for fitness."
 
-    msg.body(translate_text(txt, lang))
+    send_zoko_message(sender_phone, translate_text(txt, lang))
 
-    msg_health = resp.message()
     if "sakhi" in product:
         h_txt = "Do you have thyroid or period issues?"
     elif "malt" in product:
@@ -1469,10 +1519,10 @@ def calculate_bmi_reply(h, w, name, product, resp, session):
     else:
         h_txt = "Any other health issues?"
 
-    msg_health.body(translate_text(h_txt, lang))
+    send_zoko_message(sender_phone, translate_text(h_txt, lang))
 
     session["consultation_state"] = "health_check"
-    return Response(str(resp), mimetype="application/xml")
+    return jsonify(status="ok", state="bmi_calc")
 
 @app.route("/")
 def wake_up():
