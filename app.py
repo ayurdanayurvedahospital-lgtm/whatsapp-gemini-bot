@@ -4,12 +4,16 @@ import requests
 from urllib3.util.retry import Retry
 import threading
 import logging
+import google.generativeai as genai
+import time
 from flask import Flask, request, jsonify
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 API_KEY = os.environ.get("GEMINI_API_KEY")
+if API_KEY:
+    genai.configure(api_key=API_KEY)
 ZOKO_API_KEY = os.environ.get("ZOKO_API_KEY")
 
 # GLOBAL SESSION FOR CONNECTION POOLING
@@ -1182,6 +1186,58 @@ def parse_measurements(text):
 
     return height_cm, weight_kg
 
+def handle_audio_message(file_url, sender_phone):
+    local_filename = f"temp_audio_{sender_phone}_{int(time.time())}.ogg"
+
+    try:
+        # 1. Download Audio
+        logging.info(f"Downloading audio from {file_url}")
+        with http_session.get(file_url, stream=True) as r:
+            r.raise_for_status()
+            with open(local_filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        # 2. Upload to Gemini
+        logging.info("Uploading audio to Gemini...")
+        myfile = genai.upload_file(local_filename)
+
+        # 3. Wait for Processing
+        while myfile.state.name == "PROCESSING":
+            time.sleep(1)
+            myfile = genai.get_file(myfile.name)
+
+        if myfile.state.name == "FAILED":
+            raise ValueError("Audio processing failed in Gemini.")
+
+        logging.info("Audio processed. Generating response...")
+
+        # 4. Generate Response
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        # Create a chat session to follow instructions "Call chat_session.send_message()"
+        # We inject the SYSTEM_PROMPT as history to maintain persona
+        chat_session = model.start_chat(
+            history=[
+                {"role": "user", "parts": [SYSTEM_PROMPT]},
+                {"role": "model", "parts": ["Understood. I am AIVA, the AI assistant for Ayurdan Ayurveda Hospital."]}
+            ]
+        )
+
+        prompt = "Listen to this customer voice note. It may be in Malayalam or English. Answer their question clearly and concisely in the same language they spoke."
+        response = chat_session.send_message([myfile, prompt])
+
+        return response.text
+
+    except Exception as e:
+        logging.error(f"Handle Audio Error: {e}")
+        return "Sorry, I could not process your voice note. Please type your message. 🙏"
+
+    finally:
+        # 5. Cleanup
+        if os.path.exists(local_filename):
+            os.remove(local_filename)
+
 @app.route("/bot", methods=["POST"])
 def bot():
     # 1. Zoko Webhook Handler
@@ -1194,6 +1250,7 @@ def bot():
     # Fallback logic based on user hints.
     sender_phone = data.get("sender_phone") or data.get("platform_sender_id") or ""
     incoming_msg = data.get("message", "").strip()
+    msg_type = data.get("type", "text")
 
     # Ensure we have essential data
     if not sender_phone:
@@ -1203,6 +1260,20 @@ def bot():
     # Check if user has STOP_BOT tag
     if check_stop_bot(sender_phone):
         return jsonify(status="stopped")
+
+    # --- AUDIO HANDLING ---
+    if msg_type in ["audio", "audio_message"]:
+        file_url = data.get("fileUrl")
+        if file_url:
+            # Notify user we are processing
+            send_zoko_message(sender_phone, "Listening to your voice note... 🎧")
+
+            ai_reply = handle_audio_message(file_url, sender_phone)
+            send_zoko_message(sender_phone, ai_reply)
+            return jsonify(status="ok", action="audio_processed")
+        else:
+            logging.error("Audio message received but no fileUrl found.")
+            # Fall through or return error? Better to ignore or log.
 
     # Clean phone for internal usage
     sender_phone_clean = sender_phone.replace("+", "") # if needed, though dict keys use raw phone usually
