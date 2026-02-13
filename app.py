@@ -547,7 +547,7 @@ Q74. Can I take it during menstruation? A: Yes, it provides much-needed energy d
 Q75. Is it sugar-free? A: You must check the specific label, but usually, Ayurvedic lehyams contain jaggery or sugar as a carrier.
 Q76. Does it help with stamina? A: Yes. You won't get breathless as easily.
 Q77. Can I take it with multivitamin tablets? A: Yes, but Sakhi Tone is a natural multivitamin in itself!
-Q78. Is it available in other countries? A: Yes, we have worldwide delivery available.
+Q78. Is it available in other countries? A: Avilable middle east countries.
 Q79. Can I give it to my elderly mother? A: Yes, it is very good for geriatric care and strength.
 80. Does it contain chemical preservatives? A: We use permitted class II preservatives only if necessary, but mostly rely on natural preservation techniques.
 81. Will it make me sleepy or drowsy during the day? A: No. It gives energy, not drowsiness.
@@ -626,7 +626,7 @@ Q33. What should I avoid? A: Junk food (empty calories) and skipping meals.
 Q34. Is sleep important? A: Crucial. Muscles grow only when you sleep, not when you work out.
 Q35. Does smoking affect weight gain? A: Yes. Nicotine kills appetite and increases metabolism. If you smoke, gaining weight is very hard.
 Q36. What about alcohol? A: Avoid it. Alcohol damages the stomach lining and blocks nutrient absorption.
-Q37. How many meals should I eat? A: Aim for 3 main meals + 2 solid snacks between them.
+37. How many meals should I eat? A: Aim for 3 main meals + 2 solid snacks between them.
 Q38. Does stress affect weight? A: Yes. Stress releases cortisol, which eats muscle.
 Q39. Can I stay awake late at night? A: Avoid it regularly. Your body recovers between 10 PM and 2 AM.
 Q40. Is consistency important? A: It is everything. You cannot build a house by working only on weekends. Take it every day.
@@ -663,7 +663,7 @@ Q66. Does it help with bony wrists/arms? A: It helps add overall mass, which wil
 Q67. Can I take it if I have high BP? A: Consult a doctor, but generally safe.
 Q68. Is it good for runners/athletes? A: Yes, it provides the glycogen storage needed for endurance.
 Q69. Will I lose the weight if I stop? A: Not if you keep eating the same amount of food.
-70. Can I mix it with water if I don't like milk? A: Yes, but you lose the calories from the milk.
+Q70. Can I mix it with water if I don't like milk? A: Yes, but you lose the calories from the milk.
 71. Does it contain sugar? A: It likely contains natural sweeteners or jaggery base for the lehyam consistency.
 72. Can I take it if I have gastric trouble? A: It should actually help cure gastric trouble by fixing digestion.
 73. Does it help with depression? A: By improving physical vitality and gut health, it often lifts the mood.
@@ -871,7 +871,7 @@ Section F: Safety & Medical
 Q51. Does it have side effects? A: No known side effects when used as directed.
 Q52. Can diabetics take it? A: Yes, generally safe as it contains no sugar, but consult a doctor to be sure.
 Q53. Can people with High BP take it? A: Generally yes, but consult a doctor.
-Q54. Does it affect the liver? A: No. Ayurvedic herbs usually support liver health.
+54. Does it affect the liver? A: No. Ayurvedic herbs usually support liver health.
 55. Does it affect the kidneys? A: No.
 56. Is it safe for the heart? A: Yes.
 57. Can pregnant women take it? A: No. Pregnant women should always consult their gynecologist before taking any supplement.
@@ -887,7 +887,7 @@ Q64. Can I take it with daily vitamins? A: Yes.
 Q65. Do I need to follow a special diet? A: No special diet, just eat more of whatever healthy food you like.
 Q66. Should I drink more water? A: Yes. Digestion requires water.
 Q67. Can I eat junk food? A: Try to eat nutritious food for beauty and strength. Junk food only gives belly fat.
-68. Can I take it with Ayurvedic Arishtams? A: Yes.
+Q68. Can I take it with Ayurvedic Arishtams? A: Yes.
 69. Can I take it with homeopathic medicine? A: Keep a gap of 1 hour.
 70. Is it better than chemical syrups? A: Yes. Chemical syrups often cause extreme drowsiness. This does not.
 
@@ -1063,21 +1063,66 @@ def get_ai_reply(user_msg, product_context=None, user_name="Customer", language=
         logging.error(f"AI Error: {e}")
         return "Server busy. Please try again."
 
+def get_best_product_match(incoming_msg):
+    incoming_lower = incoming_msg.lower()
+
+    # Specific keywords we want to prioritize
+    # e.g., if user says "Staamigen Powder", we want "powder", not "staamigen"
+    # "malt" -> "staamigen malt"
+    specific_keywords = ["malt", "powder", "junior", "kids", "sakhi", "diabet", "gain", "hair", "pain"]
+
+    # Find all matches
+    matches = []
+    for key in PRODUCT_IMAGES.keys():
+        if key in incoming_lower:
+            matches.append(key)
+
+    if not matches:
+        return "Pending"
+
+    # If multiple matches, check if any is a 'specific' keyword
+    best_match = None
+    for m in matches:
+        if any(s in m for s in specific_keywords):
+            best_match = m
+            break
+
+    if best_match:
+        return best_match
+
+    # Default to the first match found
+    return matches[0]
+
 def parse_measurements(text):
     height_cm = 0
     weight_kg = 0
-    cm_match = re.search(r'(\d{2,3})\s*cm', text.lower())
+    text_lower = text.lower()
+
+    # Height: strict check for 'cm'
+    cm_match = re.search(r'(\d{2,3})\s*(?:cm|cms)', text_lower)
     if cm_match:
         height_cm = int(cm_match.group(1))
     else:
-        ft_match = re.search(r'(\d)\.(\d+)', text)
-        if ft_match:
-            feet = int(ft_match.group(1))
-            inches = int(ft_match.group(2))
-            height_cm = int((feet * 30.48) + (inches * 2.54))
-    kg_match = re.search(r'(\d{2,3})\s*kg', text.lower())
+        # Height: strict check for ft/feet/inches
+        # 1. "5.8" with explicit "ft" or "feet" following
+        ft_decimal_match = re.search(r'(\d)\.(\d+)\s*(?:ft|feet)', text_lower)
+        # 2. 5'8 or 5' 8"
+        ft_quote_match = re.search(r'(\d)\s*[\'’]\s*(\d+)(?:\s*[\"”])?', text_lower)
+
+        if ft_decimal_match:
+             feet = int(ft_decimal_match.group(1))
+             inches = int(ft_decimal_match.group(2))
+             height_cm = int((feet * 30.48) + (inches * 2.54))
+        elif ft_quote_match:
+             feet = int(ft_quote_match.group(1))
+             inches = int(ft_quote_match.group(2))
+             height_cm = int((feet * 30.48) + (inches * 2.54))
+
+    # Weight: strict check for 'kg' or 'kgs'
+    kg_match = re.search(r'(\d{2,3})\s*(?:kg|kgs|kilo)', text_lower)
     if kg_match:
         weight_kg = int(kg_match.group(1))
+
     return height_cm, weight_kg
 
 @app.route("/bot", methods=["POST"])
@@ -1089,12 +1134,7 @@ def bot():
     resp = MessagingResponse()
 
     if sender_phone not in user_sessions:
-         detected_product = "Pending"
-         incoming_lower = incoming_msg.lower()
-         for key in PRODUCT_IMAGES.keys():
-             if key in incoming_lower:
-                 detected_product = key
-                 break
+         detected_product = get_best_product_match(incoming_msg)
 
          global global_agent_counter
          current_agent = AGENTS[0] # Forced Agent 1 (Sreelekha)
@@ -1179,12 +1219,12 @@ def bot():
     current_product_key = session["data"].get("product", "")
 
     if current_product_key not in incoming_lower:
-        for key in PRODUCT_IMAGES.keys():
-            if key in incoming_lower and key != current_product_key:
-                session["data"]["product"] = key
-                session["step"] = "consultation_active"
-                session["consultation_state"] = "intro"
-                return run_consultation_flow(session, incoming_msg, resp)
+        best_match = get_best_product_match(incoming_msg)
+        if best_match != "Pending" and best_match != current_product_key:
+             session["data"]["product"] = best_match
+             session["step"] = "consultation_active"
+             session["consultation_state"] = "intro"
+             return run_consultation_flow(session, incoming_msg, resp)
 
     # RESET
     if incoming_msg.lower() in ["reset", "restart"]:
@@ -1243,6 +1283,12 @@ def bot():
 
     # 2. NAME & PRODUCT ROUTING
     elif step == "ask_name":
+        # Basic validation for Name
+        if len(incoming_msg) < 2 or incoming_msg.isdigit():
+             msg = resp.message()
+             msg.body("Please enter a valid name to continue.")
+             return Response(str(resp), mimetype="application/xml")
+
         session["data"]["name"] = incoming_msg
         save_to_google_sheet(session["data"])
 
@@ -1289,13 +1335,10 @@ def bot():
 
     # 4. MANUAL PRODUCT ENTRY
     elif step == "ask_product_manual":
-        found = False
-        for key in PRODUCT_IMAGES.keys():
-            if key in incoming_msg.lower():
-                session["data"]["product"] = key
-                found = True
-                break
-        if not found:
+        best_match = get_best_product_match(incoming_msg)
+        if best_match != "Pending":
+            session["data"]["product"] = best_match
+        else:
             session["data"]["product"] = "general"
 
         save_to_google_sheet(session["data"])
