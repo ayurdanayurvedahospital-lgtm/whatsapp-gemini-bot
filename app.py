@@ -532,14 +532,14 @@ Q68. Is it good for hair fall? A: Nutritional deficiencies cause hair fall. By f
 Q69. Can I take it if I have high blood pressure? A: Consult a doctor. Generally safe, but BP patients should monitor sodium intake.
 Q70. How is it different from Protein Powder? A: Protein powder builds muscle only. Sakhi Tone balances hormones, digestion, immunity, and tissue. It is holistic.
 Q71. Can I take it if I have gastric issues or acidity? A: Yes, but take it after food. It usually helps settle digestion.
-Q72. What if I get loose motions? A: Reduce the dose to half for a few days until your body adjusts.
-Q73. Does it help with white discharge (Leucorrhea)? A: First steps to take control lucorrhoea. It cause weightloss. Sakhitone It improves general strength, which helps the body fight underlying weaknesses associated with discharge.
-Q74. Can I take it during menstruation? A: Yes, it provides much-needed energy during those days.
-Q75. Is it sugar-free? A: You must check the specific label, but usually, Ayurvedic lehyams contain jaggery or sugar as a carrier.
-Q76. Does it help with stamina? A: Yes. You won't get breathless as easily.
-Q77. Can I take it with multivitamin tablets? A: Yes, but Sakhi Tone is a natural multivitamin in itself!
-Q78. Is it available in other countries? A: Avilable middle east countries.
-Q79. Can I give it to my elderly mother? A: Yes, it is very good for geriatric care and strength.
+72. What if I get loose motions? A: Reduce the dose to half for a few days until your body adjusts.
+73. Does it help with white discharge (Leucorrhea)? A: First steps to take control lucorrhoea. It cause weightloss. Sakhitone It improves general strength, which helps the body fight underlying weaknesses associated with discharge.
+74. Can I take it during menstruation? A: Yes, it provides much-needed energy during those days.
+75. Is it sugar-free? A: You must check the specific label, but usually, Ayurvedic lehyams contain jaggery or sugar as a carrier.
+76. Does it help with stamina? A: Yes. You won't get breathless as easily.
+77. Can I take it with multivitamin tablets? A: Yes, but Sakhi Tone is a natural multivitamin in itself!
+78. Is it available in other countries? A: Avilable middle east countries.
+79. Can I give it to my elderly mother? A: Yes, it is very good for geriatric care and strength.
 80. Does it contain chemical preservatives? A: We use permitted class II preservatives only if necessary, but mostly rely on natural preservation techniques.
 81. Will it make me sleepy or drowsy during the day? A: No. It gives energy, not drowsiness.
 82. Can I take it if I am trying to conceive? A: Yes. A healthy, nourished body is better prepared for pregnancy. Stop once pregnancy is confirmed.
@@ -755,8 +755,8 @@ Q45. Can it be mixed with honey? A: Yes.
 Q46. Can it be taken with protein powder? A: Yes.
 Q47. What if a dose is missed? A: Continue normally.
 Q48. Can dosage be increased for faster results? A: No. Consistency matters more.
-Q49. Minimum duration of use? A: 3 months.
-Q50. Maximum duration? A: 6 months or as advised.
+49. Minimum duration of use? A: 3 months.
+50. Maximum duration? A: 6 months or as advised.
 
 Section F: Safety & Parent Questions
 Q51. Is it safe for 13-year-olds? A: Yes, under proper guidance.
@@ -953,6 +953,21 @@ Q97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
 
 # --- HELPER FUNCTIONS ---
 
+def _send_to_sheet_task(data):
+    try:
+        requests.post(GOOGLE_FORM_URL, data=data, timeout=8)
+    except Exception as e:
+        logging.error(f"❌ SAVE ERROR: {e}")
+
+def save_to_google_sheet(user_data):
+    phone_clean = user_data.get('phone', '').replace("+", "")
+    form_data = {
+        FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+        FORM_FIELDS["phone"]: phone_clean,
+        FORM_FIELDS["product"]: user_data.get("product", "Pending")
+    }
+    threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
+
 def send_zoko_message(phone, text):
     """
     Sends a message via Zoko API.
@@ -1012,7 +1027,7 @@ def check_stop_bot(phone):
         logging.error(f"Zoko Tag Check Error: {e}")
         return False
 
-def process_audio(file_url):
+def process_audio(file_url, history_context, current_agent):
     """
     Downloads audio, uploads to Gemini, and returns AI response.
     """
@@ -1043,13 +1058,17 @@ def process_audio(file_url):
 
         logging.info("Audio processed. Generating response...")
 
-        # 4. Generate Response
-        # Audio processing usually stateless or single turn context for simplicity in this refactor
+        # 4. Generate Response with History
+        # Construct dynamic prompt
+        system_instructions = SYSTEM_PROMPT
+        if current_agent:
+            system_instructions += f"\nORDER LINK: {current_agent['link']} (Phone: {current_agent['phone']})"
+
         chat_session = model.start_chat(
             history=[
-                {"role": "user", "parts": [SYSTEM_PROMPT]},
+                {"role": "user", "parts": [system_instructions]},
                 {"role": "model", "parts": ["Understood. I am AIVA, the AI assistant for Ayurdan Ayurveda Hospital."]}
-            ]
+            ] + history_context
         )
 
         prompt = "Listen to this audio. Answer the user's question clearly and concisely in the same language (Malayalam/English)."
@@ -1144,23 +1163,41 @@ def bot():
     try:
         response_text = ""
 
-        if msg_type == "text":
-            # Session Management
-            if sender_phone not in user_sessions:
-                user_sessions[sender_phone] = {"history": []}
+        # Session Management
+        if sender_phone not in user_sessions:
+            # Assign Agent
+            current_agent = AGENTS[0] # Default for now
+            user_sessions[sender_phone] = {
+                "history": [],
+                "agent": current_agent,
+                "data": {"phone": sender_phone}
+            }
 
-            session_history = user_sessions[sender_phone]["history"]
+        session = user_sessions[sender_phone]
+        session_history = session["history"]
+        current_agent = session["agent"]
+
+        # Detect Product for Lead Gen
+        product_context = get_best_product_match(incoming_msg)
+        if product_context != "Pending":
+            session["data"]["product"] = product_context
+            # Trigger background save
+            save_to_google_sheet(session["data"])
+
+        if msg_type == "text":
+            # Construct Dynamic System Prompt
+            system_instructions = SYSTEM_PROMPT
+            if current_agent:
+                system_instructions += f"\nORDER LINK: {current_agent['link']} (Phone: {current_agent['phone']})"
 
             # Start Chat with History
             chat_session = model.start_chat(
                 history=[
-                    {"role": "user", "parts": [SYSTEM_PROMPT]},
+                    {"role": "user", "parts": [system_instructions]},
                     {"role": "model", "parts": ["Understood. I am AIVA."]}
                 ] + session_history
             )
 
-            # Basic Product Context Injection
-            product_context = get_best_product_match(incoming_msg)
             full_query = incoming_msg
             if product_context != "Pending":
                 full_query = f"User is asking about {product_context}. {incoming_msg}"
@@ -1168,7 +1205,7 @@ def bot():
             ai_resp = chat_session.send_message(full_query)
             response_text = ai_resp.text
 
-            # Update History (Keep it reasonable size)
+            # Update History
             if len(session_history) > 20:
                 session_history.pop(0)
                 session_history.pop(0)
@@ -1178,7 +1215,15 @@ def bot():
 
         elif msg_type in ["audio", "audio_message"] and file_url:
             send_zoko_message(sender_phone, "Listening... 🎧")
-            response_text = process_audio(file_url)
+            response_text = process_audio(file_url, session_history, current_agent)
+
+            # Update History for Audio
+            if len(session_history) > 20:
+                session_history.pop(0)
+                session_history.pop(0)
+
+            session_history.append({"role": "user", "parts": ["(User sent audio)"]})
+            session_history.append({"role": "model", "parts": [response_text]})
 
         else:
             return jsonify(status="ignored", reason="unsupported_type")
