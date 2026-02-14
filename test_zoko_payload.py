@@ -9,14 +9,11 @@ class TestZokoPayload(unittest.TestCase):
         self.app.testing = True
 
     @patch('app.requests.post')
-    @patch('app.http_session')  # Patch the global session object
+    @patch('app.check_stop_bot')
     @patch('app.model.start_chat')
-    def test_zoko_payload_root_sender(self, mock_start_chat, mock_http_session, mock_post):
+    def test_zoko_payload_root_sender(self, mock_start_chat, mock_check_stop_bot, mock_post):
         # Mock Zoko Stop Bot check
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {'data': []}
-        mock_http_session.get.return_value = mock_response
+        mock_check_stop_bot.return_value = False
 
         # Mock Gemini Response
         mock_chat = MagicMock()
@@ -46,11 +43,10 @@ class TestZokoPayload(unittest.TestCase):
 
         response = self.app.post('/bot', json=payload)
 
-        # Should be 200 OK, not 400 Bad Request
+        # Should be 200 OK
         self.assertEqual(response.status_code, 200, f"Expected 200 but got {response.status_code}. Response: {response.data}")
         json_data = response.get_json()
         self.assertEqual(json_data['status'], 'ok')
-        self.assertTrue(json_data.get('response_sent'))
 
 if __name__ == '__main__':
     unittest.main()

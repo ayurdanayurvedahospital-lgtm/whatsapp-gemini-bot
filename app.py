@@ -5,7 +5,6 @@ import google.generativeai as genai
 import tempfile
 import threading
 import logging
-import re
 import time
 from flask import Flask, request, jsonify
 
@@ -26,34 +25,13 @@ if not ZOKO_API_KEY:
 # Initialize Gemini Model
 model = genai.GenerativeModel("gemini-2.5-flash")
 
-# GLOBAL SESSION FOR CONNECTION POOLING
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+# --- DATA STRUCTURES ---
 
-retry_strategy = Retry(
-    total=3,
-    backoff_factor=0.1,
-    status_forcelist=[429, 500, 502, 503, 504],
-)
-adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=retry_strategy)
-http_session = requests.Session()
-http_session.mount("https://", adapter)
-http_session.mount("http://", adapter)
+AGENTS = [
+    {"name": "Sreelekha", "role": "Senior Consultant"},
+    {"name": "Savitha", "role": "Support Agent"}
+]
 
-# STOP BOT CACHE (Minimize Latency)
-STOP_BOT_CACHE = {}
-STOP_BOT_CACHE_TTL = 60 # seconds
-stop_bot_lock = threading.Lock()
-
-# FORM FIELDS (Google Sheets)
-GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
-FORM_FIELDS = {
-    "name": "entry.2005620554",
-    "phone": "entry.1117261166",
-    "product": "entry.839337160"
-}
-
-# 🖼️ SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
     "kids": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -79,134 +57,176 @@ PRODUCT_IMAGES = {
     "neeli": "https://ayuralpha.in/cdn/shop/files/18.png?v=1725948517&width=823"
 }
 
+LINKS = {
+    "website": "https://ayuralpha.in/",
+    "flipkart": "https://www.flipkart.com/search?q=Alpha+Ayurveda",
+    "amazon": "https://www.amazon.in/s?k=Alpha+Ayurveda"
+}
+
+# Google Sheets Config
+GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
+FORM_FIELDS = {
+    "name": "entry.2005620554",
+    "phone": "entry.1117261166",
+    "product": "entry.839337160"
+}
+
 user_sessions = {}
 
-# LANGUAGE OPTIONS
-LANGUAGES = {
-    "1": "English",
-    "2": "Malayalam",
-    "3": "Tamil",
-    "4": "Hindi",
-    "5": "Kannada",
-    "6": "Telugu",
-    "7": "Bengali",
-    "8": "Other"
-}
+# --- HELPER FUNCTIONS ---
 
-# 🌐 UI TRANSLATION DICTIONARY
-UI_STRINGS = {
-    "English": {
-        "ask_name": "Great! You selected English.\nMay I know your *Name*?",
-        "ask_product": "Thank you! Which product would you like to know about? (e.g., Sakhitone, Staamigen Malt, Junior Staamigen?)",
-        "confirm_switch": "Do you want me to talk in English from now? (Yes/No)",
-        "intro_prefix": "You are inquiring about"
-    },
-    "Malayalam": {
-        "ask_name": "നന്ദി! നിങ്ങളുടെ പേര് എന്താണ്? (What is your name?)",
-        "ask_product": "നന്ദി! നിങ്ങൾക്ക് ഏത് ഉൽപ്പന്നത്തെക്കുറിച്ചാണ് അറിയേണ്ടത്? (e.g., Sakhitone, Staamigen Malt, Junior Staamigen?)",
-        "confirm_switch": "നിങ്ങൾക്ക് ഭാഷ മലയാളത്തിലേക്ക് മാറ്റണോ? (അതെ/അല്ല)",
-        "intro_prefix": "താങ്കൾ അന്വേഷിക്കുന്നത്"
-    },
-    "Tamil": {
-        "ask_name": "நன்றி! உங்கள் பெயர் என்ன? (What is your name?)",
-        "ask_product": "நன்றி! எந்த தயாரிப்பு பற்றி நீங்கள் அறிய விரும்புகிறீர்கள்? (e.g., Sakhitone, Staamigen Malt?)",
-        "confirm_switch": "நீங்கள் தமிழுக்கு மாற விரும்புகிறீர்களா? (ஆம்/இல்லை)",
-        "intro_prefix": "நீங்கள் விசாரிப்பது"
-    },
-    "Hindi": {
-        "ask_name": "धन्यवाद! आपका शुभ नाम क्या है?",
-        "ask_product": "धन्यवाद! आप किस उत्पाद के बारे में जानना चाहते हैं? (e.g., Sakhitone, Staamigen Malt?)",
-        "confirm_switch": "क्या आप हिंदी में बात करना चाहते हैं? (हाँ/नहीं)",
-        "intro_prefix": "आप पूछताछ कर रहे हैं"
-    },
-    "Kannada": {
-        "ask_name": "ಧನ್ಯವಾದ! ನಿಮ್ಮ ಹೆಸರೇನು?",
-        "ask_product": "ಧನ್ಯವಾದ! ನೀವು ಯಾವ ಉತ್ಪನ್ನದ ಬಗ್ಗೆ ತಿಳಿಯಲು ಬಯಸುತ್ತೀರಿ?",
-        "confirm_switch": "ನೀವು ಕನ್ನಡಕ್ಕೆ ಬದಲಾಯಿಸಲು ಬಯಸುವಿರಾ?",
-        "intro_prefix": "ನೀವು ಕೇಳುತ್ತಿದ್ದೀರಿ"
-    },
-    "Telugu": {
-        "ask_name": "ధన్యవాదాలు! మీ పేరు ఏమిటి?",
-        "ask_product": "ధన్యవాదాలు! మీరు ఏ ఉత్పత్తి గురించి తెలుసుకోవాలనుకుంటున్నారు?",
-        "confirm_switch": "మీరు తెలుగుకు మారాలనుకుంటున్నారా?",
-        "intro_prefix": "మీరు అడుగుతున్నారు"
-    },
-    "Bengali": {
-        "ask_name": "ধন্যবাদ! আপনার নাম কি?",
-        "ask_product": "ধন্যবাদ! আপনি কোন পণ্য সম্পর্কে জানতে চান?",
-        "confirm_switch": "আপনি কি বাংলায় কথা বলতে চান?",
-        "intro_prefix": "আপনি জিজ্ঞাসা করছেন"
-    },
-    "Other": {
-        "ask_name": "Great! Please type your name.",
-        "ask_product": "Which product would you like to know about?",
-        "confirm_switch": "Do you want to switch language?",
-        "intro_prefix": "You are asking about"
+def send_zoko_message(phone, text, image_url=None):
+    """
+    Sends a message via Zoko API.
+    If image_url is present, sends as image type with caption.
+    Otherwise sends as text type.
+    """
+    if not ZOKO_API_KEY:
+        logging.warning("Skipping Zoko Send: API Key missing")
+        return
+
+    url = "https://chat.zoko.io/v2/message"
+    headers = {
+        'apikey': ZOKO_API_KEY,
+        'Content-Type': 'application/json'
     }
-}
 
-# --- PRODUCT INTRO SCRIPTS (Bilingual Support) ---
-PRODUCT_INTROS = {
-    "sakhitone": {
-        "English": "Sakhi Tone, specifically designed to help women improve body weight and figure naturally.",
-        "Malayalam": "സ്ത്രീകൾക്ക് ശരീരഭാരവും ശരീരസൗന്ദര്യവും മെച്ചപ്പെടുത്താൻ സപ്പോർട്ട് ചെയ്യുന്ന സഖിടോണിനെ പറ്റിയാണ്.",
-        "Tamil": "பெண்களின் உடல் எடை மற்றும் தோற்றத்தை மேம்படுத்த உதவும் சகி டோன் பற்றி.",
-        "Hindi": "सखी टोन के बारे में, जो महिलाओं को वजन और फिगर बढ़ाने में मदद करता है।"
-    },
-    "staamigen": {
-        "English": "Staamigen Malt, designed to help men build muscle and healthy weight.",
-        "Malayalam": "പുരുഷന്മാർക്ക് ശരീരഭാരവും മസിലും വർധിപ്പിക്കാൻ സഹായിക്കുന്ന സ്റ്റാമിജൻ മാൾട്ടിനെ പറ്റിയാണ്.",
-        "Tamil": "ஆண்களுக்கு தசை மற்றும் எடையை அதிகரிக்க உதவும் ஸ்டாமிஜென் மால்ட் பற்றி.",
-        "Hindi": "स्टैमिजेन माल्ट के बारे में, जो पुरुषों को वजन बढ़ाने में मदद करता है।"
-    },
-    "gain": {
-        "English": "Ayurdan Gain Plus, an appetite restorer to help you eat well and build a healthy body.",
-        "Malayalam": "വിശപ്പ് വർധിപ്പിക്കാനും അതുവഴി ശരീരഭാരം കൂട്ടാനും സഹായിക്കുന്ന ആയുർദാൻ ഗെയിൻ പ്ലസിനെക്കുറിച്ചാണ്.",
-        "Tamil": "பசியைத் தூண்டி, உடல் எடையை அதிகரிக்க உதவும் ஆயுர்தான் கெயின் பிளஸ் பற்றி."
+    if image_url:
+        payload = {
+            'channel': 'whatsapp',
+            'recipient': phone,
+            'type': 'image',
+            'url': image_url,
+            'caption': text
+        }
+    else:
+        payload = {
+            'channel': 'whatsapp',
+            'recipient': phone,
+            'type': 'text',
+            'message': text
+        }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        logging.error(f"Zoko Send Error: {e}")
+
+def check_stop_bot(phone):
+    """
+    Checks if the user has a 'STOP_BOT' tag in Zoko.
+    Returns True if stopped.
+    """
+    if not ZOKO_API_KEY:
+        return False
+
+    url = f"https://chat.zoko.io/v2/chats?phone={phone}"
+    headers = {'apikey': ZOKO_API_KEY}
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            # Handle both list and dict returns just in case
+            chat_data = data.get('data', []) if isinstance(data, dict) else data
+
+            if isinstance(chat_data, list):
+                for chat in chat_data:
+                    tags = chat.get('tags', [])
+                    if any(t.lower() == "stop_bot" for t in tags):
+                        return True
+            elif isinstance(chat_data, dict):
+                tags = chat_data.get('tags', [])
+                if any(t.lower() == "stop_bot" for t in tags):
+                    return True
+    except Exception as e:
+        logging.error(f"Zoko Tag Check Error: {e}")
+
+    return False
+
+def process_audio(file_url, history_context):
+    """
+    Downloads OGG file, uploads to Gemini, and answers directly.
+    """
+    local_filename = None
+    try:
+        # Download
+        with requests.get(file_url, stream=True) as r:
+            r.raise_for_status()
+            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
+                for chunk in r.iter_content(chunk_size=8192):
+                    tmp.write(chunk)
+                local_filename = tmp.name
+
+        # Upload
+        myfile = genai.upload_file(local_filename, mime_type='audio/ogg')
+        while myfile.state.name == "PROCESSING":
+            time.sleep(1)
+            myfile = genai.get_file(myfile.name)
+
+        if myfile.state.name == "FAILED":
+            raise ValueError("Audio processing failed in Gemini.")
+
+        # Generate Response
+        # We use the existing chat session to keep context if possible,
+        # or start a new one if needed. Here we assume we want to maintain the session.
+        chat_session = model.start_chat(
+            history=[
+                {"role": "user", "parts": [SYSTEM_PROMPT]},
+                {"role": "model", "parts": ["Understood. I am AIVA, your AI Virtual Assistant."]}
+            ] + history_context
+        )
+
+        prompt = "Listen to this audio. Transcribe it and answer the user's question directly as AIVA."
+        response = chat_session.send_message([myfile, prompt])
+        return response.text
+
+    except Exception as e:
+        logging.error(f"Audio Process Error: {e}")
+        return "Sorry, I could not process your voice note. Please type your message."
+
+    finally:
+        if local_filename and os.path.exists(local_filename):
+            os.remove(local_filename)
+
+def _send_to_sheet_task(data):
+    try:
+        requests.post(GOOGLE_FORM_URL, data=data, timeout=10)
+    except Exception as e:
+        logging.error(f"Sheet Save Error: {e}")
+
+def save_to_sheet(user_data):
+    """
+    Saves user data to Google Sheet in background.
+    """
+    phone_clean = user_data.get('phone', '').replace("+", "")
+    form_data = {
+        FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
+        FORM_FIELDS["phone"]: phone_clean,
+        FORM_FIELDS["product"]: user_data.get("product", "Pending")
     }
-}
+    threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
 
-# VOICE REJECTION
-VOICE_REPLIES = {
-    "English": "Sorry, I cannot listen to voice notes. Please type your message. 🙏",
-    "Malayalam": "ക്ഷമിക്കണം, എനിക്ക് വോയിസ് മെസേജ് കേൾക്കാൻ കഴിയില്ല. ദയവായി ടൈപ്പ് ചെയ്യാമോ? 🙏",
-    "Tamil": "மன்னிக்கவும், என்னால் ஆடியோ கேட்க முடியாது. தயவுசெய்து டைப் செய்யவும். 🙏",
-    "Hindi": "क्षमा करें, मैं वॉयस नोट नहीं सुन सकता। कृपया टाइप करें। 🙏",
-    "Kannada": "ಕ್ಷಮಿಸಿ, ನಾನು ಧ್ವನಿ ಸಂದೇಶಗಳನ್ನು ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ. 🙏",
-    "Telugu": "క్షమించండి, నేను వాయిస్ మెసేజ్ వినలేను. దయచేసి టైప్ చేయండి. 🙏",
-    "Bengali": "দুঃখিত, আমি ভয়েস মেসেজ শুনতে পাই না। দয়া করে লিখে পাঠান। 🙏"
-}
+def get_product_image(text):
+    text_lower = text.lower()
+    for key, url in PRODUCT_IMAGES.items():
+        if key in text_lower:
+            return url
+    return None
 
-# THE SUPER-BRAIN (FULL KNOWLEDGE BASE)
+# --- THE BRAIN (SYSTEM PROMPT) ---
 SYSTEM_PROMPT = '''
-**Role:** AIVA (Ayurdan Ayurveda Hospital, Pandalam - 100+ Years Legacy).
+**Role:** Hello/Namaskaram, I'm AIVA your AI Virtual Assistant from Ayurdan Ayurveda Hospital.
 **Tone:** Empathetic, Authoritative, Concise, Persuasive.
 
-**⚠️ CRITICAL RULES FOR AI RESPONSE (STRICTLY FOLLOW):**
-1. **NAME DEFINITION:** Do NOT start every message with "AIVA here" or "I am AIVA". Only mention your name if explicitly asked. ONLY if the user explicitly asks "What is AIVA?" or "What does AIVA stand for?", explain that it means "Alpha Ayurveda Virtual Assistant".
-2. **ANTI-VERBOSITY RULE:** Answer **ONLY** the specific question asked. Do NOT dump extra info.
-   - If a detailed explanation is needed, **summarize it into ONE clear paragraph** without losing logic.
-3. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
-4. **CONTEXT ISOLATION:** - If talking about [PRODUCT A], answer based ONLY on [PRODUCT A].
-   - If user asks a general question (e.g., "Price?", "Side effects?"), answer ONLY for the CURRENT product.
-   - Do NOT mention other products unless explicitly asked.
-5. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
-6. **DELIVERY RULE:** If a user asks about availability in ANY specific country (e.g., "Is it available in Dubai?", "USA?", "UK?"), ALWAYS reply: "Yes, we have worldwide delivery available." (Do NOT mention GCC or Middle East specific limitations).
-7. **MEDICAL DISCLAIMER:** If the user asks about specific diseases (Thyroid, Diabetes, PCOD, etc.), strictly append this to your answer:
-   *(Note: I am an AI Assistant. Please consult our doctors at Ayurdan Ayurveda Hospital for a personalized diagnosis and to clarify your concerns.)*
-8. **GEMINI UPGRADE:** You are running on Gemini 2.5 Flash. Your responses must be instantaneous and concise.
-9. **PASSIVE CALCULATION RULE:** If the user mentions their height and weight (e.g., "I am 165cm and 60kg"), calculate their BMI immediately without asking. Formula: BMI = Weight(kg) / (Height(m)^2). Output: "Your BMI is [value]. This is considered [Underweight/Normal/Overweight]."
-
-**🧠 SALES PSYCHOLOGY & LINK RESTRICTION (MUST FOLLOW):**
-1. **INDIRECT PERSUASION:** Do not just give dry facts. Use psychological triggers to make the user visualize the benefit.
-   - **Future Pacing:** Make them imagine the positive result (e.g., "Imagine feeling confident when your clothes fit perfectly...").
-   - **Agitate the Problem:** Gently remind them of the cost of inaction (e.g., "Every day you wait is another day of feeling tired. Start your journey to strength today.").
-   - **Social Proof:** Mention "Many of our customers felt the same way until they tried..."
-2. **NO UNSOLICITED LINKS & HUMAN HANDOFF:**
-   - **Do NOT** share any external WhatsApp links or phone numbers.
-   - If the user wants to order (e.g., "How do I buy?", "Send link", "I want to order"), ask them to provide their **Name and Delivery Address** right here in the chat.
-   - Tell them that a human agent is present in this chat and will process their order shortly.
-   - Frame the purchase as the final step to their transformation, but keep the conversation within this chat.
+**⚠️ CRITICAL RULES:**
+1. **Language Rule:** Identify the user's language (English, Malayalam, Tamil, etc.) and reply in the EXACT same language. If the user explicitly asks to change language, confirm and switch.
+2. **Context Rule:** Always remember the product the user is asking about. If they switch topics, update your context and answer relevantly.
+3. **Link Rule:** If asked for a website, give the Alpha Ayurveda link (https://ayuralpha.in/). Only give Flipkart/Amazon links if EXPLICITLY requested.
+4. **Passive BMI Rule:** Do not ask for age/height/weight. ONLY if user provides Height(cm) and Weight(kg), calculate: (Height-100) - Current Weight = Difference. Tell them the difference.
+   - Example: Height 165cm, Weight 60kg. (165-100) - 60 = 5. Tell them "You are 5 units away from the calculation reference" (or adapt to medical context: "Your ideal weight difference is...").
+5. **No Unsolicited Links:** Do not share WhatsApp links or phone numbers unless configured. Ask for Name/Address for orders.
 
 *** 🔍 COMPLETE KNOWLEDGE BASE ***
 
@@ -776,9 +796,9 @@ Q54. Does it affect height? A: Proper nutrition supports natural growth.
 Q55. Can it cause acne? A: Rarely. Balanced diet prevents it.
 Q56. Is it safe for long-term organs? A: Yes.
 Q57. Can diabetic teens use it? A: Consult doctor.
-Q58. Is it vegetarian? A: Yes.
-Q59. Does it affect liver or kidney? A: No.
-Q60. Is it addictive? A: No.
+58. Is it vegetarian? A: Yes.
+59. Does it affect liver or kidney? A: No.
+60. Is it addictive? A: No.
 
 Section G: Common Objections & Answers
 Q61. “I eat a lot but still thin.” A: Digestion and absorption need support.
@@ -961,283 +981,89 @@ Q97. Can I stop cold turkey? A: Yes, no withdrawal symptoms.
 - Feminine Wellness Combo: ₹1161
 '''
 
-# --- HELPER FUNCTIONS ---
-
-def _send_to_sheet_task(data):
-    try:
-        requests.post(GOOGLE_FORM_URL, data=data, timeout=8)
-    except Exception as e:
-        logging.error(f"❌ SAVE ERROR: {e}")
-
-def save_to_google_sheet(user_data):
-    phone_clean = user_data.get('phone', '').replace("+", "")
-    form_data = {
-        FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-        FORM_FIELDS["phone"]: phone_clean,
-        FORM_FIELDS["product"]: user_data.get("product", "Pending")
-    }
-    threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
-
-def send_zoko_message(phone, text):
-    """
-    Sends a message via Zoko API.
-    """
-    if not ZOKO_API_KEY:
-        logging.warning("Skipping Zoko Send: API Key missing")
-        return
-
-    url = "https://chat.zoko.io/v2/message"
-    headers = {
-        'apikey': ZOKO_API_KEY,
-        'Content-Type': 'application/json'
-    }
-    payload = {
-        'channel': 'whatsapp',
-        'recipient': phone,
-        'type': 'text',
-        'message': text
-    }
-
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=5)
-        response.raise_for_status()
-    except Exception as e:
-        logging.error(f"Zoko Send Error: {e}")
-
-def check_stop_bot(phone):
-    """
-    Checks Zoko tags for 'STOP_BOT'.
-    Uses an in-memory cache to reduce latency (TTL=60s).
-    Returns True if bot should stop, False otherwise.
-    """
-    current_time = time.time()
-
-    # Check Cache First
-    with stop_bot_lock:
-        if phone in STOP_BOT_CACHE:
-            is_stopped, timestamp = STOP_BOT_CACHE[phone]
-            if current_time - timestamp < STOP_BOT_CACHE_TTL:
-                return is_stopped
-
-    if not ZOKO_API_KEY:
-        return False
-
-    url = f"https://chat.zoko.io/v2/chats?phone={phone}"
-    headers = {'apikey': ZOKO_API_KEY}
-
-    is_stopped = False
-    try:
-        # Use the optimized session
-        resp = http_session.get(url, headers=headers, timeout=3) # Lower timeout
-        if resp.status_code == 200:
-            data = resp.json()
-            chat_data = data.get('data', []) if isinstance(data, dict) else data
-
-            if isinstance(chat_data, list):
-                for chat in chat_data:
-                    tags = chat.get('tags', [])
-                    if any(t.lower() == "stop_bot" for t in tags):
-                        is_stopped = True
-                        break
-            elif isinstance(chat_data, dict):
-                tags = chat_data.get('tags', [])
-                if any(t.lower() == "stop_bot" for t in tags):
-                    is_stopped = True
-    except Exception as e:
-        logging.error(f"Zoko Tag Check Error: {e}")
-        # On error, default to NOT stopped to keep bot alive, but don't cache error state heavily?
-        # Actually, let's cache False to avoid hammering the API if it's down.
-        is_stopped = False
-
-    # Update Cache
-    with stop_bot_lock:
-        STOP_BOT_CACHE[phone] = (is_stopped, current_time)
-
-    return is_stopped
-
-def process_audio(file_url, history_context):
-    """
-    Downloads audio, uploads to Gemini, and returns AI response.
-    """
-    local_filename = None
-
-    try:
-        # 1. Download Audio
-        logging.info(f"Downloading audio from {file_url}")
-        with requests.get(file_url, stream=True) as r:
-            r.raise_for_status()
-            # Use tempfile for safe temporary file creation
-            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
-                for chunk in r.iter_content(chunk_size=8192):
-                    tmp.write(chunk)
-                local_filename = tmp.name
-
-        # 2. Upload to Gemini
-        logging.info("Uploading audio to Gemini...")
-        myfile = genai.upload_file(local_filename, mime_type='audio/ogg')
-
-        # 3. Wait for Processing
-        while myfile.state.name == "PROCESSING":
-            time.sleep(1)
-            myfile = genai.get_file(myfile.name)
-
-        if myfile.state.name == "FAILED":
-            raise ValueError("Audio processing failed in Gemini.")
-
-        logging.info("Audio processed. Generating response...")
-
-        # 4. Generate Response with History
-        # Construct dynamic prompt
-        system_instructions = SYSTEM_PROMPT
-
-        chat_session = model.start_chat(
-            history=[
-                {"role": "user", "parts": [system_instructions]},
-                {"role": "model", "parts": ["Understood. I am AIVA, the AI assistant for Ayurdan Ayurveda Hospital."]}
-            ] + history_context
-        )
-
-        prompt = "Listen to this audio. Answer the user's question clearly and concisely in the same language (Malayalam/English)."
-        response = chat_session.send_message([myfile, prompt])
-
-        return response.text
-
-    except Exception as e:
-        logging.error(f"Handle Audio Error: {e}")
-        return "Sorry, I could not process your voice note. Please type your message. 🙏"
-
-    finally:
-        # 5. Cleanup
-        if local_filename and os.path.exists(local_filename):
-            try:
-                os.remove(local_filename)
-            except Exception as e:
-                logging.error(f"Cleanup Error: {e}")
-
-def get_best_product_match(incoming_msg):
-    incoming_lower = incoming_msg.lower()
-
-    # Priority Levels for Keywords
-    high_priority = ["diabet", "sugar", "hair", "pain", "muktanjan", "junior", "kids", "sakhi", "vrindha", "vrinda", "white", "kanya", "period", "gain", "strength", "saphala", "neeli", "gas"]
-    medium_priority = ["malt", "powder"]
-
-    matches = []
-    for key in PRODUCT_IMAGES.keys():
-        if key in incoming_lower:
-            matches.append(key)
-
-    if not matches:
-        return "Pending"
-
-    for m in matches:
-        if any(h in m for h in high_priority):
-            return m
-
-    for m in matches:
-        if any(med in m for med in medium_priority):
-            return m
-
-    return matches[0]
-
-
-@app.route('/', methods=['GET'])
-def health_check():
-    return "Active", 200
+# --- MAIN LOGIC ---
 
 @app.route("/bot", methods=["POST"])
 def bot():
     data = request.json
     print(f"Incoming Zoko Payload: {data}")
 
-    # 1. Phone Number Extraction (from 'customer' object)
-    sender_phone = data.get("platformSenderId") or data.get("customer", {}).get("platformSenderId")
+    # 1. FIX JSON PARSING (Robust fallback per user request)
+    sender_phone = data.get("customer", {}).get("platformSenderId")
+    if not sender_phone:
+        sender_phone = data.get("platformSenderId")
 
-    # 2. Message Text Extraction (from 'text' field)
     incoming_msg = data.get("text", "")
-    if incoming_msg:
-        incoming_msg = incoming_msg.strip()
-
-    # 3. Message Type Extraction
     msg_type = data.get("type", "text")
-
-    # 4. Audio URL Extraction
     file_url = data.get("fileUrl")
 
     if not sender_phone:
         return jsonify(status="error", reason="No sender_phone"), 400
 
-    # 5. Stop Logic (Check AFTER extraction)
-    if check_stop_bot(sender_phone):
+    # 2. STOP LOGIC
+    # Check 'STOP_BOT' tag via API or text command
+    if check_stop_bot(sender_phone) or (incoming_msg and incoming_msg.strip().upper() == "STOP BOT"):
         return jsonify(status="stopped")
+
+    # Session Management
+    if sender_phone not in user_sessions:
+        user_sessions[sender_phone] = {
+            "history": [],
+            "data": {"phone": sender_phone}
+        }
+    session = user_sessions[sender_phone]
 
     try:
         response_text = ""
+        image_url = None
 
-        # Session Management
-        if sender_phone not in user_sessions:
-            user_sessions[sender_phone] = {
-                "history": [],
-                "data": {"phone": sender_phone}
-            }
+        # 3. IMAGE LOGIC (Check for product keywords)
+        if incoming_msg:
+            image_url = get_product_image(incoming_msg)
 
-        session = user_sessions[sender_phone]
-        session_history = session["history"]
+            # Save product context if detected
+            if image_url:
+                # We can't easily extract the key from just URL, so re-scan keys
+                for key in PRODUCT_IMAGES:
+                    if key in incoming_msg.lower():
+                        session["data"]["product"] = key
+                        save_to_sheet(session["data"])
+                        break
 
-        # Detect Product for Lead Gen
-        product_context = get_best_product_match(incoming_msg)
-        if product_context != "Pending":
-            session["data"]["product"] = product_context
-            # Trigger background save
-            save_to_google_sheet(session["data"])
+        # 4. PROCESSING
+        if msg_type in ["audio", "audio_message"] and file_url:
+            send_zoko_message(sender_phone, "Listening... 🎧")
+            # History context is passed to maintain conversation flow if needed by internal logic,
+            # but process_audio implements the specific prompt request.
+            response_text = process_audio(file_url, session["history"])
 
-        if msg_type == "text":
-            # Construct Dynamic System Prompt
-            system_instructions = SYSTEM_PROMPT
+            # Update history (mocked since we don't have the user text, only audio)
+            session["history"].append({"role": "user", "parts": ["(User sent audio)"]})
+            session["history"].append({"role": "model", "parts": [response_text]})
 
-            # Start Chat with History
+        elif msg_type == "text":
+             # Start Chat with History
             chat_session = model.start_chat(
                 history=[
-                    {"role": "user", "parts": [system_instructions]},
+                    {"role": "user", "parts": [SYSTEM_PROMPT]},
                     {"role": "model", "parts": ["Understood. I am AIVA."]}
-                ] + session_history
+                ] + session["history"]
             )
 
-            full_query = incoming_msg
-            if product_context != "Pending":
-                full_query = f"User is asking about {product_context}. {incoming_msg}"
-
-            ai_resp = chat_session.send_message(full_query)
+            ai_resp = chat_session.send_message(incoming_msg)
             response_text = ai_resp.text
 
             # Update History
-            if len(session_history) > 20:
-                session_history.pop(0)
-                session_history.pop(0)
+            session["history"].append({"role": "user", "parts": [incoming_msg]})
+            session["history"].append({"role": "model", "parts": [response_text]})
 
-            session_history.append({"role": "user", "parts": [incoming_msg]})
-            session_history.append({"role": "model", "parts": [response_text]})
-
-        elif msg_type in ["audio", "audio_message"] and file_url:
-            send_zoko_message(sender_phone, "Listening... 🎧")
-            response_text = process_audio(file_url, session_history)
-
-            # Update History for Audio
-            if len(session_history) > 20:
-                session_history.pop(0)
-                session_history.pop(0)
-
-            session_history.append({"role": "user", "parts": ["(User sent audio)"]})
-            session_history.append({"role": "model", "parts": [response_text]})
-
-        else:
-            return jsonify(status="ignored", reason="unsupported_type")
-
+        # 5. RESPONSE
         if response_text:
-            send_zoko_message(sender_phone, response_text)
+            send_zoko_message(sender_phone, response_text, image_url)
             return jsonify(status="ok", response_sent=True)
 
     except Exception as e:
-        logging.error(f"Bot Error: {e}")
+        logging.error(f"Bot Logic Error: {e}")
         return jsonify(status="error", reason=str(e)), 500
 
     return jsonify(status="ok")
