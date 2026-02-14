@@ -72,6 +72,8 @@ FORM_FIELDS = {
 }
 
 user_sessions = {}
+stop_bot_cache = {} # phone -> {"stopped": bool, "timestamp": float}
+CACHE_TTL = 300  # 5 minutes
 
 # --- HELPER FUNCTIONS ---
 
@@ -117,13 +119,22 @@ def check_stop_bot(phone):
     """
     Checks if the user has a 'STOP_BOT' tag in Zoko.
     Returns True if stopped.
+    Uses caching to reduce API calls.
     """
+    # Check Cache
+    now = time.time()
+    if phone in stop_bot_cache:
+        cached = stop_bot_cache[phone]
+        if now - cached["timestamp"] < CACHE_TTL:
+            return cached["stopped"]
+
     if not ZOKO_API_KEY:
         return False
 
     url = f"https://chat.zoko.io/v2/chats?phone={phone}"
     headers = {'apikey': ZOKO_API_KEY}
 
+    is_stopped = False
     try:
         resp = requests.get(url, headers=headers, timeout=5)
         if resp.status_code == 200:
@@ -135,15 +146,20 @@ def check_stop_bot(phone):
                 for chat in chat_data:
                     tags = chat.get('tags', [])
                     if any(t.lower() == "stop_bot" for t in tags):
-                        return True
+                        is_stopped = True
+                        break
             elif isinstance(chat_data, dict):
                 tags = chat_data.get('tags', [])
                 if any(t.lower() == "stop_bot" for t in tags):
-                    return True
+                    is_stopped = True
     except Exception as e:
         logging.error(f"Zoko Tag Check Error: {e}")
+        # On error, we default to False (allow) but rely on local cache if available?
+        # No, if cache expired or missing, we have to guess. Defaulting to False.
 
-    return False
+    # Update Cache
+    stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
+    return is_stopped
 
 def process_audio(file_url, history_context):
     """
@@ -996,6 +1012,11 @@ def bot():
     incoming_msg = data.get("text", "")
     msg_type = data.get("type", "text")
     file_url = data.get("fileUrl")
+    direction = data.get("direction")
+
+    # IGNORE OUTGOING MESSAGES (Loop Prevention)
+    if direction and direction != "FROM_CUSTOMER":
+        return jsonify(status="ignored", reason="Not from customer"), 200
 
     if not sender_phone:
         return jsonify(status="error", reason="No sender_phone"), 400
@@ -1009,9 +1030,29 @@ def bot():
     if sender_phone not in user_sessions:
         user_sessions[sender_phone] = {
             "history": [],
-            "data": {"phone": sender_phone}
+            "data": {"phone": sender_phone},
+            "last_messages": [],
+            "stopped_loop": False
         }
     session = user_sessions[sender_phone]
+
+    # REPETITION CHECK (Stop if user sends same msg 3 times)
+    if session.get("stopped_loop"):
+        return jsonify(status="stopped_repetition")
+
+    if incoming_msg:
+        # Initialize if missing (backward compatibility)
+        if "last_messages" not in session:
+            session["last_messages"] = []
+
+        session["last_messages"].append(incoming_msg)
+        if len(session["last_messages"]) > 3:
+            session["last_messages"].pop(0)
+
+        if len(session["last_messages"]) == 3 and all(m == incoming_msg for m in session["last_messages"]):
+             session["stopped_loop"] = True
+             logging.info(f"Repetitive messages from {sender_phone}. Stopping bot loop.")
+             return jsonify(status="stopped_repetition")
 
     try:
         response_text = ""
