@@ -1150,7 +1150,7 @@ def bot():
     print(f"Incoming Zoko Payload: {data}")
 
     # 1. Phone Number Extraction (from 'customer' object)
-    sender_phone = data.get("customer", {}).get("platformSenderId")
+    sender_phone = data.get("platformSenderId") or data.get("customer", {}).get("platformSenderId")
 
     # 2. Message Text Extraction (from 'text' field)
     incoming_msg = data.get("text", "")
