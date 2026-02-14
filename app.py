@@ -4,11 +4,12 @@ import flask
 import google.generativeai as genai
 import tempfile
 import threading
+import re
 import logging
 import time
 from flask import Flask, request, jsonify
 
-# Import Knowledge Base
+# Import Knowledge Base and System Prompt
 from knowledge_base_data import AGENTS, PRODUCT_IMAGES, LINKS, GOOGLE_FORM_URL, FORM_FIELDS
 from system_prompt import SYSTEM_PROMPT
 
@@ -30,32 +31,27 @@ if not ZOKO_API_KEY:
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 # --- DATA STRUCTURES ---
-
 user_sessions = {}
 stop_bot_cache = {} # phone -> {"stopped": bool, "timestamp": float}
 CACHE_TTL = 300  # 5 minutes
 
-processed_messages = {} # msg_id -> timestamp
-PROCESSED_TTL = 600 # 10 minutes (Keep IDs for 10 mins to avoid duplicates)
-
 # --- HELPER FUNCTIONS ---
-
-def cleanup_processed_messages():
-    """Removes old message IDs from cache to prevent memory leaks."""
-    now = time.time()
-    to_remove = [mid for mid, ts in processed_messages.items() if now - ts > PROCESSED_TTL]
-    for mid in to_remove:
-        del processed_messages[mid]
 
 def send_zoko_message(phone, text, image_url=None):
     """
     Sends a message via Zoko API.
-    If image_url is present, sends as image type with caption.
-    Otherwise sends as text type.
+    Fixes 400 Error by cleaning phone number and handling empty text.
     """
     if not ZOKO_API_KEY:
         logging.warning("Skipping Zoko Send: API Key missing")
         return
+
+    if not text and not image_url:
+        logging.warning("Skipping Zoko Send: No text or image provided")
+        return
+
+    # Clean phone number (remove leading +)
+    phone = phone.replace("+", "")
 
     url = "https://chat.zoko.io/v2/message"
     headers = {
@@ -83,13 +79,12 @@ def send_zoko_message(phone, text, image_url=None):
         response = requests.post(url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
     except Exception as e:
-        logging.error(f"Zoko Send Error: {e}")
+        logging.error(f"Zoko Send Error: {e} | Payload: {payload}")
 
 def check_stop_bot(phone):
     """
     Checks if the user has a 'STOP_BOT' tag in Zoko.
     Returns True if stopped.
-    Uses caching to reduce API calls.
     """
     # Check Cache
     now = time.time()
@@ -101,6 +96,11 @@ def check_stop_bot(phone):
     if not ZOKO_API_KEY:
         return False
 
+    # Clean phone number for query as well? Usually query params handle + encoded.
+    # But for consistency let's try with + first as it is in Zoko usually.
+    # The helper `send_zoko_message` stripped it, but `chats?phone=` might need it.
+    # I'll stick to the raw phone for the query unless it fails.
+
     url = f"https://chat.zoko.io/v2/chats?phone={phone}"
     headers = {'apikey': ZOKO_API_KEY}
 
@@ -109,7 +109,6 @@ def check_stop_bot(phone):
         resp = requests.get(url, headers=headers, timeout=5)
         if resp.status_code == 200:
             data = resp.json()
-            # Handle both list and dict returns just in case
             chat_data = data.get('data', []) if isinstance(data, dict) else data
 
             if isinstance(chat_data, list):
@@ -124,24 +123,14 @@ def check_stop_bot(phone):
                     is_stopped = True
     except Exception as e:
         logging.error(f"Zoko Tag Check Error: {e}")
-        # On error, we default to False (allow) but rely on local cache if available?
-        # No, if cache expired or missing, we have to guess. Defaulting to False.
 
     # Update Cache
     stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
     return is_stopped
 
-def set_stop_bot_locally(phone):
+def process_audio(file_url):
     """
-    Manually sets the stop bot status in the local cache.
-    Use this when the user sends a STOP command, so we don't need to wait for Zoko API or cache expiry.
-    """
-    stop_bot_cache[phone] = {"stopped": True, "timestamp": time.time()}
-    logging.info(f"Manually set STOP_BOT for {phone} in local cache.")
-
-def process_audio(file_url, history_context):
-    """
-    Downloads OGG file, uploads to Gemini, and answers directly.
+    Downloads OGG file, uploads to Gemini, and returns text response.
     """
     local_filename = None
     try:
@@ -162,18 +151,18 @@ def process_audio(file_url, history_context):
         if myfile.state.name == "FAILED":
             raise ValueError("Audio processing failed in Gemini.")
 
-        # Generate Response
-        # We use the existing chat session to keep context if possible,
-        # or start a new one if needed. Here we assume we want to maintain the session.
-        chat_session = model.start_chat(
-            history=[
-                {"role": "user", "parts": [SYSTEM_PROMPT]},
-                {"role": "model", "parts": ["Understood. I am AIVA, your AI Virtual Assistant."]}
-            ] + history_context
-        )
+        # Generate Response using System Prompt context if we were in a session,
+        # but here we simplify as per instruction: "Download OGG, upload to Gemini, return text response."
+        # We need a chat session or a generate_content call.
+        # I'll use a new chat session with System Prompt to ensure persona.
+
+        chat = model.start_chat(history=[
+            {"role": "user", "parts": [SYSTEM_PROMPT]},
+            {"role": "model", "parts": ["Understood. I am AIVA."]}
+        ])
 
         prompt = "Listen to this audio. You are AIVA. Answer the user's question directly, briefly, and politely in the same language."
-        response = chat_session.send_message([myfile, prompt])
+        response = chat.send_message([myfile, prompt])
         return response.text
 
     except Exception as e:
@@ -184,160 +173,91 @@ def process_audio(file_url, history_context):
         if local_filename and os.path.exists(local_filename):
             os.remove(local_filename)
 
-def _send_to_sheet_task(data):
-    try:
-        requests.post(GOOGLE_FORM_URL, data=data, timeout=10)
-    except Exception as e:
-        logging.error(f"Sheet Save Error: {e}")
-
-def save_to_sheet(user_data):
+def handle_message(data):
     """
-    Saves user data to Google Sheet in background.
-    """
-    phone_clean = user_data.get('phone', '').replace("+", "")
-    form_data = {
-        FORM_FIELDS["name"]: user_data.get("name", "Unknown"),
-        FORM_FIELDS["phone"]: phone_clean,
-        FORM_FIELDS["product"]: user_data.get("product", "Pending")
-    }
-    threading.Thread(target=_send_to_sheet_task, args=(form_data,)).start()
-
-def get_product_image(text):
-    text_lower = text.lower()
-    for key, url in PRODUCT_IMAGES.items():
-        if key in text_lower:
-            return url
-    return None
-
-def handle_background_message(data):
-    """
-    Main Logic Handler (Running in Background Thread).
-    Parses Zoko payload, checks stops/loops, calls AI, and sends response.
+    Background Message Handler.
     """
     try:
-        # 1. PARSE JSON
-        sender_phone = data.get("customer", {}).get("platformSenderId")
+        # 1. Parse
+        customer = data.get("customer", {})
+        sender_phone = customer.get("platformSenderId")
         if not sender_phone:
-            sender_phone = data.get("platformSenderId")
+             # Fallback
+             sender_phone = data.get("platformSenderId")
+
+        if not sender_phone:
+            logging.error("No sender_phone found.")
+            return
 
         incoming_msg = data.get("text", "")
         msg_type = data.get("type", "text")
         file_url = data.get("fileUrl")
         direction = data.get("direction")
-        msg_id = data.get("id")
 
-        if not sender_phone:
-            logging.error("No sender_phone found in payload")
-            return
-
-        # 2. LOOP PREVENTION (Ignore Outgoing)
+        # Ignore outgoing messages
         if direction and direction != "FROM_CUSTOMER":
             return
 
-        # 3. IDEMPOTENCY CHECK
-        if msg_id:
-            if msg_id in processed_messages:
-                logging.info(f"Ignoring duplicate message ID: {msg_id}")
-                return
-            processed_messages[msg_id] = time.time()
-
-            # Cleanup occasionally
-            if len(processed_messages) > 1000:
-                cleanup_processed_messages()
-
-        # 4. STOP LOGIC
-        # Check 'STOP_BOT' tag via API or text command
-        is_stopped = check_stop_bot(sender_phone)
-
-        # If explicit STOP command, update local cache immediately
-        if incoming_msg and incoming_msg.strip().upper() in ["STOP BOT", "STOP"]:
-            set_stop_bot_locally(sender_phone)
-            # We don't return here immediately because we might want to confirm?
-            # But per logic, we should stop responding.
+        # 2. STOP BOT Logic
+        if check_stop_bot(sender_phone):
+            logging.info(f"Bot is stopped for {sender_phone}")
             return
 
-        if is_stopped:
+        if incoming_msg and incoming_msg.strip().upper() == "STOP BOT":
+            # Update cache locally as well to be safe
+            stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
+            send_zoko_message(sender_phone, "Bot Stopped")
             return
 
-        # 5. SESSION MANAGEMENT
-        if sender_phone not in user_sessions:
-            user_sessions[sender_phone] = {
-                "history": [],
-                "data": {"phone": sender_phone},
-                "last_messages": [],
-                "stopped_loop": False
-            }
-        session = user_sessions[sender_phone]
-
-        # 6. REPETITION CHECK (Stop if user sends same msg 3 times)
-        if session.get("stopped_loop"):
-            return
-
-        if incoming_msg:
-            # Initialize if missing
-            if "last_messages" not in session:
-                session["last_messages"] = []
-
-            session["last_messages"].append(incoming_msg)
-            if len(session["last_messages"]) > 3:
-                session["last_messages"].pop(0)
-
-            if len(session["last_messages"]) == 3 and all(m == incoming_msg for m in session["last_messages"]):
-                 session["stopped_loop"] = True
-                 logging.info(f"Repetitive messages from {sender_phone}. Stopping bot loop.")
-                 return
-
-        response_text = ""
+        # 3. Image Detection
         image_url = None
-
-        # 7. IMAGE LOGIC (Check for product keywords)
         if incoming_msg:
-            image_url = get_product_image(incoming_msg)
+            msg_lower = incoming_msg.lower()
+            for key, url in PRODUCT_IMAGES.items():
+                if key in msg_lower:
+                    image_url = url
+                    break
 
-            # Save product context if detected
-            if image_url:
-                for key in PRODUCT_IMAGES:
-                    if key in incoming_msg.lower():
-                        session["data"]["product"] = key
-                        save_to_sheet(session["data"])
-                        break
+        # 4. AI Generation
+        response_text = ""
 
-        # 8. PROCESSING (Audio/Text)
-        if msg_type in ["audio", "audio_message"] and file_url:
-            send_zoko_message(sender_phone, "Listening... 🎧")
-            # History context is passed to maintain conversation flow
-            response_text = process_audio(file_url, session["history"])
+        # Session History
+        if sender_phone not in user_sessions:
+            user_sessions[sender_phone] = []
+        history = user_sessions[sender_phone]
 
-            # Update history
-            session["history"].append({"role": "user", "parts": ["(User sent audio)"]})
-            session["history"].append({"role": "model", "parts": [response_text]})
-
-        elif msg_type == "text":
-             # Start Chat with History
-            chat_session = model.start_chat(
-                history=[
-                    {"role": "user", "parts": [SYSTEM_PROMPT]},
-                    {"role": "model", "parts": ["Understood. I am AIVA."]}
-                ] + session["history"]
-            )
+        if msg_type == "audio":
+             if file_url:
+                 send_zoko_message(sender_phone, "Listening... 🎧")
+                 response_text = process_audio(file_url)
+        else:
+            # Text Processing
+            chat = model.start_chat(history=[
+                {"role": "user", "parts": [SYSTEM_PROMPT]},
+                {"role": "model", "parts": ["Understood. I am AIVA."]}
+            ] + history)
 
             try:
-                ai_resp = chat_session.send_message(incoming_msg)
+                ai_resp = chat.send_message(incoming_msg)
                 response_text = ai_resp.text
+
+                # Update History
+                history.append({"role": "user", "parts": [incoming_msg]})
+                history.append({"role": "model", "parts": [response_text]})
+                # Keep history short? User didn't specify, but good practice.
+                if len(history) > 20:
+                    user_sessions[sender_phone] = history[-20:]
+
             except Exception as e:
-                 logging.error(f"Gemini API Error: {e}")
-                 response_text = "I'm having trouble connecting right now. Please try again later."
+                logging.error(f"Gemini Error: {e}")
+                response_text = "I am currently experiencing high traffic. Please try again later."
 
-            # Update History
-            session["history"].append({"role": "user", "parts": [incoming_msg]})
-            session["history"].append({"role": "model", "parts": [response_text]})
-
-        # 9. SEND RESPONSE
+        # 5. Send Response
         if response_text:
             send_zoko_message(sender_phone, response_text, image_url)
 
     except Exception as e:
-        logging.error(f"Background Process Error: {e}")
+        logging.error(f"Background Handler Error: {e}")
 
 # --- MAIN ROUTE ---
 
@@ -345,13 +265,13 @@ def handle_background_message(data):
 def bot():
     """
     Webhook Endpoint.
-    Only spawns the background thread and returns 200 OK immediately.
+    Returns 200 OK immediately and processes in background.
     """
     data = request.json
     print(f"Incoming Zoko Payload: {data}")
 
     # Start Background Thread
-    thread = threading.Thread(target=handle_background_message, args=(data,))
+    thread = threading.Thread(target=handle_message, args=(data,))
     thread.start()
 
     return jsonify(status="received"), 200

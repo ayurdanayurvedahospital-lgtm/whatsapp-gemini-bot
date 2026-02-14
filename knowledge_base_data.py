@@ -1,7 +1,7 @@
-# --- CONFIGURATION (Knowledge Base will be moved later) ---
+# --- CONFIGURATION ---
 AGENTS = [
-    {"name": "Sreelekha", "role": "Senior Consultant"},
-    {"name": "Savitha", "role": "Support Agent"}
+    {"name": "Sreelekha", "role": "Senior Consultant", "phone": "+91 99463 88900"},
+    {"name": "Savitha", "role": "Support Agent", "phone": "+91 99463 88900"}
 ]
 
 PRODUCT_IMAGES = {
