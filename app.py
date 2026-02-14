@@ -35,7 +35,17 @@ user_sessions = {}
 stop_bot_cache = {} # phone -> {"stopped": bool, "timestamp": float}
 CACHE_TTL = 300  # 5 minutes
 
+processed_messages = {} # msg_id -> timestamp
+PROCESSED_TTL = 600 # 10 minutes (Keep IDs for 10 mins to avoid duplicates)
+
 # --- HELPER FUNCTIONS ---
+
+def cleanup_processed_messages():
+    """Removes old message IDs from cache to prevent memory leaks."""
+    now = time.time()
+    to_remove = [mid for mid, ts in processed_messages.items() if now - ts > PROCESSED_TTL]
+    for mid in to_remove:
+        del processed_messages[mid]
 
 def send_zoko_message(phone, text, image_url=None):
     """
@@ -199,6 +209,65 @@ def get_product_image(text):
             return url
     return None
 
+def process_message_async(sender_phone, incoming_msg, msg_type, file_url, session):
+    """
+    Background task to process the message logic (Image check, Audio/Text processing, Response).
+    """
+    try:
+        response_text = ""
+        image_url = None
+
+        # 3. IMAGE LOGIC (Check for product keywords)
+        if incoming_msg:
+            image_url = get_product_image(incoming_msg)
+
+            # Save product context if detected
+            if image_url:
+                # We can't easily extract the key from just URL, so re-scan keys
+                for key in PRODUCT_IMAGES:
+                    if key in incoming_msg.lower():
+                        session["data"]["product"] = key
+                        save_to_sheet(session["data"])
+                        break
+
+        # 4. PROCESSING
+        if msg_type in ["audio", "audio_message"] and file_url:
+            send_zoko_message(sender_phone, "Listening... 🎧")
+            # History context is passed to maintain conversation flow if needed by internal logic,
+            # but process_audio implements the specific prompt request.
+            response_text = process_audio(file_url, session["history"])
+
+            # Update history (mocked since we don't have the user text, only audio)
+            session["history"].append({"role": "user", "parts": ["(User sent audio)"]})
+            session["history"].append({"role": "model", "parts": [response_text]})
+
+        elif msg_type == "text":
+             # Start Chat with History
+            chat_session = model.start_chat(
+                history=[
+                    {"role": "user", "parts": [SYSTEM_PROMPT]},
+                    {"role": "model", "parts": ["Understood. I am AIVA."]}
+                ] + session["history"]
+            )
+
+            try:
+                ai_resp = chat_session.send_message(incoming_msg)
+                response_text = ai_resp.text
+            except Exception as e:
+                 logging.error(f"Gemini API Error: {e}")
+                 response_text = "I'm having trouble connecting right now. Please try again later."
+
+            # Update History
+            session["history"].append({"role": "user", "parts": [incoming_msg]})
+            session["history"].append({"role": "model", "parts": [response_text]})
+
+        # 5. RESPONSE
+        if response_text:
+            send_zoko_message(sender_phone, response_text, image_url)
+
+    except Exception as e:
+        logging.error(f"Async Processing Error: {e}")
+
 # --- MAIN LOGIC ---
 
 @app.route("/bot", methods=["POST"])
@@ -215,6 +284,7 @@ def bot():
     msg_type = data.get("type", "text")
     file_url = data.get("fileUrl")
     direction = data.get("direction")
+    msg_id = data.get("id")
 
     # IGNORE OUTGOING MESSAGES (Loop Prevention)
     if direction and direction != "FROM_CUSTOMER":
@@ -222,6 +292,17 @@ def bot():
 
     if not sender_phone:
         return jsonify(status="error", reason="No sender_phone"), 400
+
+    # IDEMPOTENCY CHECK
+    if msg_id:
+        if msg_id in processed_messages:
+            logging.info(f"Ignoring duplicate message ID: {msg_id}")
+            return jsonify(status="ignored", reason="duplicate_id"), 200
+        processed_messages[msg_id] = time.time()
+
+        # Cleanup occasionally (simple implementation)
+        if len(processed_messages) > 1000:
+            cleanup_processed_messages()
 
     # 2. STOP LOGIC
     # Check 'STOP_BOT' tag via API or text command
@@ -263,60 +344,16 @@ def bot():
              logging.info(f"Repetitive messages from {sender_phone}. Stopping bot loop.")
              return jsonify(status="stopped_repetition")
 
-    try:
-        response_text = ""
-        image_url = None
+    # ASYNC PROCESSING
+    # Start the heavy lifting in a background thread to return 200 OK immediately
+    # This prevents Zoko from timing out and retrying the webhook
+    thread = threading.Thread(
+        target=process_message_async,
+        args=(sender_phone, incoming_msg, msg_type, file_url, session)
+    )
+    thread.start()
 
-        # 3. IMAGE LOGIC (Check for product keywords)
-        if incoming_msg:
-            image_url = get_product_image(incoming_msg)
-
-            # Save product context if detected
-            if image_url:
-                # We can't easily extract the key from just URL, so re-scan keys
-                for key in PRODUCT_IMAGES:
-                    if key in incoming_msg.lower():
-                        session["data"]["product"] = key
-                        save_to_sheet(session["data"])
-                        break
-
-        # 4. PROCESSING
-        if msg_type in ["audio", "audio_message"] and file_url:
-            send_zoko_message(sender_phone, "Listening... 🎧")
-            # History context is passed to maintain conversation flow if needed by internal logic,
-            # but process_audio implements the specific prompt request.
-            response_text = process_audio(file_url, session["history"])
-
-            # Update history (mocked since we don't have the user text, only audio)
-            session["history"].append({"role": "user", "parts": ["(User sent audio)"]})
-            session["history"].append({"role": "model", "parts": [response_text]})
-
-        elif msg_type == "text":
-             # Start Chat with History
-            chat_session = model.start_chat(
-                history=[
-                    {"role": "user", "parts": [SYSTEM_PROMPT]},
-                    {"role": "model", "parts": ["Understood. I am AIVA."]}
-                ] + session["history"]
-            )
-
-            ai_resp = chat_session.send_message(incoming_msg)
-            response_text = ai_resp.text
-
-            # Update History
-            session["history"].append({"role": "user", "parts": [incoming_msg]})
-            session["history"].append({"role": "model", "parts": [response_text]})
-
-        # 5. RESPONSE
-        if response_text:
-            send_zoko_message(sender_phone, response_text, image_url)
-            return jsonify(status="ok", response_sent=True)
-
-    except Exception as e:
-        logging.error(f"Bot Logic Error: {e}")
-        return jsonify(status="error", reason=str(e)), 500
-
-    return jsonify(status="ok")
+    return jsonify(status="queued")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)

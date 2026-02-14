@@ -7,6 +7,7 @@ class TestZokoPayload(unittest.TestCase):
     def setUp(self):
         self.app = app.app.test_client()
         self.app.testing = True
+        app.processed_messages.clear() # Clear idempotency cache
 
     @patch('app.requests.post')
     @patch('app.check_stop_bot')
@@ -43,10 +44,10 @@ class TestZokoPayload(unittest.TestCase):
 
         response = self.app.post('/bot', json=payload)
 
-        # Should be 200 OK
+        # Should be 200 OK and queued
         self.assertEqual(response.status_code, 200, f"Expected 200 but got {response.status_code}. Response: {response.data}")
         json_data = response.get_json()
-        self.assertEqual(json_data['status'], 'ok')
+        self.assertEqual(json_data['status'], 'queued')
 
 if __name__ == '__main__':
     unittest.main()
