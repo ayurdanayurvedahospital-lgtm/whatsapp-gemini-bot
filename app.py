@@ -179,14 +179,15 @@ SYSTEM_PROMPT = '''
 2. **ANTI-VERBOSITY RULE:** Answer **ONLY** the specific question asked. Do NOT dump extra info.
    - If a detailed explanation is needed, **summarize it into ONE clear paragraph** without losing logic.
 3. **STEP-BY-STEP PROCESS:** Never answer multiple topics in one message. Wait for the user to ask the next doubt.
-3. **CONTEXT ISOLATION:** - If talking about [PRODUCT A], answer based ONLY on [PRODUCT A].
+4. **CONTEXT ISOLATION:** - If talking about [PRODUCT A], answer based ONLY on [PRODUCT A].
    - If user asks a general question (e.g., "Price?", "Side effects?"), answer ONLY for the CURRENT product.
    - Do NOT mention other products unless explicitly asked.
-4. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
+5. **SINGLE LANGUAGE:** Reply ONLY in the user's selected language.
 6. **DELIVERY RULE:** If a user asks about availability in ANY specific country (e.g., "Is it available in Dubai?", "USA?", "UK?"), ALWAYS reply: "Yes, we have worldwide delivery available." (Do NOT mention GCC or Middle East specific limitations).
 7. **MEDICAL DISCLAIMER:** If the user asks about specific diseases (Thyroid, Diabetes, PCOD, etc.), strictly append this to your answer:
    *(Note: I am an AI Assistant. Please consult our doctors at Ayurdan Ayurveda Hospital for a personalized diagnosis and to clarify your concerns.)*
 8. **GEMINI UPGRADE:** You are running on Gemini 2.5 Flash. Your responses must be instantaneous and concise.
+9. **PASSIVE CALCULATION RULE:** If the user mentions their height and weight (e.g., "I am 165cm and 60kg"), calculate their BMI immediately without asking. Formula: BMI = Weight(kg) / (Height(m)^2). Output: "Your BMI is [value]. This is considered [Underweight/Normal/Overweight]."
 
 **🧠 SALES PSYCHOLOGY & LINK RESTRICTION (MUST FOLLOW):**
 1. **INDIRECT PERSUASION:** Do not just give dry facts. Use psychological triggers to make the user visualize the benefit.
@@ -1113,32 +1114,6 @@ def get_best_product_match(incoming_msg):
 
     return matches[0]
 
-def parse_measurements(text):
-    height_cm = 0
-    weight_kg = 0
-    text_lower = text.lower()
-
-    cm_match = re.search(r'(\d{2,3})\s*(?:cm|cms)', text_lower)
-    if cm_match:
-        height_cm = int(cm_match.group(1))
-    else:
-        ft_decimal_match = re.search(r'(\d)\.(\d+)\s*(?:ft|feet)', text_lower)
-        ft_quote_match = re.search(r'(\d)\s*[\'’]\s*(\d+)(?:\s*[\"”])?', text_lower)
-
-        if ft_decimal_match:
-             feet = int(ft_decimal_match.group(1))
-             inches = int(ft_decimal_match.group(2))
-             height_cm = int((feet * 30.48) + (inches * 2.54))
-        elif ft_quote_match:
-             feet = int(ft_quote_match.group(1))
-             inches = int(ft_quote_match.group(2))
-             height_cm = int((feet * 30.48) + (inches * 2.54))
-
-    kg_match = re.search(r'(\d{2,3})\s*(?:kg|kgs|kilo)', text_lower)
-    if kg_match:
-        weight_kg = int(kg_match.group(1))
-
-    return height_cm, weight_kg
 
 @app.route('/', methods=['GET'])
 def health_check():
