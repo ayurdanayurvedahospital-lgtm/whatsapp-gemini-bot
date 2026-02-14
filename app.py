@@ -172,7 +172,7 @@ def process_audio(file_url, history_context):
             ] + history_context
         )
 
-        prompt = "Listen to this audio. Transcribe it and answer the user's question directly as AIVA."
+        prompt = "Listen to this audio. You are AIVA. Answer the user's question directly, briefly, and politely in the same language."
         response = chat_session.send_message([myfile, prompt])
         return response.text
 
@@ -209,35 +209,106 @@ def get_product_image(text):
             return url
     return None
 
-def process_message_async(sender_phone, incoming_msg, msg_type, file_url, session):
+def handle_background_message(data):
     """
-    Background task to process the message logic (Image check, Audio/Text processing, Response).
+    Main Logic Handler (Running in Background Thread).
+    Parses Zoko payload, checks stops/loops, calls AI, and sends response.
     """
     try:
+        # 1. PARSE JSON
+        sender_phone = data.get("customer", {}).get("platformSenderId")
+        if not sender_phone:
+            sender_phone = data.get("platformSenderId")
+
+        incoming_msg = data.get("text", "")
+        msg_type = data.get("type", "text")
+        file_url = data.get("fileUrl")
+        direction = data.get("direction")
+        msg_id = data.get("id")
+
+        if not sender_phone:
+            logging.error("No sender_phone found in payload")
+            return
+
+        # 2. LOOP PREVENTION (Ignore Outgoing)
+        if direction and direction != "FROM_CUSTOMER":
+            return
+
+        # 3. IDEMPOTENCY CHECK
+        if msg_id:
+            if msg_id in processed_messages:
+                logging.info(f"Ignoring duplicate message ID: {msg_id}")
+                return
+            processed_messages[msg_id] = time.time()
+
+            # Cleanup occasionally
+            if len(processed_messages) > 1000:
+                cleanup_processed_messages()
+
+        # 4. STOP LOGIC
+        # Check 'STOP_BOT' tag via API or text command
+        is_stopped = check_stop_bot(sender_phone)
+
+        # If explicit STOP command, update local cache immediately
+        if incoming_msg and incoming_msg.strip().upper() in ["STOP BOT", "STOP"]:
+            set_stop_bot_locally(sender_phone)
+            # We don't return here immediately because we might want to confirm?
+            # But per logic, we should stop responding.
+            return
+
+        if is_stopped:
+            return
+
+        # 5. SESSION MANAGEMENT
+        if sender_phone not in user_sessions:
+            user_sessions[sender_phone] = {
+                "history": [],
+                "data": {"phone": sender_phone},
+                "last_messages": [],
+                "stopped_loop": False
+            }
+        session = user_sessions[sender_phone]
+
+        # 6. REPETITION CHECK (Stop if user sends same msg 3 times)
+        if session.get("stopped_loop"):
+            return
+
+        if incoming_msg:
+            # Initialize if missing
+            if "last_messages" not in session:
+                session["last_messages"] = []
+
+            session["last_messages"].append(incoming_msg)
+            if len(session["last_messages"]) > 3:
+                session["last_messages"].pop(0)
+
+            if len(session["last_messages"]) == 3 and all(m == incoming_msg for m in session["last_messages"]):
+                 session["stopped_loop"] = True
+                 logging.info(f"Repetitive messages from {sender_phone}. Stopping bot loop.")
+                 return
+
         response_text = ""
         image_url = None
 
-        # 3. IMAGE LOGIC (Check for product keywords)
+        # 7. IMAGE LOGIC (Check for product keywords)
         if incoming_msg:
             image_url = get_product_image(incoming_msg)
 
             # Save product context if detected
             if image_url:
-                # We can't easily extract the key from just URL, so re-scan keys
                 for key in PRODUCT_IMAGES:
                     if key in incoming_msg.lower():
                         session["data"]["product"] = key
                         save_to_sheet(session["data"])
                         break
 
-        # 4. PROCESSING
+        # 8. PROCESSING (Audio/Text)
         if msg_type in ["audio", "audio_message"] and file_url:
             send_zoko_message(sender_phone, "Listening... 🎧")
-            # History context is passed to maintain conversation flow if needed by internal logic,
-            # but process_audio implements the specific prompt request.
+            # History context is passed to maintain conversation flow
             response_text = process_audio(file_url, session["history"])
 
-            # Update history (mocked since we don't have the user text, only audio)
+            # Update history
             session["history"].append({"role": "user", "parts": ["(User sent audio)"]})
             session["history"].append({"role": "model", "parts": [response_text]})
 
@@ -261,99 +332,29 @@ def process_message_async(sender_phone, incoming_msg, msg_type, file_url, sessio
             session["history"].append({"role": "user", "parts": [incoming_msg]})
             session["history"].append({"role": "model", "parts": [response_text]})
 
-        # 5. RESPONSE
+        # 9. SEND RESPONSE
         if response_text:
             send_zoko_message(sender_phone, response_text, image_url)
 
     except Exception as e:
-        logging.error(f"Async Processing Error: {e}")
+        logging.error(f"Background Process Error: {e}")
 
-# --- MAIN LOGIC ---
+# --- MAIN ROUTE ---
 
 @app.route("/bot", methods=["POST"])
 def bot():
+    """
+    Webhook Endpoint.
+    Only spawns the background thread and returns 200 OK immediately.
+    """
     data = request.json
     print(f"Incoming Zoko Payload: {data}")
 
-    # 1. FIX JSON PARSING (Robust fallback per user request)
-    sender_phone = data.get("customer", {}).get("platformSenderId")
-    if not sender_phone:
-        sender_phone = data.get("platformSenderId")
-
-    incoming_msg = data.get("text", "")
-    msg_type = data.get("type", "text")
-    file_url = data.get("fileUrl")
-    direction = data.get("direction")
-    msg_id = data.get("id")
-
-    # IGNORE OUTGOING MESSAGES (Loop Prevention)
-    if direction and direction != "FROM_CUSTOMER":
-        return jsonify(status="ignored", reason="Not from customer"), 200
-
-    if not sender_phone:
-        return jsonify(status="error", reason="No sender_phone"), 400
-
-    # IDEMPOTENCY CHECK
-    if msg_id:
-        if msg_id in processed_messages:
-            logging.info(f"Ignoring duplicate message ID: {msg_id}")
-            return jsonify(status="ignored", reason="duplicate_id"), 200
-        processed_messages[msg_id] = time.time()
-
-        # Cleanup occasionally (simple implementation)
-        if len(processed_messages) > 1000:
-            cleanup_processed_messages()
-
-    # 2. STOP LOGIC
-    # Check 'STOP_BOT' tag via API or text command
-    is_stopped = check_stop_bot(sender_phone)
-
-    # If explicit STOP command, update local cache immediately
-    if incoming_msg and incoming_msg.strip().upper() in ["STOP BOT", "STOP"]:
-        set_stop_bot_locally(sender_phone)
-        return jsonify(status="stopped")
-
-    if is_stopped:
-        return jsonify(status="stopped")
-
-    # Session Management
-    if sender_phone not in user_sessions:
-        user_sessions[sender_phone] = {
-            "history": [],
-            "data": {"phone": sender_phone},
-            "last_messages": [],
-            "stopped_loop": False
-        }
-    session = user_sessions[sender_phone]
-
-    # REPETITION CHECK (Stop if user sends same msg 3 times)
-    if session.get("stopped_loop"):
-        return jsonify(status="stopped_repetition")
-
-    if incoming_msg:
-        # Initialize if missing (backward compatibility)
-        if "last_messages" not in session:
-            session["last_messages"] = []
-
-        session["last_messages"].append(incoming_msg)
-        if len(session["last_messages"]) > 3:
-            session["last_messages"].pop(0)
-
-        if len(session["last_messages"]) == 3 and all(m == incoming_msg for m in session["last_messages"]):
-             session["stopped_loop"] = True
-             logging.info(f"Repetitive messages from {sender_phone}. Stopping bot loop.")
-             return jsonify(status="stopped_repetition")
-
-    # ASYNC PROCESSING
-    # Start the heavy lifting in a background thread to return 200 OK immediately
-    # This prevents Zoko from timing out and retrying the webhook
-    thread = threading.Thread(
-        target=process_message_async,
-        args=(sender_phone, incoming_msg, msg_type, file_url, session)
-    )
+    # Start Background Thread
+    thread = threading.Thread(target=handle_background_message, args=(data,))
     thread.start()
 
-    return jsonify(status="queued")
+    return jsonify(status="received"), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
