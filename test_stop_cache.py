@@ -42,5 +42,14 @@ class TestStopCache(unittest.TestCase):
         self.assertFalse(is_stopped_3, "Should be updated to allowed")
         self.assertEqual(mock_get.call_count, 2, "Should call API again after expiry")
 
+    def test_local_stop_override(self):
+        # Verify that set_stop_bot_locally works immediately
+        self.assertFalse(app.check_stop_bot(self.phone), "Initially should not be stopped (no key/mock)")
+
+        app.set_stop_bot_locally(self.phone)
+
+        self.assertTrue(app.check_stop_bot(self.phone), "Should be stopped after local override")
+        self.assertTrue(app.stop_bot_cache[self.phone]["stopped"])
+
 if __name__ == '__main__':
     unittest.main()
