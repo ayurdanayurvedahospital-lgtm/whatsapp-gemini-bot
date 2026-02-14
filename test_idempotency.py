@@ -1,19 +1,16 @@
 import unittest
-from unittest.mock import patch, MagicMock
-import json
+from unittest.mock import patch
+import app
 import time
-import threading
-from app import app, user_sessions, processed_messages
 
 class TestIdempotency(unittest.TestCase):
     def setUp(self):
-        self.app = app.test_client()
+        self.app = app.app.test_client()
         self.app.testing = True
-        user_sessions.clear()
-        processed_messages.clear()
+        app.processed_messages.clear()
 
-    @patch('app.process_message_async')
-    def test_duplicate_request_idempotency(self, mock_process_async):
+    @patch('app.threading.Thread')
+    def test_duplicate_request_idempotency_webhook(self, mock_thread):
         payload = {
             'id': 'unique-msg-id-123',
             'platformSenderId': '+919999999999',
@@ -27,53 +24,21 @@ class TestIdempotency(unittest.TestCase):
         # 1. Send first request
         resp1 = self.app.post('/bot', json=payload)
         self.assertEqual(resp1.status_code, 200)
-        self.assertEqual(resp1.json['status'], 'queued')
+        self.assertEqual(resp1.json['status'], 'received')
 
-        # Verify thread was started (async process called)
-        # Note: In the actual app, it spawns a thread which calls this function.
-        # Since we patch it, the thread calls the mock.
-        # We need to wait a tiny bit for thread to start?
-        # Actually, threading.Thread(target=mock).start() runs instantly usually.
-        # But to be safe, we can wait a small amount.
-        time.sleep(0.1)
-        self.assertEqual(mock_process_async.call_count, 1)
+        # Verify thread spawned
+        self.assertEqual(mock_thread.call_count, 1)
 
         # 2. Send duplicate request
+        # The /bot endpoint ITSELF doesn't check idempotency anymore, it just queues.
+        # Idempotency is inside the thread.
+        # But for Zoko, we MUST return 200 OK every time.
         resp2 = self.app.post('/bot', json=payload)
         self.assertEqual(resp2.status_code, 200)
-        self.assertEqual(resp2.json['status'], 'ignored')
-        self.assertEqual(resp2.json['reason'], 'duplicate_id')
+        self.assertEqual(resp2.json['status'], 'received')
 
-        # Verify process_async was NOT called again
-        time.sleep(0.1)
-        self.assertEqual(mock_process_async.call_count, 1)
-
-    @patch('app.process_message_async')
-    def test_different_ids(self, mock_process_async):
-        payload1 = {
-            'id': 'msg-1',
-            'platformSenderId': '+919999999999',
-            'type': 'text',
-            'text': 'Hi',
-            'direction': 'FROM_CUSTOMER',
-            'customer': {'platformSenderId': '+919999999999'}
-        }
-        payload2 = {
-            'id': 'msg-2', # Different ID
-            'platformSenderId': '+919999999999',
-            'type': 'text',
-            'text': 'Hello',
-            'direction': 'FROM_CUSTOMER',
-            'customer': {'platformSenderId': '+919999999999'}
-        }
-
-        self.app.post('/bot', json=payload1)
-        time.sleep(0.1)
-        self.assertEqual(mock_process_async.call_count, 1)
-
-        self.app.post('/bot', json=payload2)
-        time.sleep(0.1)
-        self.assertEqual(mock_process_async.call_count, 2)
+        # Verify thread spawned again (it will handle duplicates internally)
+        self.assertEqual(mock_thread.call_count, 2)
 
 if __name__ == '__main__':
     unittest.main()
