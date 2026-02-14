@@ -1149,14 +1149,24 @@ def bot():
     data = request.json
     print(f"Incoming Zoko Payload: {data}")
 
-    sender_phone = data.get("sender_phone") or data.get("platform_sender_id") or ""
-    incoming_msg = data.get("message", "").strip()
+    # 1. Phone Number Extraction (from 'customer' object)
+    sender_phone = data.get("customer", {}).get("platformSenderId")
+
+    # 2. Message Text Extraction (from 'text' field)
+    incoming_msg = data.get("text", "")
+    if incoming_msg:
+        incoming_msg = incoming_msg.strip()
+
+    # 3. Message Type Extraction
     msg_type = data.get("type", "text")
+
+    # 4. Audio URL Extraction
     file_url = data.get("fileUrl")
 
     if not sender_phone:
         return jsonify(status="error", reason="No sender_phone"), 400
 
+    # 5. Stop Logic (Check AFTER extraction)
     if check_stop_bot(sender_phone):
         return jsonify(status="stopped")
 
