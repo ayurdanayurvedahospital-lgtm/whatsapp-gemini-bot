@@ -37,14 +37,6 @@ FORM_FIELDS = {
     "product": "entry.839337160"
 }
 
-# 👥 AGENT ROTATION LIST
-AGENTS = [
-    {"name": "Sreelekha", "phone": "+91 9895900809", "link": "https://wa.link/t45vpy"},
-    {"name": "Savitha", "phone": "+91 9447225084", "link": "https://wa.link/nxzz8w"},
-    {"name": "Sreelakshmi", "phone": "+91 8304945580", "link": "https://wa.link/i4d2yf"},
-    {"name": "Rekha", "phone": "+91 9526530800", "link": "https://wa.link/t4huis"}
-]
-
 # 🖼️ SMART IMAGE LIBRARY
 PRODUCT_IMAGES = {
     "junior": "https://ayuralpha.in/cdn/shop/files/Junior_Stamigen_634a1744-3579-476f-9631-461566850dce.png?v=1727083144",
@@ -194,10 +186,11 @@ SYSTEM_PROMPT = '''
    - **Future Pacing:** Make them imagine the positive result (e.g., "Imagine feeling confident when your clothes fit perfectly...").
    - **Agitate the Problem:** Gently remind them of the cost of inaction (e.g., "Every day you wait is another day of feeling tired. Start your journey to strength today.").
    - **Social Proof:** Mention "Many of our customers felt the same way until they tried..."
-2. **NO UNSOLICITED LINKS:**
-   - You possess the ORDER LINK. **Do NOT** share it unless the user **EXPLICITLY** asks for it (e.g., "How do I buy?", "Send link", "I want to order", "Where to get?").
-   - Even if they ask for the Price, provide the Price but **DO NOT** give the link immediately. Wait for them to say "Okay, I'll buy it."
-   - When you *do* share the link, frame it as the final step to their transformation.
+2. **NO UNSOLICITED LINKS & HUMAN HANDOFF:**
+   - **Do NOT** share any external WhatsApp links or phone numbers.
+   - If the user wants to order (e.g., "How do I buy?", "Send link", "I want to order"), ask them to provide their **Name and Delivery Address** right here in the chat.
+   - Tell them that a human agent is present in this chat and will process their order shortly.
+   - Frame the purchase as the final step to their transformation, but keep the conversation within this chat.
 
 *** 🔍 COMPLETE KNOWLEDGE BASE ***
 
@@ -1028,7 +1021,7 @@ def check_stop_bot(phone):
         logging.error(f"Zoko Tag Check Error: {e}")
         return False
 
-def process_audio(file_url, history_context, current_agent):
+def process_audio(file_url, history_context):
     """
     Downloads audio, uploads to Gemini, and returns AI response.
     """
@@ -1062,8 +1055,6 @@ def process_audio(file_url, history_context, current_agent):
         # 4. Generate Response with History
         # Construct dynamic prompt
         system_instructions = SYSTEM_PROMPT
-        if current_agent:
-            system_instructions += f"\nORDER LINK: {current_agent['link']} (Phone: {current_agent['phone']})"
 
         chat_session = model.start_chat(
             history=[
@@ -1140,17 +1131,13 @@ def bot():
 
         # Session Management
         if sender_phone not in user_sessions:
-            # Assign Agent
-            current_agent = AGENTS[0] # Default for now
             user_sessions[sender_phone] = {
                 "history": [],
-                "agent": current_agent,
                 "data": {"phone": sender_phone}
             }
 
         session = user_sessions[sender_phone]
         session_history = session["history"]
-        current_agent = session["agent"]
 
         # Detect Product for Lead Gen
         product_context = get_best_product_match(incoming_msg)
@@ -1162,8 +1149,6 @@ def bot():
         if msg_type == "text":
             # Construct Dynamic System Prompt
             system_instructions = SYSTEM_PROMPT
-            if current_agent:
-                system_instructions += f"\nORDER LINK: {current_agent['link']} (Phone: {current_agent['phone']})"
 
             # Start Chat with History
             chat_session = model.start_chat(
@@ -1190,7 +1175,7 @@ def bot():
 
         elif msg_type in ["audio", "audio_message"] and file_url:
             send_zoko_message(sender_phone, "Listening... 🎧")
-            response_text = process_audio(file_url, session_history, current_agent)
+            response_text = process_audio(file_url, session_history)
 
             # Update History for Audio
             if len(session_history) > 20:
