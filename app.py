@@ -1,5 +1,7 @@
 import os
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import flask
 import google.generativeai as genai
 import tempfile
@@ -28,6 +30,15 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 # GLOBAL SESSION FOR CONNECTION POOLING
 http_session = requests.Session()
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS", "POST"]
+)
+adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=50, pool_maxsize=50)
+http_session.mount("https://", adapter)
+http_session.mount("http://", adapter)
 
 # FORM FIELDS (Google Sheets)
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
@@ -72,6 +83,9 @@ PRODUCT_IMAGES = {
 }
 
 user_sessions = {}
+STOP_BOT_CACHE = {}
+STOP_BOT_CACHE_LOCK = threading.Lock()
+STOP_BOT_CACHE_TTL = 60 # Cache stop_bot status for 60 seconds
 
 # LANGUAGE OPTIONS
 LANGUAGES = {
@@ -974,24 +988,33 @@ def send_zoko_message(phone, text):
     }
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=5)
+        response = http_session.post(url, json=payload, headers=headers, timeout=5)
         response.raise_for_status()
     except Exception as e:
         logging.error(f"Zoko Send Error: {e}")
 
 def check_stop_bot(phone):
     """
-    Checks Zoko tags for 'STOP_BOT'.
+    Checks Zoko tags for 'STOP_BOT' with a local TTL cache.
     Returns True if bot should stop, False otherwise.
     """
     if not ZOKO_API_KEY:
         return False
 
+    # Check Cache
+    now = time.time()
+    with STOP_BOT_CACHE_LOCK:
+        if phone in STOP_BOT_CACHE:
+            stopped, expiry = STOP_BOT_CACHE[phone]
+            if now < expiry:
+                return stopped
+
     url = f"https://chat.zoko.io/v2/chats?phone={phone}"
     headers = {'apikey': ZOKO_API_KEY}
 
     try:
-        resp = requests.get(url, headers=headers, timeout=5)
+        resp = http_session.get(url, headers=headers, timeout=5)
+        result = False
         if resp.status_code == 200:
             data = resp.json()
             # Depending on Zoko API, response might be a list or object with data
@@ -1001,13 +1024,17 @@ def check_stop_bot(phone):
                 for chat in chat_data:
                     tags = chat.get('tags', [])
                     if any(t.lower() == "stop_bot" for t in tags):
-                        return True
+                        result = True
+                        break
             elif isinstance(chat_data, dict):
                 tags = chat_data.get('tags', [])
                 if any(t.lower() == "stop_bot" for t in tags):
-                    return True
+                    result = True
 
-        return False
+        # Update Cache
+        with STOP_BOT_CACHE_LOCK:
+            STOP_BOT_CACHE[phone] = (result, now + STOP_BOT_CACHE_TTL)
+        return result
     except Exception as e:
         logging.error(f"Zoko Tag Check Error: {e}")
         return False
@@ -1021,7 +1048,7 @@ def process_audio(file_url):
     try:
         # 1. Download Audio
         logging.info(f"Downloading audio from {file_url}")
-        with requests.get(file_url, stream=True) as r:
+        with http_session.get(file_url, stream=True) as r:
             r.raise_for_status()
             # Use tempfile for safe temporary file creation
             with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
