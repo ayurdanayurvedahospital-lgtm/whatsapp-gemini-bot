@@ -27,7 +27,23 @@ if not ZOKO_API_KEY:
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 # GLOBAL SESSION FOR CONNECTION POOLING
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=0.1,
+    status_forcelist=[429, 500, 502, 503, 504],
+)
+adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=retry_strategy)
 http_session = requests.Session()
+http_session.mount("https://", adapter)
+http_session.mount("http://", adapter)
+
+# STOP BOT CACHE (Minimize Latency)
+STOP_BOT_CACHE = {}
+STOP_BOT_CACHE_TTL = 60 # seconds
+stop_bot_lock = threading.Lock()
 
 # FORM FIELDS (Google Sheets)
 GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScyMCgip5xW1sZiRrlNwa14m_u9v7ekSbIS58T5cE84unJG2A/formResponse"
@@ -991,35 +1007,53 @@ def send_zoko_message(phone, text):
 def check_stop_bot(phone):
     """
     Checks Zoko tags for 'STOP_BOT'.
+    Uses an in-memory cache to reduce latency (TTL=60s).
     Returns True if bot should stop, False otherwise.
     """
+    current_time = time.time()
+
+    # Check Cache First
+    with stop_bot_lock:
+        if phone in STOP_BOT_CACHE:
+            is_stopped, timestamp = STOP_BOT_CACHE[phone]
+            if current_time - timestamp < STOP_BOT_CACHE_TTL:
+                return is_stopped
+
     if not ZOKO_API_KEY:
         return False
 
     url = f"https://chat.zoko.io/v2/chats?phone={phone}"
     headers = {'apikey': ZOKO_API_KEY}
 
+    is_stopped = False
     try:
-        resp = requests.get(url, headers=headers, timeout=5)
+        # Use the optimized session
+        resp = http_session.get(url, headers=headers, timeout=3) # Lower timeout
         if resp.status_code == 200:
             data = resp.json()
-            # Depending on Zoko API, response might be a list or object with data
             chat_data = data.get('data', []) if isinstance(data, dict) else data
 
             if isinstance(chat_data, list):
                 for chat in chat_data:
                     tags = chat.get('tags', [])
                     if any(t.lower() == "stop_bot" for t in tags):
-                        return True
+                        is_stopped = True
+                        break
             elif isinstance(chat_data, dict):
                 tags = chat_data.get('tags', [])
                 if any(t.lower() == "stop_bot" for t in tags):
-                    return True
-
-        return False
+                    is_stopped = True
     except Exception as e:
         logging.error(f"Zoko Tag Check Error: {e}")
-        return False
+        # On error, default to NOT stopped to keep bot alive, but don't cache error state heavily?
+        # Actually, let's cache False to avoid hammering the API if it's down.
+        is_stopped = False
+
+    # Update Cache
+    with stop_bot_lock:
+        STOP_BOT_CACHE[phone] = (is_stopped, current_time)
+
+    return is_stopped
 
 def process_audio(file_url, history_context):
     """
