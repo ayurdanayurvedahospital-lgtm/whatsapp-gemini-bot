@@ -10,12 +10,12 @@ import time
 from flask import Flask, request, jsonify
 
 # Import Knowledge Base and System Prompt
-from knowledge_base_data import AGENTS, PRODUCT_IMAGES, LINKS, GOOGLE_FORM_URL, FORM_FIELDS
+from knowledge_base_data import PRODUCT_IMAGES
 from system_prompt import SYSTEM_PROMPT
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 if API_KEY:
@@ -35,12 +35,17 @@ user_sessions = {}
 stop_bot_cache = {} # phone -> {"stopped": bool, "timestamp": float}
 CACHE_TTL = 300  # 5 minutes
 
+# Idempotency & Loop Prevention
+processed_messages = set() # Store message IDs
+processed_messages_lock = threading.Lock()
+user_last_messages = {} # phone -> [msg1, msg2, msg3]
+
 # --- HELPER FUNCTIONS ---
 
-def send_zoko_message(phone, text, image_url=None):
+def send_zoko_message(phone, text=None, image_url=None):
     """
     Sends a message via Zoko API.
-    Fixes 400 Error by cleaning phone number and handling empty text.
+    CRITICAL UPDATE: Handles EITHER text OR image. Mutually exclusive.
     """
     if not ZOKO_API_KEY:
         logging.warning("Skipping Zoko Send: API Key missing")
@@ -51,7 +56,7 @@ def send_zoko_message(phone, text, image_url=None):
         return
 
     # Clean phone number (remove leading +)
-    phone = phone.replace("+", "")
+    phone_clean = phone.replace("+", "")
 
     url = "https://chat.zoko.io/v2/message"
     headers = {
@@ -59,27 +64,31 @@ def send_zoko_message(phone, text, image_url=None):
         'Content-Type': 'application/json'
     }
 
+    payload = {
+        'channel': 'whatsapp',
+        'recipient': phone_clean
+    }
+
     if image_url:
-        payload = {
-            'channel': 'whatsapp',
-            'recipient': phone,
-            'type': 'image',
-            'url': image_url,
-            'caption': text
-        }
-    else:
-        payload = {
-            'channel': 'whatsapp',
-            'recipient': phone,
-            'type': 'text',
-            'message': text
-        }
+        # Image Message - NO CAPTION to avoid 400 errors if caption is too long or malformed
+        payload['type'] = 'image'
+        payload['url'] = image_url
+        # Zoko API might accept 'caption' for images, but user requested separation to avoid errors.
+        # We will strictly send just the image here.
+    elif text:
+        # Text Message
+        payload['type'] = 'text'
+        payload['message'] = text
 
     try:
+        logging.info(f"Sending Zoko Message: Type={'Image' if image_url else 'Text'} to {phone_clean}")
         response = requests.post(url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
-    except Exception as e:
-        logging.error(f"Zoko Send Error: {e} | Payload: {payload}")
+        logging.info(f"Zoko Send Success: {response.json()}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Zoko Send Error: {e}")
+        if e.response is not None:
+             logging.error(f"Zoko Response: {e.response.text}")
 
 def check_stop_bot(phone):
     """
@@ -96,11 +105,6 @@ def check_stop_bot(phone):
     if not ZOKO_API_KEY:
         return False
 
-    # Clean phone number for query as well? Usually query params handle + encoded.
-    # But for consistency let's try with + first as it is in Zoko usually.
-    # The helper `send_zoko_message` stripped it, but `chats?phone=` might need it.
-    # I'll stick to the raw phone for the query unless it fails.
-
     url = f"https://chat.zoko.io/v2/chats?phone={phone}"
     headers = {'apikey': ZOKO_API_KEY}
 
@@ -109,18 +113,20 @@ def check_stop_bot(phone):
         resp = requests.get(url, headers=headers, timeout=5)
         if resp.status_code == 200:
             data = resp.json()
+            # Handle potential list or dict return
             chat_data = data.get('data', []) if isinstance(data, dict) else data
 
             if isinstance(chat_data, list):
                 for chat in chat_data:
                     tags = chat.get('tags', [])
-                    if any(t.lower() == "stop_bot" for t in tags):
-                        is_stopped = True
-                        break
-            elif isinstance(chat_data, dict):
-                tags = chat_data.get('tags', [])
-                if any(t.lower() == "stop_bot" for t in tags):
-                    is_stopped = True
+                    # tags can be list of strings or list of dicts depending on API version
+                    # assuming list of strings based on common Zoko usage, or list of dicts with 'name'
+                    for t in tags:
+                        tag_name = t if isinstance(t, str) else t.get('name', '')
+                        if tag_name.lower() == "stop_bot":
+                            is_stopped = True
+                            break
+                    if is_stopped: break
     except Exception as e:
         logging.error(f"Zoko Tag Check Error: {e}")
 
@@ -128,13 +134,14 @@ def check_stop_bot(phone):
     stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
     return is_stopped
 
-def process_audio(file_url):
+def process_audio(file_url, sender_phone):
     """
-    Downloads OGG file, uploads to Gemini, and returns text response.
+    Downloads OGG/Audio file, uploads to Gemini, and returns text response.
     """
     local_filename = None
     try:
         # Download
+        logging.info(f"Downloading audio from {file_url}")
         with requests.get(file_url, stream=True) as r:
             r.raise_for_status()
             with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
@@ -142,8 +149,11 @@ def process_audio(file_url):
                     tmp.write(chunk)
                 local_filename = tmp.name
 
-        # Upload
+        # Upload to Gemini
+        logging.info("Uploading audio to Gemini...")
         myfile = genai.upload_file(local_filename, mime_type='audio/ogg')
+
+        # Wait for processing
         while myfile.state.name == "PROCESSING":
             time.sleep(1)
             myfile = genai.get_file(myfile.name)
@@ -151,17 +161,14 @@ def process_audio(file_url):
         if myfile.state.name == "FAILED":
             raise ValueError("Audio processing failed in Gemini.")
 
-        # Generate Response using System Prompt context if we were in a session,
-        # but here we simplify as per instruction: "Download OGG, upload to Gemini, return text response."
-        # We need a chat session or a generate_content call.
-        # I'll use a new chat session with System Prompt to ensure persona.
-
+        # Context
+        history = user_sessions.get(sender_phone, [])
         chat = model.start_chat(history=[
             {"role": "user", "parts": [SYSTEM_PROMPT]},
             {"role": "model", "parts": ["Understood. I am AIVA."]}
-        ])
+        ] + history)
 
-        prompt = "Listen to this audio. You are AIVA. Answer the user's question directly, briefly, and politely in the same language."
+        prompt = "Listen to this audio. You are AIVA. Answer the user's question directly, briefly (under 60 words), and politely in the same language."
         response = chat.send_message([myfile, prompt])
         return response.text
 
@@ -173,108 +180,164 @@ def process_audio(file_url):
         if local_filename and os.path.exists(local_filename):
             os.remove(local_filename)
 
-def handle_message(data):
+def get_ai_response(sender_phone, message_text, history):
     """
-    Background Message Handler.
+    Generates AI response using Gemini.
     """
     try:
-        # 1. Parse
-        customer = data.get("customer", {})
-        sender_phone = customer.get("platformSenderId")
+        # Construct Chat
+        chat_history = [
+            {"role": "user", "parts": [SYSTEM_PROMPT]},
+            {"role": "model", "parts": ["Understood. I am AIVA."]}
+        ] + history
+
+        chat = model.start_chat(history=chat_history)
+        response = chat.send_message(message_text)
+        return response.text
+    except Exception as e:
+        logging.error(f"Gemini AI Error: {e}")
+        return "I am currently experiencing high traffic. Please try again later."
+
+def handle_message(payload):
+    """
+    Background worker to process incoming Zoko webhook.
+    """
+    try:
+        # 1. Extract Basic Info
+        # Zoko payloads vary. Try to extract aggressively.
+        message_id = payload.get("messageId")
+        if not message_id:
+            # Fallback for some events
+            message_id = payload.get("eventId")
+
+        # Idempotency Check
+        if message_id:
+            with processed_messages_lock:
+                if message_id in processed_messages:
+                    logging.info(f"Duplicate Message ID {message_id}. Skipping.")
+                    return
+                processed_messages.add(message_id)
+                # Cleanup old IDs? For now, let it grow (or we can use a TTL cache later)
+                if len(processed_messages) > 10000:
+                    processed_messages.clear() # Naive cleanup
+
+        sender_phone = payload.get("platformSenderId")
         if not sender_phone:
-             # Fallback
-             sender_phone = data.get("platformSenderId")
+            customer = payload.get("customer", {})
+            sender_phone = customer.get("platformSenderId")
 
         if not sender_phone:
-            logging.error("No sender_phone found.")
+            logging.error("No sender_phone found in payload.")
             return
 
-        incoming_msg = data.get("text", "")
-        msg_type = data.get("type", "text")
-        file_url = data.get("fileUrl")
-        direction = data.get("direction")
+        # Check Direction - Ignore outgoing
+        direction = payload.get("direction")
+        if direction and direction != "incoming":
+             # Zoko sometimes uses "from_customer" or "incoming".
+             # If it's explicit "outgoing" or "from_business", ignore.
+             if direction.lower() in ["outgoing", "from_business"]:
+                 logging.info("Ignoring outgoing message.")
+                 return
 
-        # Ignore outgoing messages
-        if direction and direction != "FROM_CUSTOMER":
-            return
+        # 2. Extract Content
+        msg_type = payload.get("type", "text")
+        text_body = payload.get("text", "")
+        file_url = payload.get("fileUrl")
 
-        # 2. STOP BOT Logic
+        # 3. Stop Bot Check
         if check_stop_bot(sender_phone):
-            logging.info(f"Bot is stopped for {sender_phone}")
+            logging.info(f"Bot execution stopped for {sender_phone} (Tag: stop_bot)")
             return
 
-        if incoming_msg and incoming_msg.strip().upper() == "STOP BOT":
-            # Update cache locally as well to be safe
+        # Check for STOP command in text
+        if text_body and text_body.strip().upper() == "STOP BOT":
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
-            send_zoko_message(sender_phone, "Bot Stopped")
+            send_zoko_message(sender_phone, text="Bot has been stopped for this chat.")
             return
 
-        # 3. Image Detection
-        image_url = None
-        if incoming_msg:
-            msg_lower = incoming_msg.lower()
+        # 4. Loop Prevention
+        if text_body:
+            last_msgs = user_last_messages.get(sender_phone, [])
+            last_msgs.append(text_body)
+            if len(last_msgs) > 3:
+                last_msgs.pop(0)
+            user_last_messages[sender_phone] = last_msgs
+
+            # Check if all 3 are identical
+            if len(last_msgs) == 3 and all(m == last_msgs[0] for m in last_msgs):
+                logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
+                return
+
+        # 5. Logic Branching
+        response_text = ""
+        found_image_url = None
+
+        # A. Image Keyword Detection
+        if text_body:
+            lower_msg = text_body.lower()
             for key, url in PRODUCT_IMAGES.items():
-                if key in msg_lower:
-                    image_url = url
+                if key in lower_msg:
+                    found_image_url = url
                     break
 
-        # 4. AI Generation
-        response_text = ""
+        # B. Audio Processing
+        if msg_type == "audio" and file_url:
+            send_zoko_message(sender_phone, text="Listening... 🎧")
+            response_text = process_audio(file_url, sender_phone)
 
-        # Session History
-        if sender_phone not in user_sessions:
-            user_sessions[sender_phone] = []
-        history = user_sessions[sender_phone]
+        # C. Text Processing
+        elif text_body or msg_type == "text":
+            # Get History
+            if sender_phone not in user_sessions:
+                user_sessions[sender_phone] = []
+            history = user_sessions[sender_phone]
 
-        if msg_type == "audio":
-             if file_url:
-                 send_zoko_message(sender_phone, "Listening... 🎧")
-                 response_text = process_audio(file_url)
+            response_text = get_ai_response(sender_phone, text_body, history)
+
+            # Update History
+            history.append({"role": "user", "parts": [text_body]})
+            history.append({"role": "model", "parts": [response_text]})
+            # Keep history short (last 20 turns)
+            if len(history) > 20:
+                user_sessions[sender_phone] = history[-20:]
+
         else:
-            # Text Processing
-            chat = model.start_chat(history=[
-                {"role": "user", "parts": [SYSTEM_PROMPT]},
-                {"role": "model", "parts": ["Understood. I am AIVA."]}
-            ] + history)
+            logging.info(f"Unsupported message type: {msg_type}")
+            return
 
-            try:
-                ai_resp = chat.send_message(incoming_msg)
-                response_text = ai_resp.text
+        # 6. Send Response (Split Flow)
+        if found_image_url:
+            send_zoko_message(sender_phone, image_url=found_image_url)
+            time.sleep(1) # Wait 1 second to ensure order
 
-                # Update History
-                history.append({"role": "user", "parts": [incoming_msg]})
-                history.append({"role": "model", "parts": [response_text]})
-                # Keep history short? User didn't specify, but good practice.
-                if len(history) > 20:
-                    user_sessions[sender_phone] = history[-20:]
-
-            except Exception as e:
-                logging.error(f"Gemini Error: {e}")
-                response_text = "I am currently experiencing high traffic. Please try again later."
-
-        # 5. Send Response
         if response_text:
-            send_zoko_message(sender_phone, response_text, image_url)
+            send_zoko_message(sender_phone, text=response_text)
 
     except Exception as e:
-        logging.error(f"Background Handler Error: {e}")
+        logging.error(f"Error in handle_message: {e}")
 
-# --- MAIN ROUTE ---
+# --- WEBHOOK ENTRY POINT ---
 
 @app.route("/bot", methods=["POST"])
 def bot():
     """
-    Webhook Endpoint.
-    Returns 200 OK immediately and processes in background.
+    Receives Webhook from Zoko.
     """
-    data = request.json
-    print(f"Incoming Zoko Payload: {data}")
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"status": "error", "message": "No JSON data"}), 400
 
-    # Start Background Thread
-    thread = threading.Thread(target=handle_message, args=(data,))
-    thread.start()
+        # Spawn background thread
+        thread = threading.Thread(target=handle_message, args=(data,))
+        thread.daemon = True # Daemon thread so it doesn't block shutdown
+        thread.start()
 
-    return jsonify(status="received"), 200
+        return jsonify({"status": "received"}), 200
+
+    except Exception as e:
+        logging.error(f"Webhook Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
