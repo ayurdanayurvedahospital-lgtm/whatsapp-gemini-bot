@@ -332,6 +332,14 @@ def handle_message(payload):
                 logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
                 return
 
+        # --- EXPLICIT GREETING CHECK ---
+        if text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]:
+            time_greeting = get_ist_time_greeting()
+            greeting_msg = f"{time_greeting}! ☀️ I am AIVA, an empathetic and warm AI Virtual Assistant from Ayurdan Ayurveda Hospital! I am here to help you with any questions about our Ayurvedic products and services. You can type your message or send a Voice Note. How may I help you? 😊"
+            send_zoko_message(sender_phone, text=greeting_msg)
+            logging.info(f"Sent explicit greeting to {sender_phone}")
+            return # Skip AI generation for greeting
+
         logging.info("STEP 2: Processing Logic (AI/Image)")
 
         response_text = ""
