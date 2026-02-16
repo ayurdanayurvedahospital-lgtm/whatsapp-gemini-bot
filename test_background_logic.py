@@ -84,10 +84,12 @@ class TestBackgroundLogic(unittest.TestCase):
 
     @patch('app.send_zoko_message')
     def test_loop_prevention(self, mock_send):
+        # Note: "Hello" is now caught by greeting check, so we use a different text for loop test
+        # to ensure it hits the loop logic and AI logic (mocked)
         data = {
             'platformSenderId': '+919999999999',
             'direction': 'incoming',
-            'text': 'Hello',
+            'text': 'Loop Test',
             'type': 'text',
             'messageId': 'msg_loop_1'
         }
@@ -124,7 +126,6 @@ class TestBackgroundLogic(unittest.TestCase):
 
         app.handle_message(data_agent)
 
-        # Verify mute and response
         self.assertIn(phone, app.muted_users)
         mock_send.assert_called_with(phone, text="You can contact our Agent Sreelekha at +91 9895900809. I will now pause so you can speak with her.")
         mock_send.reset_mock()
@@ -150,9 +151,29 @@ class TestBackgroundLogic(unittest.TestCase):
         }
         app.handle_message(data_resume)
 
-        # Verify unmute and response
         self.assertNotIn(phone, app.muted_users)
         mock_send.assert_called_with(phone, text="Bot resumed. How can I help?")
+
+    @patch('app.send_zoko_message')
+    @patch('app.get_ist_time_greeting')
+    def test_explicit_greeting(self, mock_greeting, mock_send):
+        mock_greeting.return_value = "Good Morning"
+
+        data = {
+            'platformSenderId': '+919999999999',
+            'direction': 'incoming',
+            'text': 'Hi',
+            'type': 'text',
+            'messageId': 'msg_hi'
+        }
+
+        # Ensure AI is NOT called
+        with patch('app.get_ai_response') as mock_ai:
+            app.handle_message(data)
+            mock_ai.assert_not_called()
+
+        expected_msg = "Good Morning! ☀️ I am AIVA, an empathetic and warm AI Virtual Assistant from Ayurdan Ayurveda Hospital! I am here to help you with any questions about our Ayurvedic products and services. You can type your message or send a Voice Note. How may I help you? 😊"
+        mock_send.assert_called_with('+919999999999', text=expected_msg)
 
 if __name__ == '__main__':
     unittest.main()
