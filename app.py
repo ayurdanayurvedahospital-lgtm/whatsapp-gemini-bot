@@ -18,7 +18,6 @@ try:
     from system_prompt import SYSTEM_PROMPT
 except ImportError as e:
     logging.error(f"Failed to import modular files: {e}")
-    # Define minimal fallbacks to prevent crash if files are missing (though they should exist)
     AGENTS = []
     PRODUCT_IMAGES = {}
     LINKS = {}
@@ -56,7 +55,7 @@ processed_messages = set()
 processed_messages_lock = threading.Lock()
 user_last_messages = {}
 muted_users = set()  # Tracks users currently talking to a human agent
-greeted_users = {} # phone -> timestamp (tracks last greeting time)
+last_greeted = {} # phone -> timestamp (tracks last greeting time for 12h rule)
 
 # --- HELPER FUNCTIONS ---
 
@@ -102,8 +101,8 @@ def send_zoko_message(phone, text=None, image_url=None, caption=None):
     # Send Image First if exists
     if image_url:
         try:
-            # Ensure caption is present to avoid 400 errors (if API requires it, strictly speaking Zoko v2 might allow no caption, but user requested mandatory)
-            img_caption = caption if caption else "Ayurdan Product"
+            # Ensure caption is present
+            img_caption = caption if caption else "Ayurdan Ayurveda"
 
             payload = {
                 "channel": "whatsapp",
@@ -142,7 +141,6 @@ def send_zoko_message(phone, text=None, image_url=None, caption=None):
 def check_stop_bot(phone):
     """
     Check if bot is stopped via Zoko tags (STOP_BOT) or cache.
-    Note: This is separate from the in-memory 'muted_users' set.
     """
     now = time.time()
     if phone in stop_bot_cache:
@@ -162,7 +160,6 @@ def check_stop_bot(phone):
             data = resp.json()
             chat_data = data.get('data', []) if isinstance(data, dict) else data
 
-            # Helper to check tags list
             def has_stop_tag(tags):
                 for t in tags:
                     tag_name = t if isinstance(t, str) else t.get('name', '')
@@ -209,7 +206,6 @@ def process_audio(file_url, sender_phone):
         if myfile.state.name == "FAILED":
             raise ValueError("Audio processing failed in Gemini.")
 
-        # Determine Greeting
         greeting = get_ist_time_greeting()
 
         history = user_sessions.get(sender_phone, [])
@@ -218,7 +214,7 @@ def process_audio(file_url, sender_phone):
             {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
         ] + history)
 
-        prompt = f"Listen to this audio. You are AIVA. Current Time Greeting: {greeting}. Answer briefly (under 60 words) and politely in the same language."
+        prompt = f"Listen to this audio. You are AIVA. Current Time Greeting: {greeting}. Answer as a consultant."
         response = chat.send_message([myfile, prompt])
         return response.text
 
@@ -240,9 +236,8 @@ def get_ai_response(sender_phone, message_text, history):
 
         chat = model.start_chat(history=chat_history)
 
-        full_prompt = f"Current Time Greeting: {greeting}\nUser Message: {message_text}"
-
-        response = chat.send_message(full_prompt)
+        # Inject context if needed, mostly context is in system prompt
+        response = chat.send_message(message_text)
         return response.text
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
@@ -291,7 +286,6 @@ def handle_message(payload):
                 logging.info(f"Bot resumed for {sender_phone} via 'START BOT' command.")
                 send_zoko_message(sender_phone, text="Bot resumed. How can I help?")
             else:
-                # If not muted, just acknowledge or proceed. Let's acknowledge to confirm it's running.
                 send_zoko_message(sender_phone, text="Bot is already active. How can I help?")
             return
 
@@ -300,26 +294,12 @@ def handle_message(payload):
             logging.info(f"User {sender_phone} is muted (talking to human). Ignoring message.")
             return
 
-        # --- STEP 3: AGENT HANDOVER DETECTION ---
-        if text_body:
-            lower_msg = text_body.lower()
-            handover_keywords = ["agent", "human", "customer care", "speak to person"]
-            if any(k in lower_msg for k in handover_keywords):
-                response_text = "You can contact our Agent Sreelekha at +91 9895900809. I will now pause so you can speak with her."
-                send_zoko_message(sender_phone, text=response_text)
-                muted_users.add(sender_phone)
-                logging.info(f"User {sender_phone} requested agent. Bot muted.")
-                return
-
-        # --- STEP 4: EXISTING LOGIC ---
-
         # Check Stop Bot (Tag-based)
         if check_stop_bot(sender_phone):
             logging.info(f"Bot Stopped for {sender_phone} (Tag Check)")
             return
 
         if text_body and text_body.strip().upper() == "STOP BOT":
-            # This logic mimics the tag-based stop but is triggered by text command.
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             send_zoko_message(sender_phone, text="Bot has been stopped for this chat.")
             return
@@ -334,23 +314,20 @@ def handle_message(payload):
                 logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
                 return
 
-        # --- EXPLICIT GREETING CHECK (ONE-TIME per 24h) ---
+        # --- GREETING CHECK (12 HOUR RULE) ---
+        # Only check if it looks like a greeting or start of conv
         is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
-        last_greet_time = greeted_users.get(sender_phone)
+
         current_time = time.time()
+        last_time = last_greeted.get(sender_phone, 0)
 
-        should_send_greeting = False
-        if is_greeting_keyword:
-            if not last_greet_time or (current_time - last_greet_time > 24 * 3600):
-                should_send_greeting = True
-
-        if should_send_greeting:
+        if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
-            greeting_msg = f"{time_greeting}! ☀️ I am AIVA, an empathetic and warm AI Virtual Assistant from Ayurdan Ayurveda Hospital! I am here to help you with any questions about our Ayurvedic products and services. You can type your message or send a Voice Note. How may I help you? 😊"
+            greeting_msg = f"{time_greeting}! ☀️ I am AIVA, the Senior Ayurvedic Expert at Ayurdan Ayurveda Hospital. I am here to understand your health concerns and guide you to the right solution. You can type your message or send a Voice Note. How may I help you today? 🌿"
             send_zoko_message(sender_phone, text=greeting_msg)
-            greeted_users[sender_phone] = current_time
-            logging.info(f"Sent explicit greeting to {sender_phone}")
-            return # Skip AI generation for greeting
+            last_greeted[sender_phone] = current_time
+            logging.info(f"Sent 12h greeting to {sender_phone}")
+            return # Stop here for greeting
 
         logging.info("STEP 2: Processing Logic (AI/Image)")
 
@@ -379,15 +356,29 @@ def handle_message(payload):
 
             response_text = get_ai_response(sender_phone, text_body, history)
 
+            # Store history (without the handover token if we remove it? best to keep raw history)
             history.append({"role": "user", "parts": [text_body]})
             history.append({"role": "model", "parts": [response_text]})
             if len(history) > 20:
                 user_sessions[sender_phone] = history[-20:]
 
-        logging.info("STEP 3: Sending Text Response")
+        logging.info("STEP 3: Sending Response")
 
         if response_text:
-            send_zoko_message(sender_phone, text=response_text)
+            if "[HANDOVER]" in response_text:
+                # Clean text
+                clean_text = response_text.replace("[HANDOVER]", "").strip()
+                if clean_text:
+                    send_zoko_message(sender_phone, text=clean_text)
+
+                # Send Agent Contact
+                send_zoko_message(sender_phone, text="📞 You can contact our Expert Sreelekha directly at +91 9895900809.")
+
+                # Mute User
+                muted_users.add(sender_phone)
+                logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
+            else:
+                send_zoko_message(sender_phone, text=response_text)
 
     except Exception as e:
         logging.error(f"CRITICAL ERROR in handle_message: {e}")
