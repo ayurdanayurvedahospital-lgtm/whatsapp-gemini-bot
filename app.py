@@ -78,7 +78,7 @@ def get_ist_time_greeting():
         logging.error(f"Time Error: {e}")
         return "Hello"
 
-def send_zoko_message(phone, text=None, image_url=None):
+def send_zoko_message(phone, text=None, image_url=None, caption=None):
     """
     Sends message to Zoko. Handles Text vs Image split logic.
     Always sends image first if available.
@@ -91,7 +91,7 @@ def send_zoko_message(phone, text=None, image_url=None):
         return
 
     # Crucial Fix: Clean phone number
-    phone_clean = phone.replace("+", "")
+    recipient = phone.replace("+", "")
     url = "https://chat.zoko.io/v2/message"
     headers = {
         'apikey': ZOKO_API_KEY,
@@ -102,13 +102,13 @@ def send_zoko_message(phone, text=None, image_url=None):
     if image_url:
         try:
             payload = {
-                'channel': 'whatsapp',
-                'recipient': phone_clean,
-                'type': 'image',
-                'url': image_url
-                # NO CAPTION to avoid 400 errors
+                "channel": "whatsapp",
+                "recipient": recipient,
+                "type": "image",
+                "url": image_url,
+                "caption": caption if caption else "Ayurdan Product"
             }
-            logging.info(f"Sending Image to {phone_clean}")
+            logging.info(f"Sending Image to {recipient}")
             resp = requests.post(url, json=payload, headers=headers, timeout=10)
             if resp.status_code != 200:
                 logging.error(f"Image Send Failed: {resp.status_code} - {resp.text}")
@@ -124,11 +124,11 @@ def send_zoko_message(phone, text=None, image_url=None):
         try:
             payload = {
                 'channel': 'whatsapp',
-                'recipient': phone_clean,
+                'recipient': recipient,
                 'type': 'text',
                 'message': text
             }
-            logging.info(f"Sending Text to {phone_clean}")
+            logging.info(f"Sending Text to {recipient}")
             resp = requests.post(url, json=payload, headers=headers, timeout=10)
             resp.raise_for_status()
             logging.info(f"Text Sent: {resp.status_code}")
@@ -351,11 +351,18 @@ def handle_message(payload):
             for key, url in PRODUCT_IMAGES.items():
                 if key in lower_msg:
                     found_image_url = url
+                    product_name = key.replace('_', ' ').title()
+                    # Send Image IMMEDIATELY with caption
+                    send_zoko_message(sender_phone, image_url=found_image_url, caption=product_name)
+                    # We continue to also send AI response below, but since we sent the image here,
+                    # we should avoid duplicate sending logic if we had any.
+                    # The original code had:
+                    # if found_image_url: send_zoko_message(..., image_url=found_image_url)
+                    # at the end. We should remove that or flag it.
+                    # I will remove the deferred image sending at the end and rely on this immediate send.
+                    # The instruction said "Update handle_message ... Inside the loop ... Send the Image".
+                    # So I am doing it here.
                     break
-
-        # Send Image IMMEDIATELY if found
-        if found_image_url:
-            send_zoko_message(sender_phone, image_url=found_image_url)
 
         # Audio vs Text Logic
         if msg_type == "audio" and file_url:
