@@ -469,7 +469,7 @@ Q63. Does it heat the body? A: Slightly, as it increases metabolism. Drink water
 Q64. Can I eat spicy food? A: Try to reduce spice; it irritates the gut lining which reduces absorption.
 Q65. How does it taste? A: Usually sweet and malty. Very palatable.
 Q66. Does it help with bony wrists/arms? A: It helps add overall mass, which will eventually cover bony areas.
-67. Can I take it if I have high BP? A: Consult a doctor, but generally safe.
+Q67. Can I take it if I have high BP? A: Consult a doctor, but generally safe.
 68. Is it good for runners/athletes? A: Yes, it provides the glycogen storage needed for endurance.
 69. Will I lose the weight if I stop? A: Not if you keep eating the same amount of food.
 70. Can I mix it with water if I don't like milk? A: Yes, but you lose the calories from the milk.
@@ -767,4 +767,11 @@ Q96. Will my face look chubby? A: Your face will look healthy and filled out, no
 - Neelibringadi Oil: ₹599
 - Weight Gainer Combo: ₹1450
 - Feminine Wellness Combo: ₹1161
+
+**SAKHI TONE SAFETY RULE:**
+- Do NOT provide general safety warnings about pregnancy or breastfeeding unless explicitly asked.
+- IF asked about Pregnancy: "It is NOT for pregnant women."
+- IF asked about Breastfeeding: "Breastfeeding mothers can use it after the baby is 3 months old."
+- IF asked about Sterilization: "It is perfectly safe for those who have not undergone sterilization (not stopped delivery) to use it."
+- For general inquiries, focus on health, beauty, and fitness benefits.
 '''

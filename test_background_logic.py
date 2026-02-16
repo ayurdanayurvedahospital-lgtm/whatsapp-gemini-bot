@@ -10,6 +10,7 @@ class TestBackgroundLogic(unittest.TestCase):
         app.processed_messages.clear()
         app.user_last_messages.clear()
         app.muted_users.clear()
+        app.greeted_users.clear()
 
     @patch('app.send_zoko_message')
     @patch('app.check_stop_bot')
@@ -61,10 +62,6 @@ class TestBackgroundLogic(unittest.TestCase):
 
         app.model = MagicMock()
         app.model.start_chat.return_value.send_message.return_value.text = "Here is info about Junior Staamigen."
-
-        # NOTE: Using a key that matches knowledge_base_data.py
-        # 'junior' -> "Junior Staamigen Malt" logic implies capitalization
-        # Let's assume PRODUCT_IMAGES has 'junior'
 
         data = {
             'platformSenderId': '+919999999999',
@@ -119,7 +116,6 @@ class TestBackgroundLogic(unittest.TestCase):
     def test_agent_handover_and_resume(self, mock_send):
         phone = '+919999999999'
 
-        # 1. User asks for agent
         data_agent = {
             'platformSenderId': phone,
             'direction': 'incoming',
@@ -127,14 +123,11 @@ class TestBackgroundLogic(unittest.TestCase):
             'type': 'text',
             'messageId': 'msg_agent'
         }
-
         app.handle_message(data_agent)
-
         self.assertIn(phone, app.muted_users)
         mock_send.assert_called_with(phone, text="You can contact our Agent Sreelekha at +91 9895900809. I will now pause so you can speak with her.")
         mock_send.reset_mock()
 
-        # 2. User sends another message (should be ignored)
         data_ignore = {
             'platformSenderId': phone,
             'direction': 'incoming',
@@ -145,7 +138,6 @@ class TestBackgroundLogic(unittest.TestCase):
         app.handle_message(data_ignore)
         mock_send.assert_not_called()
 
-        # 3. Resume command
         data_resume = {
             'platformSenderId': phone,
             'direction': 'incoming',
@@ -154,30 +146,40 @@ class TestBackgroundLogic(unittest.TestCase):
             'messageId': 'msg_resume'
         }
         app.handle_message(data_resume)
-
         self.assertNotIn(phone, app.muted_users)
         mock_send.assert_called_with(phone, text="Bot resumed. How can I help?")
 
     @patch('app.send_zoko_message')
     @patch('app.get_ist_time_greeting')
-    def test_explicit_greeting(self, mock_greeting, mock_send):
+    def test_one_time_greeting(self, mock_greeting, mock_send):
         mock_greeting.return_value = "Good Morning"
-
+        phone = '+919999999999'
         data = {
-            'platformSenderId': '+919999999999',
+            'platformSenderId': phone,
             'direction': 'incoming',
             'text': 'Hi',
             'type': 'text',
             'messageId': 'msg_hi'
         }
 
-        # Ensure AI is NOT called
+        # 1. First Greeting
         with patch('app.get_ai_response') as mock_ai:
             app.handle_message(data)
             mock_ai.assert_not_called()
 
         expected_msg = "Good Morning! ☀️ I am AIVA, an empathetic and warm AI Virtual Assistant from Ayurdan Ayurveda Hospital! I am here to help you with any questions about our Ayurvedic products and services. You can type your message or send a Voice Note. How may I help you? 😊"
-        mock_send.assert_called_with('+919999999999', text=expected_msg)
+        mock_send.assert_called_with(phone, text=expected_msg)
+        self.assertIn(phone, app.greeted_users)
+
+        # Reset mocks
+        mock_send.reset_mock()
+
+        # 2. Second "Hi" (should go to AI, not Greeting)
+        data['messageId'] = 'msg_hi_2'
+        with patch('app.get_ai_response', return_value="AI Response"):
+            app.handle_message(data)
+            # Should have called AI
+            mock_send.assert_called_with(phone, text="AI Response")
 
 if __name__ == '__main__':
     unittest.main()
