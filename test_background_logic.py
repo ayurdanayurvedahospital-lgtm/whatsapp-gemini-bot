@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 import app
 import time
 
@@ -13,9 +13,11 @@ class TestBackgroundLogic(unittest.TestCase):
     @patch('app.send_zoko_message')
     @patch('app.check_stop_bot')
     @patch('app.process_audio')
-    def test_audio_processing(self, mock_process_audio, mock_check_stop, mock_send):
+    @patch('app.get_ist_time_greeting')
+    def test_audio_processing(self, mock_greeting, mock_process_audio, mock_check_stop, mock_send):
         mock_check_stop.return_value = False
         mock_process_audio.return_value = "Audio Response"
+        mock_greeting.return_value = "Good Morning"
 
         data = {
             'platformSenderId': '+919999999999',
@@ -59,15 +61,14 @@ class TestBackgroundLogic(unittest.TestCase):
 
     @patch('app.send_zoko_message')
     @patch('app.check_stop_bot')
-    @patch('app.model.start_chat') # Mock Gemini
-    @patch('time.sleep') # Mock sleep to speed up test
-    def test_image_logic(self, mock_sleep, mock_start_chat, mock_check_stop, mock_send):
+    @patch('app.get_ist_time_greeting')
+    def test_image_logic(self, mock_greeting, mock_check_stop, mock_send):
         mock_check_stop.return_value = False
+        mock_greeting.return_value = "Good Evening"
 
-        # Mock Gemini Response
-        mock_chat = MagicMock()
-        mock_start_chat.return_value = mock_chat
-        mock_chat.send_message.return_value.text = "Here is info about Junior Staamigen."
+        # Mock app.model to prevent actual API calls
+        app.model = MagicMock()
+        app.model.start_chat.return_value.send_message.return_value.text = "Here is info about Junior Staamigen."
 
         data = {
             'platformSenderId': '+919999999999',
@@ -81,8 +82,7 @@ class TestBackgroundLogic(unittest.TestCase):
 
         # Expected:
         # 1. Image message (url found for 'junior')
-        # 2. Sleep
-        # 3. Text message (AI response)
+        # 2. Text message (AI response)
 
         self.assertEqual(mock_send.call_count, 2)
 
@@ -127,6 +127,12 @@ class TestBackgroundLogic(unittest.TestCase):
 
         # Only 2 calls expected (1, 2 sent response. 3, 4 blocked because they complete the set of 3 identical)
         self.assertEqual(mock_send.call_count, 2)
+
+    def test_get_ist_time_greeting(self):
+        # We can't easily mock datetime.now() inside the function without more patching
+        # But we can verify it returns one of the expected strings
+        greeting = app.get_ist_time_greeting()
+        self.assertIn(greeting, ["Good Morning", "Good Afternoon", "Good Evening"])
 
 if __name__ == '__main__':
     unittest.main()

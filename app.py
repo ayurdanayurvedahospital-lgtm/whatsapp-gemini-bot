@@ -8,6 +8,8 @@ import requests
 import flask
 import google.generativeai as genai
 import tempfile
+from datetime import datetime
+import pytz
 from flask import Flask, request, jsonify
 
 # Import modularized data and prompt
@@ -16,9 +18,11 @@ try:
     from system_prompt import SYSTEM_PROMPT
 except ImportError as e:
     logging.error(f"Failed to import modular files: {e}")
-    # Fallback or exit? The user wants "Guaranteed Stable", so maybe define minimal fallback if modules missing?
-    # But files exist in repo. I will proceed assuming they exist.
-    pass
+    # Define minimal fallbacks to prevent crash if files are missing (though they should exist)
+    AGENTS = []
+    PRODUCT_IMAGES = {}
+    LINKS = {}
+    SYSTEM_PROMPT = "You are AIVA."
 
 # --- CONFIGURATION ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,6 +57,25 @@ processed_messages_lock = threading.Lock()
 user_last_messages = {}
 
 # --- HELPER FUNCTIONS ---
+
+def get_ist_time_greeting():
+    """
+    Returns 'Good Morning', 'Good Afternoon', or 'Good Evening' based on IST.
+    """
+    try:
+        ist = pytz.timezone('Asia/Kolkata')
+        now = datetime.now(ist)
+        hour = now.hour
+
+        if 5 <= hour < 12:
+            return "Good Morning"
+        elif 12 <= hour < 17:
+            return "Good Afternoon"
+        else:
+            return "Good Evening"
+    except Exception as e:
+        logging.error(f"Time Error: {e}")
+        return "Hello"
 
 def send_zoko_message(phone, text=None, image_url=None):
     """
@@ -176,13 +199,16 @@ def process_audio(file_url, sender_phone):
         if myfile.state.name == "FAILED":
             raise ValueError("Audio processing failed in Gemini.")
 
+        # Determine Greeting
+        greeting = get_ist_time_greeting()
+
         history = user_sessions.get(sender_phone, [])
         chat = model.start_chat(history=[
             {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": ["Understood. I am AIVA."]}
+            {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
         ] + history)
 
-        prompt = "Listen to this audio. You are AIVA. Answer briefly (under 60 words) and politely in the same language."
+        prompt = f"Listen to this audio. You are AIVA. Current Time Greeting: {greeting}. Answer briefly (under 60 words) and politely in the same language."
         response = chat.send_message([myfile, prompt])
         return response.text
 
@@ -195,13 +221,22 @@ def process_audio(file_url, sender_phone):
 
 def get_ai_response(sender_phone, message_text, history):
     try:
+        greeting = get_ist_time_greeting()
+
         chat_history = [
             {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": ["Understood. I am AIVA."]}
+            {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
         ] + history
 
         chat = model.start_chat(history=chat_history)
-        response = chat.send_message(message_text)
+
+        # Inject greeting context into the prompt if it's the start of conversation or generic hi
+        # Actually, best to just provide the greeting as context so the model decides when to use it.
+        # But the prompt rule says "If user says 'Hi'... check provided Time of Day".
+        # So we pass it as context.
+        full_prompt = f"Current Time Greeting: {greeting}\nUser Message: {message_text}"
+
+        response = chat.send_message(full_prompt)
         return response.text
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
@@ -235,7 +270,6 @@ def handle_message(payload):
 
         direction = payload.get("direction")
         if direction and direction != "incoming" and direction != "from_customer":
-             # Handle Zoko's various direction strings. If it looks like outgoing, skip.
              if direction.lower() in ["outgoing", "from_business"]:
                  logging.info("Ignoring outgoing message.")
                  return
@@ -277,6 +311,10 @@ def handle_message(payload):
                     found_image_url = url
                     break
 
+        # Send Image IMMEDIATELY if found
+        if found_image_url:
+            send_zoko_message(sender_phone, image_url=found_image_url)
+
         # Audio vs Text Logic
         if msg_type == "audio" and file_url:
             send_zoko_message(sender_phone, text="Listening... 🎧")
@@ -293,10 +331,7 @@ def handle_message(payload):
             if len(history) > 20:
                 user_sessions[sender_phone] = history[-20:]
 
-        logging.info("STEP 3: Sending Response")
-
-        if found_image_url:
-            send_zoko_message(sender_phone, image_url=found_image_url)
+        logging.info("STEP 3: Sending Text Response")
 
         if response_text:
             send_zoko_message(sender_phone, text=response_text)
