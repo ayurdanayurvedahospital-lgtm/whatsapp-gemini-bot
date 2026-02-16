@@ -227,11 +227,14 @@ def process_audio(file_url, sender_phone):
 
 def get_ai_response(sender_phone, message_text, history):
     try:
-        greeting = get_ist_time_greeting()
+        # Note: We do NOT inject greeting into context here anymore,
+        # as the system prompt strictly forbids the AI from greeting.
+        # But we might want to inject time context if needed.
+        # The prompt says "The Python code sends the welcome message automatically."
 
         chat_history = [
             {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
+            {"role": "model", "parts": ["Understood. I will NOT greet. I will start with the next question directly."]}
         ] + history
 
         chat = model.start_chat(history=chat_history)
@@ -288,7 +291,7 @@ def handle_message(payload):
                 send_zoko_message(sender_phone, text="Bot is already active. How can I help?")
             return
 
-        # --- STEP 2: CHECK MUTE STATUS ---
+        # --- STEP 1B: CHECK MUTE STATUS ---
         if sender_phone in muted_users:
             logging.info(f"User {sender_phone} is muted (talking to human). Ignoring message.")
             return
@@ -313,22 +316,21 @@ def handle_message(payload):
                 logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
                 return
 
-        # --- GREETING CHECK (12 HOUR RULE) ---
-        # Only check if it looks like a greeting or start of conv
-        is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
-
+        # --- STEP 2: SMART GREETING LOGIC (12 HOUR RULE) ---
         current_time = time.time()
         last_time = last_greeted.get(sender_phone, 0)
 
-        if is_greeting_keyword and (current_time - last_time > 12 * 3600):
+        # Check if we should send the manual greeting
+        if (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
             greeting_msg = f"{time_greeting}! ☀️ I am AIVA, the Senior Ayurvedic Expert at Ayurdan Ayurveda Hospital. I am here to understand your health concerns and guide you to the right solution. You can type your message or send a Voice Note. How may I help you today? 🌿"
             send_zoko_message(sender_phone, text=greeting_msg)
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
-            return # Stop here for greeting
+            # IMPORTANT: We DO NOT return here. We proceed to let the AI analyze the incoming text.
+            # Example: User says "I want weight gain". Bot sends "Good Morning...", then AI sees "I want weight gain" and starts Phase 1.
 
-        logging.info("STEP 2: Processing Logic (AI/Image)")
+        logging.info("STEP 3: Processing Logic (AI/Image)")
 
         response_text = ""
         found_image_url = None
@@ -360,7 +362,7 @@ def handle_message(payload):
             if len(history) > 20:
                 user_sessions[sender_phone] = history[-20:]
 
-        logging.info("STEP 3: Sending Response")
+        logging.info("STEP 4: Sending AI Response")
 
         if response_text:
             if "[HANDOVER]" in response_text:
