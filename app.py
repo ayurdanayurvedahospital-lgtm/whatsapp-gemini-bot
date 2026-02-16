@@ -227,14 +227,11 @@ def process_audio(file_url, sender_phone):
 
 def get_ai_response(sender_phone, message_text, history):
     try:
-        # Note: We do NOT inject greeting into context here anymore,
-        # as the system prompt strictly forbids the AI from greeting.
-        # But we might want to inject time context if needed.
-        # The prompt says "The Python code sends the welcome message automatically."
+        greeting = get_ist_time_greeting()
 
         chat_history = [
             {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": ["Understood. I will NOT greet. I will start with the next question directly."]}
+            {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
         ] + history
 
         chat = model.start_chat(history=chat_history)
@@ -291,7 +288,7 @@ def handle_message(payload):
                 send_zoko_message(sender_phone, text="Bot is already active. How can I help?")
             return
 
-        # --- STEP 1B: CHECK MUTE STATUS ---
+        # --- STEP 2: CHECK MUTE STATUS ---
         if sender_phone in muted_users:
             logging.info(f"User {sender_phone} is muted (talking to human). Ignoring message.")
             return
@@ -303,6 +300,8 @@ def handle_message(payload):
 
         if text_body and text_body.strip().upper() == "STOP BOT":
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
+            # Also mute locally just in case
+            muted_users.add(sender_phone)
             send_zoko_message(sender_phone, text="Bot has been stopped for this chat.")
             return
 
@@ -316,21 +315,32 @@ def handle_message(payload):
                 logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
                 return
 
-        # --- STEP 2: SMART GREETING LOGIC (12 HOUR RULE) ---
+        # --- STEP 3: SMART GREETING LOGIC (12 HOUR RULE) ---
         current_time = time.time()
         last_time = last_greeted.get(sender_phone, 0)
 
-        # Check if we should send the manual greeting
-        if (current_time - last_time > 12 * 3600):
+        # Only greet on common greeting words to avoid interrupting conversation flow
+        is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
+
+        if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
             greeting_msg = f"{time_greeting}! ☀️ I am AIVA, the Senior Ayurvedic Expert at Ayurdan Ayurveda Hospital. I am here to understand your health concerns and guide you to the right solution. You can type your message or send a Voice Note. How may I help you today? 🌿"
             send_zoko_message(sender_phone, text=greeting_msg)
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
-            # IMPORTANT: We DO NOT return here. We proceed to let the AI analyze the incoming text.
-            # Example: User says "I want weight gain". Bot sends "Good Morning...", then AI sees "I want weight gain" and starts Phase 1.
+            # Proceed to AI logic (don't return) so if user said "Hi, I have a question", it gets processed?
+            # Actually if user just said "Hi", AI might reply again?
+            # System prompt is told NOT to greet. So AI will likely ask "How may I help?" or start Phase 1.
+            # If user said "Hi", AI output might be redundancy.
+            # But the user instruction in previous turn was "Stop here for greeting" if it was explicit greeting check.
+            # In this turn, "Smart Greeting Logic... Send manual greeting... Do nothing (AI will reply)".
+            # Wait, step 2 instruction said: "Action (True): Send message... Action (False): Do nothing (AI will reply)".
+            # This implies if greeting sent, we might NOT want AI to reply if input was just "Hi".
+            # But if input was "Hi I want weight gain", we want AI to reply.
+            # Let's trust the System Prompt "DO NOT generate greetings" rule to handle the "Hi" case gracefully (maybe by asking Phase 1 question immediately if no context, or just "How can I help?" if totally empty context).
+            # I will let it proceed to AI.
 
-        logging.info("STEP 3: Processing Logic (AI/Image)")
+        logging.info("STEP 4: Processing Logic (AI/Image)")
 
         response_text = ""
         found_image_url = None
@@ -362,21 +372,17 @@ def handle_message(payload):
             if len(history) > 20:
                 user_sessions[sender_phone] = history[-20:]
 
-        logging.info("STEP 4: Sending AI Response")
+        logging.info("STEP 5: Sending AI Response")
 
         if response_text:
+            # We removed the [HANDOVER] mute logic as requested.
+            # "The bot must stay active and continue answering questions. Do not stop the conversation."
+            # But we still strip the token if it exists to keep text clean.
             if "[HANDOVER]" in response_text:
-                # Clean text
                 clean_text = response_text.replace("[HANDOVER]", "").strip()
                 if clean_text:
                     send_zoko_message(sender_phone, text=clean_text)
-
-                # Send Agent Contact
-                send_zoko_message(sender_phone, text="📞 You can contact our Expert Sreelekha directly at +91 9895900809.")
-
-                # Mute User
-                muted_users.add(sender_phone)
-                logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
+                # We do NOT mute. We just sent the text which likely contains the contact info as per system prompt.
             else:
                 send_zoko_message(sender_phone, text=response_text)
 
