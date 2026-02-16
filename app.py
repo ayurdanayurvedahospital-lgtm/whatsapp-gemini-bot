@@ -55,6 +55,7 @@ CACHE_TTL = 300
 processed_messages = set()
 processed_messages_lock = threading.Lock()
 user_last_messages = {}
+muted_users = set()  # Tracks users currently talking to a human agent
 
 # --- HELPER FUNCTIONS ---
 
@@ -80,6 +81,7 @@ def get_ist_time_greeting():
 def send_zoko_message(phone, text=None, image_url=None):
     """
     Sends message to Zoko. Handles Text vs Image split logic.
+    Always sends image first if available.
     """
     if not ZOKO_API_KEY:
         logging.warning("Skipping Zoko Send: API Key missing")
@@ -88,7 +90,7 @@ def send_zoko_message(phone, text=None, image_url=None):
     if not text and not image_url:
         return
 
-    # Clean phone
+    # Crucial Fix: Clean phone number
     phone_clean = phone.replace("+", "")
     url = "https://chat.zoko.io/v2/message"
     headers = {
@@ -104,15 +106,18 @@ def send_zoko_message(phone, text=None, image_url=None):
                 'recipient': phone_clean,
                 'type': 'image',
                 'url': image_url
-                # NO CAPTION
+                # NO CAPTION to avoid 400 errors
             }
             logging.info(f"Sending Image to {phone_clean}")
             resp = requests.post(url, json=payload, headers=headers, timeout=10)
-            resp.raise_for_status()
-            logging.info(f"Image Sent: {resp.status_code}")
-            time.sleep(1) # Wait 1 second
+            if resp.status_code != 200:
+                logging.error(f"Image Send Failed: {resp.status_code} - {resp.text}")
+            else:
+                logging.info(f"Image Sent: {resp.status_code}")
+                time.sleep(1) # Wait 1 second
         except Exception as e:
-            logging.error(f"Failed to send image: {e}")
+            # Robust Image Sending: Log error but DO NOT CRASH. Proceed to text.
+            logging.error(f"Failed to send image (Exception): {e}")
 
     # Send Text if exists
     if text:
@@ -132,7 +137,8 @@ def send_zoko_message(phone, text=None, image_url=None):
 
 def check_stop_bot(phone):
     """
-    Check if bot is stopped via Zoko tags or cache.
+    Check if bot is stopped via Zoko tags (STOP_BOT) or cache.
+    Note: This is separate from the in-memory 'muted_users' set.
     """
     now = time.time()
     if phone in stop_bot_cache:
@@ -230,10 +236,6 @@ def get_ai_response(sender_phone, message_text, history):
 
         chat = model.start_chat(history=chat_history)
 
-        # Inject greeting context into the prompt if it's the start of conversation or generic hi
-        # Actually, best to just provide the greeting as context so the model decides when to use it.
-        # But the prompt rule says "If user says 'Hi'... check provided Time of Day".
-        # So we pass it as context.
         full_prompt = f"Current Time Greeting: {greeting}\nUser Message: {message_text}"
 
         response = chat.send_message(full_prompt)
@@ -278,12 +280,44 @@ def handle_message(payload):
         text_body = payload.get("text", "")
         file_url = payload.get("fileUrl")
 
-        # Check Stop Bot
+        # --- STEP 1: RESUME COMMAND (Priority) ---
+        if text_body and text_body.strip().upper() == "START BOT":
+            if sender_phone in muted_users:
+                muted_users.discard(sender_phone)
+                logging.info(f"Bot resumed for {sender_phone} via 'START BOT' command.")
+                send_zoko_message(sender_phone, text="Bot resumed. How can I help?")
+            else:
+                # If not muted, just acknowledge or proceed. Let's acknowledge to confirm it's running.
+                send_zoko_message(sender_phone, text="Bot is already active. How can I help?")
+            return
+
+        # --- STEP 2: CHECK MUTE STATUS ---
+        if sender_phone in muted_users:
+            logging.info(f"User {sender_phone} is muted (talking to human). Ignoring message.")
+            return
+
+        # --- STEP 3: AGENT HANDOVER DETECTION ---
+        if text_body:
+            lower_msg = text_body.lower()
+            handover_keywords = ["agent", "human", "customer care", "speak to person"]
+            if any(k in lower_msg for k in handover_keywords):
+                response_text = "You can contact our Agent Sreelekha at +91 9895900809. I will now pause so you can speak with her."
+                send_zoko_message(sender_phone, text=response_text)
+                muted_users.add(sender_phone)
+                logging.info(f"User {sender_phone} requested agent. Bot muted.")
+                return
+
+        # --- STEP 4: EXISTING LOGIC ---
+
+        # Check Stop Bot (Tag-based)
         if check_stop_bot(sender_phone):
-            logging.info(f"Bot Stopped for {sender_phone}")
+            logging.info(f"Bot Stopped for {sender_phone} (Tag Check)")
             return
 
         if text_body and text_body.strip().upper() == "STOP BOT":
+            # This logic mimics the tag-based stop but is triggered by text command.
+            # We can also add to muted_users here or use the existing cache logic.
+            # Using existing cache logic for "STOP BOT" command consistency.
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             send_zoko_message(sender_phone, text="Bot has been stopped for this chat.")
             return
@@ -298,7 +332,7 @@ def handle_message(payload):
                 logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
                 return
 
-        logging.info("STEP 2: Processing Logic")
+        logging.info("STEP 2: Processing Logic (AI/Image)")
 
         response_text = ""
         found_image_url = None

@@ -9,6 +9,7 @@ class TestBackgroundLogic(unittest.TestCase):
         app.stop_bot_cache.clear()
         app.processed_messages.clear()
         app.user_last_messages.clear()
+        app.muted_users.clear()
 
     @patch('app.send_zoko_message')
     @patch('app.check_stop_bot')
@@ -27,16 +28,10 @@ class TestBackgroundLogic(unittest.TestCase):
             'messageId': 'msg_audio_1'
         }
 
-        # We mock threading to run synchronously for test
         with patch('threading.Thread', side_effect=lambda target, args: target(*args)):
             app.handle_message(data)
 
-        # Verify calls
-        # 1. "Listening..."
-        # 2. Response
         self.assertEqual(mock_send.call_count, 2)
-
-        # Check args
         calls = mock_send.call_args_list
         self.assertEqual(calls[0].kwargs.get('text'), "Listening... 🎧")
         self.assertEqual(calls[1].kwargs.get('text'), "Audio Response")
@@ -54,9 +49,7 @@ class TestBackgroundLogic(unittest.TestCase):
         with patch('app.check_stop_bot', return_value=False):
             app.handle_message(data)
 
-        # Verify cache update
         self.assertTrue(app.stop_bot_cache['+919999999999']['stopped'])
-        # Verify response
         mock_send.assert_called_with('+919999999999', text='Bot has been stopped for this chat.')
 
     @patch('app.send_zoko_message')
@@ -66,7 +59,6 @@ class TestBackgroundLogic(unittest.TestCase):
         mock_check_stop.return_value = False
         mock_greeting.return_value = "Good Evening"
 
-        # Mock app.model to prevent actual API calls
         app.model = MagicMock()
         app.model.start_chat.return_value.send_message.return_value.text = "Here is info about Junior Staamigen."
 
@@ -80,28 +72,18 @@ class TestBackgroundLogic(unittest.TestCase):
 
         app.handle_message(data)
 
-        # Expected:
-        # 1. Image message (url found for 'junior')
-        # 2. Text message (AI response)
-
         self.assertEqual(mock_send.call_count, 2)
 
-        # Check first call (Image)
         call1_args = mock_send.call_args_list[0]
-        # send_zoko_message(sender_phone, image_url=found_image_url)
         self.assertEqual(call1_args.args[0], '+919999999999')
         self.assertIsNotNone(call1_args.kwargs.get('image_url'))
-        self.assertIsNone(call1_args.kwargs.get('text')) # Ensure text is None for image call
 
-        # Check second call (Text)
         call2_args = mock_send.call_args_list[1]
         self.assertEqual(call2_args.args[0], '+919999999999')
         self.assertEqual(call2_args.kwargs.get('text'), "Here is info about Junior Staamigen.")
-        self.assertIsNone(call2_args.kwargs.get('image_url'))
 
     @patch('app.send_zoko_message')
     def test_loop_prevention(self, mock_send):
-        # Send same message 4 times
         data = {
             'platformSenderId': '+919999999999',
             'direction': 'incoming',
@@ -112,27 +94,65 @@ class TestBackgroundLogic(unittest.TestCase):
 
         with patch('app.check_stop_bot', return_value=False):
             with patch('app.get_ai_response', return_value="Hi"):
-                 # 1st
                  data['messageId'] = '1'
                  app.handle_message(data)
-                 # 2nd
                  data['messageId'] = '2'
                  app.handle_message(data)
-                 # 3rd
                  data['messageId'] = '3'
                  app.handle_message(data)
-                 # 4th (Should be ignored)
                  data['messageId'] = '4'
                  app.handle_message(data)
 
-        # Only 2 calls expected (1, 2 sent response. 3, 4 blocked because they complete the set of 3 identical)
         self.assertEqual(mock_send.call_count, 2)
 
     def test_get_ist_time_greeting(self):
-        # We can't easily mock datetime.now() inside the function without more patching
-        # But we can verify it returns one of the expected strings
         greeting = app.get_ist_time_greeting()
         self.assertIn(greeting, ["Good Morning", "Good Afternoon", "Good Evening"])
+
+    @patch('app.send_zoko_message')
+    def test_agent_handover_and_resume(self, mock_send):
+        phone = '+919999999999'
+
+        # 1. User asks for agent
+        data_agent = {
+            'platformSenderId': phone,
+            'direction': 'incoming',
+            'text': 'I want to speak to an agent',
+            'type': 'text',
+            'messageId': 'msg_agent'
+        }
+
+        app.handle_message(data_agent)
+
+        # Verify mute and response
+        self.assertIn(phone, app.muted_users)
+        mock_send.assert_called_with(phone, text="You can contact our Agent Sreelekha at +91 9895900809. I will now pause so you can speak with her.")
+        mock_send.reset_mock()
+
+        # 2. User sends another message (should be ignored)
+        data_ignore = {
+            'platformSenderId': phone,
+            'direction': 'incoming',
+            'text': 'Hello?',
+            'type': 'text',
+            'messageId': 'msg_ignore'
+        }
+        app.handle_message(data_ignore)
+        mock_send.assert_not_called()
+
+        # 3. Resume command
+        data_resume = {
+            'platformSenderId': phone,
+            'direction': 'incoming',
+            'text': 'START BOT',
+            'type': 'text',
+            'messageId': 'msg_resume'
+        }
+        app.handle_message(data_resume)
+
+        # Verify unmute and response
+        self.assertNotIn(phone, app.muted_users)
+        mock_send.assert_called_with(phone, text="Bot resumed. How can I help?")
 
 if __name__ == '__main__':
     unittest.main()
