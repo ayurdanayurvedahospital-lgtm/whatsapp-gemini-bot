@@ -236,7 +236,6 @@ def get_ai_response(sender_phone, message_text, history):
 
         chat = model.start_chat(history=chat_history)
 
-        # Inject context if needed, mostly context is in system prompt
         response = chat.send_message(message_text)
         return response.text
     except Exception as e:
@@ -356,7 +355,6 @@ def handle_message(payload):
 
             response_text = get_ai_response(sender_phone, text_body, history)
 
-            # Store history (without the handover token if we remove it? best to keep raw history)
             history.append({"role": "user", "parts": [text_body]})
             history.append({"role": "model", "parts": [response_text]})
             if len(history) > 20:
