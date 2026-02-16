@@ -56,6 +56,7 @@ processed_messages_lock = threading.Lock()
 user_last_messages = {}
 muted_users = set()  # Tracks users currently talking to a human agent
 last_greeted = {} # phone -> timestamp (tracks last greeting time for 12h rule)
+followup_timers = {} # phone -> {'t1': Timer, 't2': Timer}
 
 # --- HELPER FUNCTIONS ---
 
@@ -137,6 +138,57 @@ def send_zoko_message(phone, text=None, image_url=None, caption=None):
             logging.info(f"Text Sent: {resp.status_code}")
         except Exception as e:
             logging.error(f"Failed to send text: {e}")
+
+def cancel_timers(phone):
+    """Cancels any pending inactivity timers for a user."""
+    if phone in followup_timers:
+        if followup_timers[phone].get('t1'):
+            try:
+                followup_timers[phone]['t1'].cancel()
+            except Exception: pass
+        if followup_timers[phone].get('t2'):
+            try:
+                followup_timers[phone]['t2'].cancel()
+            except Exception: pass
+        del followup_timers[phone]
+
+def send_followup_1(phone):
+    """First followup after 2 minutes."""
+    if phone in muted_users or check_stop_bot(phone):
+        return
+
+    logging.info(f"Sending Follow-up 1 to {phone}")
+    send_zoko_message(phone, text="Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.")
+
+    # Start Timer 2 (5 mins from now)
+    t = threading.Timer(300, send_followup_2, args=[phone]) # 5 mins = 300s
+    t.daemon = True # ensure it doesn't block exit
+    if phone in followup_timers: # Check if still relevant
+        followup_timers[phone]['t2'] = t
+        t.start()
+
+def send_followup_2(phone):
+    """Second followup after 5 minutes."""
+    if phone in muted_users or check_stop_bot(phone):
+        return
+
+    logging.info(f"Sending Follow-up 2 to {phone}")
+    send_zoko_message(phone, text="Your health deserves thoughtful attention. I’m here to guide you whenever you’re ready. Please feel free to ask me anything at any time.")
+
+    # Clean up
+    if phone in followup_timers:
+        del followup_timers[phone]
+
+def start_inactivity_timer(phone):
+    """Starts the first inactivity timer."""
+    # Cancel old ones first to be safe
+    cancel_timers(phone)
+
+    # Start Timer 1 (2 mins)
+    t = threading.Timer(120, send_followup_1, args=[phone]) # 2 mins = 120s
+    t.daemon = True
+    followup_timers[phone] = {'t1': t}
+    t.start()
 
 def check_stop_bot(phone):
     """
@@ -268,6 +320,9 @@ def handle_message(payload):
             logging.error("No sender_phone found. Aborting.")
             return
 
+        # CANCEL INACTIVITY TIMERS (User Replied)
+        cancel_timers(sender_phone)
+
         direction = payload.get("direction")
         if direction and direction != "incoming" and direction != "from_customer":
              if direction.lower() in ["outgoing", "from_business"]:
@@ -286,6 +341,9 @@ def handle_message(payload):
                 send_zoko_message(sender_phone, text="Bot resumed. How can I help?")
             else:
                 send_zoko_message(sender_phone, text="Bot is already active. How can I help?")
+
+            # Start timer after resuming
+            start_inactivity_timer(sender_phone)
             return
 
         # --- STEP 2: CHECK MUTE STATUS ---
@@ -300,7 +358,6 @@ def handle_message(payload):
 
         if text_body and text_body.strip().upper() == "STOP BOT":
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
-            # Also mute locally just in case
             muted_users.add(sender_phone)
             send_zoko_message(sender_phone, text="Bot has been stopped for this chat.")
             return
@@ -319,7 +376,6 @@ def handle_message(payload):
         current_time = time.time()
         last_time = last_greeted.get(sender_phone, 0)
 
-        # Only greet on common greeting words to avoid interrupting conversation flow
         is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
 
         if is_greeting_keyword and (current_time - last_time > 12 * 3600):
@@ -328,17 +384,10 @@ def handle_message(payload):
             send_zoko_message(sender_phone, text=greeting_msg)
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
-            # Proceed to AI logic (don't return) so if user said "Hi, I have a question", it gets processed?
-            # Actually if user just said "Hi", AI might reply again?
-            # System prompt is told NOT to greet. So AI will likely ask "How may I help?" or start Phase 1.
-            # If user said "Hi", AI output might be redundancy.
-            # But the user instruction in previous turn was "Stop here for greeting" if it was explicit greeting check.
-            # In this turn, "Smart Greeting Logic... Send manual greeting... Do nothing (AI will reply)".
-            # Wait, step 2 instruction said: "Action (True): Send message... Action (False): Do nothing (AI will reply)".
-            # This implies if greeting sent, we might NOT want AI to reply if input was just "Hi".
-            # But if input was "Hi I want weight gain", we want AI to reply.
-            # Let's trust the System Prompt "DO NOT generate greetings" rule to handle the "Hi" case gracefully (maybe by asking Phase 1 question immediately if no context, or just "How can I help?" if totally empty context).
-            # I will let it proceed to AI.
+
+            # Start timer after greeting
+            start_inactivity_timer(sender_phone)
+            return
 
         logging.info("STEP 4: Processing Logic (AI/Image)")
 
@@ -352,7 +401,6 @@ def handle_message(payload):
                 if key in lower_msg:
                     found_image_url = url
                     product_name = key.replace('_', ' ').title()
-                    # Send Image IMMEDIATELY with caption
                     send_zoko_message(sender_phone, image_url=found_image_url, caption=product_name)
                     break
 
@@ -375,16 +423,22 @@ def handle_message(payload):
         logging.info("STEP 5: Sending AI Response")
 
         if response_text:
-            # We removed the [HANDOVER] mute logic as requested.
-            # "The bot must stay active and continue answering questions. Do not stop the conversation."
-            # But we still strip the token if it exists to keep text clean.
             if "[HANDOVER]" in response_text:
                 clean_text = response_text.replace("[HANDOVER]", "").strip()
                 if clean_text:
                     send_zoko_message(sender_phone, text=clean_text)
-                # We do NOT mute. We just sent the text which likely contains the contact info as per system prompt.
+
+                send_zoko_message(sender_phone, text="📞 You can contact our Expert Sreelekha directly at +91 9895900809.")
+
+                muted_users.add(sender_phone)
+                logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
             else:
                 send_zoko_message(sender_phone, text=response_text)
+
+            # Start timer after bot replies (expecting user follow-up)
+            # Unless handover happened (muted_users would prevent follow-up sending anyway, but good to check)
+            if sender_phone not in muted_users:
+                start_inactivity_timer(sender_phone)
 
     except Exception as e:
         logging.error(f"CRITICAL ERROR in handle_message: {e}")
