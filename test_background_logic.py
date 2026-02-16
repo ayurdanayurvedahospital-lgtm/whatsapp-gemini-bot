@@ -62,6 +62,10 @@ class TestBackgroundLogic(unittest.TestCase):
         app.model = MagicMock()
         app.model.start_chat.return_value.send_message.return_value.text = "Here is info about Junior Staamigen."
 
+        # NOTE: Using a key that matches knowledge_base_data.py
+        # 'junior' -> "Junior Staamigen Malt" logic implies capitalization
+        # Let's assume PRODUCT_IMAGES has 'junior'
+
         data = {
             'platformSenderId': '+919999999999',
             'direction': 'incoming',
@@ -77,6 +81,8 @@ class TestBackgroundLogic(unittest.TestCase):
         call1_args = mock_send.call_args_list[0]
         self.assertEqual(call1_args.args[0], '+919999999999')
         self.assertIsNotNone(call1_args.kwargs.get('image_url'))
+        # New assertion: Check caption is present
+        self.assertIsNotNone(call1_args.kwargs.get('caption'))
 
         call2_args = mock_send.call_args_list[1]
         self.assertEqual(call2_args.args[0], '+919999999999')
@@ -84,8 +90,6 @@ class TestBackgroundLogic(unittest.TestCase):
 
     @patch('app.send_zoko_message')
     def test_loop_prevention(self, mock_send):
-        # Note: "Hello" is now caught by greeting check, so we use a different text for loop test
-        # to ensure it hits the loop logic and AI logic (mocked)
         data = {
             'platformSenderId': '+919999999999',
             'direction': 'incoming',
