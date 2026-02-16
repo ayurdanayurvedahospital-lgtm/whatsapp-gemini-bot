@@ -56,6 +56,7 @@ processed_messages = set()
 processed_messages_lock = threading.Lock()
 user_last_messages = {}
 muted_users = set()  # Tracks users currently talking to a human agent
+greeted_users = {} # phone -> timestamp (tracks last greeting time)
 
 # --- HELPER FUNCTIONS ---
 
@@ -101,14 +102,17 @@ def send_zoko_message(phone, text=None, image_url=None, caption=None):
     # Send Image First if exists
     if image_url:
         try:
+            # Ensure caption is present to avoid 400 errors (if API requires it, strictly speaking Zoko v2 might allow no caption, but user requested mandatory)
+            img_caption = caption if caption else "Ayurdan Product"
+
             payload = {
                 "channel": "whatsapp",
                 "recipient": recipient,
                 "type": "image",
                 "url": image_url,
-                "caption": caption if caption else "Ayurdan Product"
+                "caption": img_caption
             }
-            logging.info(f"Sending Image to {recipient}")
+            logging.info(f"Sending Image to {recipient} with caption: {img_caption}")
             resp = requests.post(url, json=payload, headers=headers, timeout=10)
             if resp.status_code != 200:
                 logging.error(f"Image Send Failed: {resp.status_code} - {resp.text}")
@@ -316,8 +320,6 @@ def handle_message(payload):
 
         if text_body and text_body.strip().upper() == "STOP BOT":
             # This logic mimics the tag-based stop but is triggered by text command.
-            # We can also add to muted_users here or use the existing cache logic.
-            # Using existing cache logic for "STOP BOT" command consistency.
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             send_zoko_message(sender_phone, text="Bot has been stopped for this chat.")
             return
@@ -332,11 +334,21 @@ def handle_message(payload):
                 logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
                 return
 
-        # --- EXPLICIT GREETING CHECK ---
-        if text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]:
+        # --- EXPLICIT GREETING CHECK (ONE-TIME per 24h) ---
+        is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
+        last_greet_time = greeted_users.get(sender_phone)
+        current_time = time.time()
+
+        should_send_greeting = False
+        if is_greeting_keyword:
+            if not last_greet_time or (current_time - last_greet_time > 24 * 3600):
+                should_send_greeting = True
+
+        if should_send_greeting:
             time_greeting = get_ist_time_greeting()
             greeting_msg = f"{time_greeting}! ☀️ I am AIVA, an empathetic and warm AI Virtual Assistant from Ayurdan Ayurveda Hospital! I am here to help you with any questions about our Ayurvedic products and services. You can type your message or send a Voice Note. How may I help you? 😊"
             send_zoko_message(sender_phone, text=greeting_msg)
+            greeted_users[sender_phone] = current_time
             logging.info(f"Sent explicit greeting to {sender_phone}")
             return # Skip AI generation for greeting
 
@@ -354,14 +366,6 @@ def handle_message(payload):
                     product_name = key.replace('_', ' ').title()
                     # Send Image IMMEDIATELY with caption
                     send_zoko_message(sender_phone, image_url=found_image_url, caption=product_name)
-                    # We continue to also send AI response below, but since we sent the image here,
-                    # we should avoid duplicate sending logic if we had any.
-                    # The original code had:
-                    # if found_image_url: send_zoko_message(..., image_url=found_image_url)
-                    # at the end. We should remove that or flag it.
-                    # I will remove the deferred image sending at the end and rely on this immediate send.
-                    # The instruction said "Update handle_message ... Inside the loop ... Send the Image".
-                    # So I am doing it here.
                     break
 
         # Audio vs Text Logic
