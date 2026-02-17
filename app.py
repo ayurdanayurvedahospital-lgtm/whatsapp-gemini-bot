@@ -87,7 +87,7 @@ def get_shopify_token():
         logging.error(f"Shopify Token Error: {e}")
         return None
 
-def check_shopify_order(identifier):
+def get_order_status(identifier):
     """
     Searches for an order by Name (e.g., #1001) or Phone Number.
     """
@@ -113,7 +113,8 @@ def check_shopify_order(identifier):
             orders = resp.json().get("orders", [])
             if orders:
                 order = orders[0]
-                return f"Order {order['name']} is currently *{order['fulfillment_status'] or 'Unfulfilled'}* and payment is *{order['financial_status']}*."
+                status = order.get('fulfillment_status') or 'Unfulfilled'
+                return f"Your order *{order['name']}* is *{status}*."
 
         # 2. If not found, try searching by Phone (requires Customer Search first)
         # Search Customer by Phone
@@ -132,7 +133,8 @@ def check_shopify_order(identifier):
                     orders = order_resp.json().get("orders", [])
                     if orders:
                         order = orders[0]
-                        return f"Your latest Order {order['name']} is *{order['fulfillment_status'] or 'Unfulfilled'}*."
+                        status = order.get('fulfillment_status') or 'Unfulfilled'
+                        return f"Your order *{order['name']}* is *{status}*."
 
         return "I couldn't find an order with those details. Please check the number and try again."
 
@@ -479,7 +481,7 @@ def handle_message(payload):
             # Check if they provided a number in the same message (digits > 3)
             potential_id = "".join(filter(str.isdigit, text_body))
             if len(potential_id) > 3:
-                 status_msg = check_shopify_order(potential_id)
+                 status_msg = get_order_status(potential_id)
                  send_zoko_message(sender_phone, text=status_msg)
                  # Reset state (Pivot back to AIVA implicitly)
                  user_order_state[sender_phone] = False
@@ -501,7 +503,7 @@ def handle_message(payload):
                 # Fall through to AIVA logic below
             else:
                 # Treat as Order ID/Phone
-                status_msg = check_shopify_order(text_body)
+                status_msg = get_order_status(text_body)
                 send_zoko_message(sender_phone, text=status_msg)
                 user_order_state[sender_phone] = False
 

@@ -49,9 +49,8 @@ class TestShopifyLogic(unittest.TestCase):
         }
         mock_get.return_value = mock_resp
 
-        status = app.check_shopify_order("1001")
-        self.assertIn("Order #1001 is currently *fulfilled*", status)
-        self.assertIn("payment is *paid*", status)
+        status = app.get_order_status("1001")
+        self.assertIn("Your order *#1001* is *fulfilled*", status)
 
         # Verify URL
         mock_get.assert_called_with(
@@ -92,13 +91,13 @@ class TestShopifyLogic(unittest.TestCase):
         # Side effect for consecutive calls
         mock_get.side_effect = [mock_fail_resp, mock_cust_resp, mock_order_resp]
 
-        status = app.check_shopify_order("9999999999")
-        self.assertIn("Your latest Order #2002 is *Unfulfilled*", status)
+        status = app.get_order_status("9999999999")
+        self.assertIn("Your order *#2002* is *Unfulfilled*", status)
 
     @patch('app.get_shopify_token')
     def test_check_order_fail(self, mock_token):
         mock_token.return_value = None
-        status = app.check_shopify_order("123")
+        status = app.get_order_status("123")
         self.assertIn("unable to access", status)
 
 if __name__ == '__main__':
