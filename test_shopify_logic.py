@@ -43,7 +43,7 @@ class TestShopifyLogic(unittest.TestCase):
         mock_resp.json.return_value = {
             "orders": [{
                 "name": "#1001",
-                "fulfillment_status": "fulfilled",
+                "fulfillment_status": "partial", # Even if partial, if fulfillments exists, we treat as fulfilled
                 "financial_status": "paid",
                 "fulfillments": [{"tracking_url": "http://track.me"}]
             }]
