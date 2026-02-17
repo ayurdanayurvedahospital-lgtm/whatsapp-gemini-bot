@@ -110,24 +110,22 @@ def get_order_status(identifier):
         url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/orders.json?name={search_term}&status=any"
         resp = requests.get(url, headers=headers, timeout=10)
         def format_order_response(order):
-            status = order.get('fulfillment_status')
             order_name = order.get('name', '')
+            fulfillments = order.get('fulfillments', [])
 
-            # Use logging.info (equivalent to print in this context)
-            logging.info(f"DEBUG: Order {order_name} status is: {status}")
+            # Debug Log
+            logging.info(f"DEBUG: Order {order_name} fulfillments data: {fulfillments}")
 
             contact_info = "\n\nPlease contact this number 919526530900 (9:30 am to 5 pm) if you have any queries in tracking details."
 
-            if status == 'fulfilled':
+            if fulfillments:
                 tracking_url = "Not Available"
-                # Try to get tracking URL from fulfillments
-                fulfillments = order.get('fulfillments', [])
-                if fulfillments:
-                    tracking_url = fulfillments[0].get('tracking_url') or "Not Available"
+                if fulfillments[0].get('tracking_url'):
+                    tracking_url = fulfillments[0].get('tracking_url')
 
                 return f"Your order *{order_name}* is *fulfilled*. Tracking: {tracking_url}{contact_info}"
             else:
-                # partial, null (None), or unfulfilled
+                # partial, null (None), or unfulfilled (empty fulfillments list)
                 return f"Your order is not fulfilled yet. It's getting ready, once fulfilled you will be receiving a message.{contact_info}"
 
         if resp.status_code == 200:
