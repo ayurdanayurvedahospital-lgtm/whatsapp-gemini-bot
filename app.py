@@ -109,12 +109,28 @@ def get_order_status(identifier):
 
         url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/orders.json?name={search_term}&status=any"
         resp = requests.get(url, headers=headers, timeout=10)
+        def format_order_response(order):
+            status = order.get('fulfillment_status')
+            order_name = order.get('name', '')
+
+            contact_info = "\n\nPlease contact this number 919526530900 (9:30 am to 5 pm) if you have any queries in tracking details."
+
+            if status == 'fulfilled':
+                tracking_url = "Not Available"
+                # Try to get tracking URL from fulfillments
+                fulfillments = order.get('fulfillments', [])
+                if fulfillments:
+                    tracking_url = fulfillments[0].get('tracking_url') or "Not Available"
+
+                return f"Your order *{order_name}* is *fulfilled*. Tracking: {tracking_url}{contact_info}"
+            else:
+                # partial, null (None), or unfulfilled
+                return f"Your order is not fulfilled yet. It's getting ready, once fulfilled you will be receiving a message.{contact_info}"
+
         if resp.status_code == 200:
             orders = resp.json().get("orders", [])
             if orders:
-                order = orders[0]
-                status = order.get('fulfillment_status') or 'Unfulfilled'
-                return f"Your order *{order['name']}* is *{status}*."
+                return format_order_response(orders[0])
 
         # 2. If not found, try searching by Phone (requires Customer Search first)
         # Search Customer by Phone
@@ -132,9 +148,7 @@ def get_order_status(identifier):
                 if order_resp.status_code == 200:
                     orders = order_resp.json().get("orders", [])
                     if orders:
-                        order = orders[0]
-                        status = order.get('fulfillment_status') or 'Unfulfilled'
-                        return f"Your order *{order['name']}* is *{status}*."
+                        return format_order_response(orders[0])
 
         return "I couldn't find an order with those details. Please check the number and try again."
 
