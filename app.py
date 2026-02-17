@@ -32,6 +32,11 @@ app = Flask(__name__)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ZOKO_API_KEY = os.environ.get("ZOKO_API_KEY")
 
+# Shopify Config
+SHOPIFY_DOMAIN = os.environ.get("SHOPIFY_DOMAIN")
+SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID")
+SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET")
+
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
@@ -39,6 +44,9 @@ else:
 
 if not ZOKO_API_KEY:
     logging.warning("ZOKO_API_KEY not set!")
+
+if not all([SHOPIFY_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET]):
+    logging.warning("Shopify Credentials missing! Order tracking will fail.")
 
 # Initialize Gemini Model
 try:
@@ -57,8 +65,80 @@ user_last_messages = {}
 muted_users = set()  # Tracks users currently talking to a human agent
 last_greeted = {} # phone -> timestamp (tracks last greeting time for 12h rule)
 followup_timers = {} # phone -> {'t1': Timer, 't2': Timer}
+user_order_state = {} # phone -> boolean (True if expecting order details)
 
 # --- HELPER FUNCTIONS ---
+
+def get_shopify_token():
+    """
+    Obtains a temporary access token via Client Credentials Flow.
+    """
+    try:
+        url = f"https://{SHOPIFY_DOMAIN}/admin/oauth/access_token"
+        payload = {
+            "client_id": SHOPIFY_CLIENT_ID,
+            "client_secret": SHOPIFY_CLIENT_SECRET,
+            "grant_type": "client_credentials"
+        }
+        resp = requests.post(url, json=payload, timeout=10)
+        resp.raise_for_status()
+        return resp.json().get("access_token")
+    except Exception as e:
+        logging.error(f"Shopify Token Error: {e}")
+        return None
+
+def check_shopify_order(identifier):
+    """
+    Searches for an order by Name (e.g., #1001) or Phone Number.
+    """
+    token = get_shopify_token()
+    if not token:
+        return "I am unable to access the order system right now. Please try again later."
+
+    headers = {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json"
+    }
+
+    try:
+        # 1. Search by Order Name (e.g., "#1001" or "1001")
+        # Ensure it starts with # if digits only, or just search
+        search_term = identifier
+        if identifier.isdigit():
+             search_term = f"#{identifier}"
+
+        url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/orders.json?name={search_term}&status=any"
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            orders = resp.json().get("orders", [])
+            if orders:
+                order = orders[0]
+                return f"Order {order['name']} is currently *{order['fulfillment_status'] or 'Unfulfilled'}* and payment is *{order['financial_status']}*."
+
+        # 2. If not found, try searching by Phone (requires Customer Search first)
+        # Search Customer by Phone
+        phone_query = identifier.replace(" ", "")
+        cust_url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/customers/search.json?query=phone:{phone_query}"
+        cust_resp = requests.get(cust_url, headers=headers, timeout=10)
+
+        if cust_resp.status_code == 200:
+            customers = cust_resp.json().get("customers", [])
+            if customers:
+                cust_id = customers[0]['id']
+                # Get Last Order for this customer
+                order_url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/customers/{cust_id}/orders.json?status=any&limit=1"
+                order_resp = requests.get(order_url, headers=headers, timeout=10)
+                if order_resp.status_code == 200:
+                    orders = order_resp.json().get("orders", [])
+                    if orders:
+                        order = orders[0]
+                        return f"Your latest Order {order['name']} is *{order['fulfillment_status'] or 'Unfulfilled'}*."
+
+        return "I couldn't find an order with those details. Please check the number and try again."
+
+    except Exception as e:
+        logging.error(f"Shopify Order Lookup Error: {e}")
+        return "I encountered an error while checking your order. Please try again later."
 
 def get_ist_time_greeting():
     """
@@ -382,7 +462,47 @@ def handle_message(payload):
                 logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
                 return
 
-        # --- STEP 3: SMART GREETING LOGIC (12 HOUR RULE) ---
+        # --- STEP 3: ORDER TRACKING PROTOCOL ---
+        is_tracking_intent = text_body and any(k in text_body.lower() for k in ["where is my order", "track my order", "order status", "track order", "status of my order"])
+
+        # Case A: User explicitly asks to track
+        if is_tracking_intent:
+            # Check if they provided a number in the same message (digits > 3)
+            potential_id = "".join(filter(str.isdigit, text_body))
+            if len(potential_id) > 3:
+                 status_msg = check_shopify_order(potential_id)
+                 send_zoko_message(sender_phone, text=status_msg)
+                 # Reset state (Pivot back to AIVA implicitly)
+                 user_order_state[sender_phone] = False
+                 return
+            else:
+                 # Ask for details
+                 user_order_state[sender_phone] = True
+                 send_zoko_message(sender_phone, text="Please enter the *Mobile Number* used for the order or your *Order Number*.")
+                 return
+
+        # Case B: User is in Tracking Mode (waiting for input)
+        if user_order_state.get(sender_phone):
+            # Check if user is trying to pivot back to health (Health keyword check)
+            # Simple heuristic: If it contains medical keywords or is long text
+            is_health_query = any(k in text_body.lower() for k in ["pain", "weight", "hair", "skin", "diabetes", "sugar", "gain", "loss", "sleep"])
+
+            if is_health_query:
+                user_order_state[sender_phone] = False
+                # Fall through to AIVA logic below
+            else:
+                # Treat as Order ID/Phone
+                status_msg = check_shopify_order(text_body)
+                send_zoko_message(sender_phone, text=status_msg)
+                user_order_state[sender_phone] = False
+
+                # Check if we should pivot back explicitly?
+                # "Post-Lookup: After providing details, if they ask a health question, pivot back..."
+                # The user will likely reply to this status.
+                # If they say "Thanks", the next message will hit AIVA.
+                return
+
+        # --- STEP 4: SMART GREETING LOGIC (12 HOUR RULE) ---
         current_time = time.time()
         last_time = last_greeted.get(sender_phone, 0)
 
@@ -399,7 +519,7 @@ def handle_message(payload):
             start_inactivity_timer(sender_phone)
             return
 
-        logging.info("STEP 4: Processing Logic (AI/Image)")
+        logging.info("STEP 5: Processing Logic (AI/Image)")
 
         response_text = ""
         found_image_url = None
@@ -430,7 +550,7 @@ def handle_message(payload):
             if len(history) > 20:
                 user_sessions[sender_phone] = history[-20:]
 
-        logging.info("STEP 5: Sending AI Response")
+        logging.info("STEP 6: Sending AI Response")
 
         if response_text:
             if "[HANDOVER]" in response_text:
