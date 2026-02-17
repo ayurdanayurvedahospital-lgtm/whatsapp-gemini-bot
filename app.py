@@ -113,6 +113,9 @@ def get_order_status(identifier):
             status = order.get('fulfillment_status')
             order_name = order.get('name', '')
 
+            # Use logging.info (equivalent to print in this context)
+            logging.info(f"DEBUG: Order {order_name} status is: {status}")
+
             contact_info = "\n\nPlease contact this number 919526530900 (9:30 am to 5 pm) if you have any queries in tracking details."
 
             if status == 'fulfilled':
