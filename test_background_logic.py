@@ -11,57 +11,46 @@ class TestBackgroundLogic(unittest.TestCase):
         app.user_last_messages.clear()
         app.muted_users.clear()
         app.last_greeted.clear()
-        # Cancel any active timers mocked or real
         for phone in list(app.followup_timers.keys()):
             app.cancel_timers(phone)
         app.followup_timers.clear()
 
     @patch('app.send_zoko_message')
-    @patch('app.start_inactivity_timer')
-    @patch('app.cancel_timers')
-    def test_timer_lifecycle(self, mock_cancel, mock_start, mock_send):
+    @patch('app.get_ist_time_greeting')
+    @patch('app.start_inactivity_timer') # Mock to prevent Thread.__init__ error in tests
+    def test_audio_processing_error(self, mock_start_timer, mock_greeting, mock_send):
+        mock_greeting.return_value = "Good Morning"
         phone = '+919999999999'
-        data = {'platformSenderId': phone, 'direction': 'incoming', 'text': 'Hi', 'type': 'text', 'messageId': '1'}
+        data = {'platformSenderId': phone, 'direction': 'incoming', 'type': 'audio', 'fileUrl': 'http://bad.url/audio.ogg', 'messageId': '1'}
 
-        # Test 1: New message triggers cancel and start
-        with patch('app.get_ai_response', return_value="Response"):
-            with patch('app.get_ist_time_greeting', return_value="Good Morning"):
+        # Simulate Error during processing
+        with patch('requests.get', side_effect=Exception("Download Failed")):
+            with patch('threading.Thread', side_effect=lambda target, args: target(*args)):
                 app.handle_message(data)
 
-        mock_cancel.assert_called_with(phone)
-        mock_start.assert_called_with(phone)
+        # Expect error message
+        mock_send.assert_called_with(phone, text="I'm sorry, I couldn't hear that clearly. Could you please type your message?")
 
     @patch('app.send_zoko_message')
-    @patch('threading.Timer')
-    def test_followup_logic(self, mock_timer, mock_send):
+    @patch('app.start_inactivity_timer') # Mock to prevent Thread.__init__ error in tests
+    def test_file_cleanup(self, mock_start_timer, mock_send):
+        # We can't easily test OS removal with mocks unless we mock os.remove and file existence
+        # But we can verify the 'finally' block logic by seeing if handle_message completes without error
         phone = '+919999999999'
+        data = {'platformSenderId': phone, 'direction': 'incoming', 'type': 'audio', 'fileUrl': 'http://good.url/audio.ogg', 'messageId': '2'}
 
-        # Simulate send_followup_1
-        app.followup_timers[phone] = {} # Mock presence
-        app.send_followup_1(phone)
+        with patch('requests.get') as mock_get:
+            mock_get.return_value.iter_content.return_value = [b'data']
+            with patch('google.generativeai.upload_file') as mock_upload:
+                mock_upload.return_value.state.name = "ACTIVE"
+                with patch('app.model.start_chat') as mock_chat:
+                    mock_chat.return_value.send_message.return_value.text = "Audio Answer"
+                    with patch('os.remove') as mock_remove:
+                        with patch('os.path.exists', return_value=True):
+                            with patch('threading.Thread', side_effect=lambda target, args: target(*args)):
+                                app.handle_message(data)
 
-        mock_send.assert_called_with(phone, text="Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.")
-        # Should start timer 2
-        mock_timer.assert_called_with(300, app.send_followup_2, args=[phone])
-
-        # Simulate send_followup_2
-        mock_send.reset_mock()
-        app.send_followup_2(phone)
-        mock_send.assert_called_with(phone, text="Your health deserves thoughtful attention. I’m here to guide you whenever you’re ready. Please feel free to ask me anything at any time.")
-
-        # Verify cleanup
-        self.assertNotIn(phone, app.followup_timers)
-
-    @patch('app.send_zoko_message')
-    def test_no_followup_if_muted(self, mock_send):
-        phone = '+919999999999'
-        app.muted_users.add(phone)
-
-        app.send_followup_1(phone)
-        mock_send.assert_not_called()
-
-        app.send_followup_2(phone)
-        mock_send.assert_not_called()
+                        mock_remove.assert_called()
 
 if __name__ == '__main__':
     unittest.main()

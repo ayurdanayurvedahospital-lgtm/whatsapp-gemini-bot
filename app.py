@@ -236,7 +236,7 @@ def check_stop_bot(phone):
 
 def process_audio(file_url, sender_phone):
     """
-    Process audio file via Gemini.
+    Process audio file via Gemini with robust error handling.
     """
     local_filename = None
     try:
@@ -249,33 +249,43 @@ def process_audio(file_url, sender_phone):
                 local_filename = tmp.name
 
         logging.info("Uploading Audio to Gemini...")
-        myfile = genai.upload_file(local_filename, mime_type='audio/ogg')
 
-        while myfile.state.name == "PROCESSING":
-            time.sleep(1)
-            myfile = genai.get_file(myfile.name)
+        try:
+            myfile = genai.upload_file(local_filename, mime_type='audio/ogg')
 
-        if myfile.state.name == "FAILED":
-            raise ValueError("Audio processing failed in Gemini.")
+            while myfile.state.name == "PROCESSING":
+                time.sleep(1)
+                myfile = genai.get_file(myfile.name)
 
-        greeting = get_ist_time_greeting()
+            if myfile.state.name == "FAILED":
+                raise ValueError("Audio processing failed in Gemini.")
 
-        history = user_sessions.get(sender_phone, [])
-        chat = model.start_chat(history=[
-            {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
-        ] + history)
+            greeting = get_ist_time_greeting()
 
-        prompt = f"Listen to this audio. You are AIVA. Current Time Greeting: {greeting}. Answer as a consultant."
-        response = chat.send_message([myfile, prompt])
-        return response.text
+            history = user_sessions.get(sender_phone, [])
+            chat = model.start_chat(history=[
+                {"role": "user", "parts": [SYSTEM_PROMPT]},
+                {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
+            ] + history)
+
+            prompt = f"Listen to this audio. You are AIVA. Current Time Greeting: {greeting}. Answer as a consultant."
+            response = chat.send_message([myfile, prompt])
+            return response.text
+
+        except Exception as e:
+            logging.error(f"Gemini Audio API Error: {e}")
+            return "I'm sorry, I couldn't hear that clearly. Could you please type your message?"
 
     except Exception as e:
-        logging.error(f"Audio Process Error: {e}")
-        return "Sorry, I could not process your voice note."
+        logging.error(f"Audio Download/Process Error: {e}")
+        return "I'm sorry, I couldn't hear that clearly. Could you please type your message?"
     finally:
         if local_filename and os.path.exists(local_filename):
-            os.remove(local_filename)
+            try:
+                os.remove(local_filename)
+                logging.info(f"Cleaned up temp file: {local_filename}")
+            except Exception as e:
+                logging.error(f"Failed to cleanup temp file: {e}")
 
 def get_ai_response(sender_phone, message_text, history):
     try:
@@ -436,7 +446,6 @@ def handle_message(payload):
                 send_zoko_message(sender_phone, text=response_text)
 
             # Start timer after bot replies (expecting user follow-up)
-            # Unless handover happened (muted_users would prevent follow-up sending anyway, but good to check)
             if sender_phone not in muted_users:
                 start_inactivity_timer(sender_phone)
 
