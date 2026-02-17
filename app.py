@@ -371,9 +371,18 @@ def get_ai_response(sender_phone, message_text, history):
     try:
         greeting = get_ist_time_greeting()
 
+        # Check if user wants to switch language (basic heuristic to override greeting bias)
+        is_language_request = any(lang in message_text.lower() for lang in ["malayalam", "tamil", "hindi", "english"])
+
+        system_instruction = SYSTEM_PROMPT
+        model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}."
+
+        if is_language_request:
+            model_ack += " I will prioritize the Language Switch Protocol."
+
         chat_history = [
-            {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
+            {"role": "user", "parts": [system_instruction]},
+            {"role": "model", "parts": [model_ack]}
         ] + history
 
         chat = model.start_chat(history=chat_history)
