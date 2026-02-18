@@ -12,6 +12,19 @@ from datetime import datetime
 import pytz
 from flask import Flask, request, jsonify
 
+# Configure basic logging for local/dev use
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+app = Flask(__name__)
+
+# Link Flask logger to Gunicorn logger if running under Gunicorn
+if __name__ != '__main__':
+    gunicorn_logger = logging.getLogger('gunicorn.error')
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
+
+logging.info("App Starting...")
+
 # Import modularized data and prompt
 try:
     from knowledge_base_data import AGENTS, PRODUCT_IMAGES, LINKS, GOOGLE_FORM_URL, FORM_FIELDS
@@ -24,11 +37,6 @@ except ImportError as e:
     SYSTEM_PROMPT = "You are AIVA."
 
 # --- CONFIGURATION ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-app = Flask(__name__)
-
-# API Keys
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ZOKO_API_KEY = os.environ.get("ZOKO_API_KEY")
 
@@ -38,7 +46,10 @@ SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID")
 SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET")
 
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        logging.error(f"Gemini Configure Error: {e}")
 else:
     logging.warning("GEMINI_API_KEY not set!")
 
@@ -397,6 +408,9 @@ def process_audio(file_url, sender_phone):
 
 def get_ai_response(sender_phone, message_text, history):
     try:
+        if not model:
+            return "I am currently undergoing maintenance. Please try again later."
+
         greeting = get_ist_time_greeting()
         current_time_str = get_current_time_str()
 
