@@ -228,7 +228,7 @@ def send_zoko_message(phone, text=None, image_url=None, caption=None):
                 "recipient": recipient,
                 "type": "image",
                 "url": image_url,
-                "caption": img_caption
+                "message": img_caption
             }
             logging.info(f"Sending Image to {recipient} with caption: {img_caption}")
             resp = requests.post(url, json=payload, headers=headers, timeout=10)
