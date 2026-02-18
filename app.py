@@ -176,6 +176,16 @@ def get_ist_time_greeting():
         logging.error(f"Time Error: {e}")
         return "Hello"
 
+def get_current_time_str():
+    """Returns formatted current time string in IST (e.g. '10:30 PM')"""
+    try:
+        ist = pytz.timezone('Asia/Kolkata')
+        now = datetime.now(ist)
+        return now.strftime("%I:%M %p")
+    except Exception as e:
+        logging.error(f"Time Str Error: {e}")
+        return "Unknown Time"
+
 def send_zoko_message(phone, text=None, image_url=None, caption=None):
     """
     Sends message to Zoko. Handles Text vs Image split logic.
@@ -358,6 +368,7 @@ def process_audio(file_url, sender_phone):
                 raise ValueError("Audio processing failed in Gemini.")
 
             greeting = get_ist_time_greeting()
+            current_time_str = get_current_time_str()
 
             history = user_sessions.get(sender_phone, [])
             chat = model.start_chat(history=[
@@ -365,7 +376,7 @@ def process_audio(file_url, sender_phone):
                 {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
             ] + history)
 
-            prompt = f"Listen to this audio. You are AIVA. Current Time Greeting: {greeting}. Answer as a consultant."
+            prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
             response = chat.send_message([myfile, prompt])
             return response.text
 
@@ -387,12 +398,16 @@ def process_audio(file_url, sender_phone):
 def get_ai_response(sender_phone, message_text, history):
     try:
         greeting = get_ist_time_greeting()
+        current_time_str = get_current_time_str()
 
         # Check if user wants to switch language (basic heuristic to override greeting bias)
         is_language_request = any(lang in message_text.lower() for lang in ["malayalam", "tamil", "hindi", "english"])
 
         system_instruction = SYSTEM_PROMPT
-        model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}."
+        # Inject context into the model's 'memory' of the system instruction or as immediate context
+        context_injection = f" Current time in Kerala is {current_time_str}."
+
+        model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection}"
 
         if is_language_request:
             model_ack += " I will prioritize the Language Switch Protocol."
@@ -536,7 +551,7 @@ def handle_message(payload):
 
         if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
-            greeting_msg = f"{time_greeting}! ☀️ I am AIVA, the Senior Ayurvedic Expert at Ayurdan Ayurveda Hospital. I am here to understand your health concerns and guide you to the right solution. You can type your message or send a Voice Note. How may I help you today? 🌿"
+            greeting_msg = f"{time_greeting}! ☀️ I am AIVA, the Senior Ayurvedic Expert at Ayurdan Ayurveda Hospital. I am here to understand your health concerns and guide you to the right solution. You can type your message or send a Voice Note in any *language*. How may I help you today? 🌿"
             send_zoko_message(sender_phone, text=greeting_msg)
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
