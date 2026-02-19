@@ -198,7 +198,9 @@ def get_current_time_str():
         return "Unknown Time"
 
 def send_whatsapp_message(to_number, message_text, message_type="text", image_url=None):
+    # FIX: Removed the leading space in the URL
     url = "https://chatapi.zoko.io/v2/message"
+
     headers = {
         "apikey": os.environ.get("ZOKO_API_KEY"),
         "Content-Type": "application/json"
@@ -213,7 +215,7 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
         }
 
     elif message_type == "image":
-        # FIX: The API explicitly demands the key 'message' for the caption, NOT 'caption'.
+        # FIX: Ensure 'message' key is used for captions (not 'caption')
         payload = {
             "channel": "whatsapp",
             "recipient": to_number,
@@ -224,7 +226,7 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
 
     try:
         response = requests.post(url, json=payload, headers=headers)
-        print(f"INFO - Sent {message_type} to {to_number}: {response.status_code}")
+        print(f"INFO - Sent {message_type}: {response.status_code}")
         return response.json()
     except Exception as e:
         print(f"ERROR - Failed to send message: {e}")
