@@ -199,7 +199,7 @@ def get_current_time_str():
 
 def send_whatsapp_message(to_number, message_text, message_type="text", image_url=None):
     # FIX: Removed the leading space in the URL
-    url = "https://chatapi.zoko.io/v2/message"
+    url = "https://chat.zoko.io/v2/message"
 
     headers = {
         "apikey": os.environ.get("ZOKO_API_KEY"),
@@ -216,20 +216,31 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
 
     elif message_type == "image":
         # FIX: Ensure 'message' key is used for captions (not 'caption')
-        payload = {
-            "channel": "whatsapp",
-            "recipient": to_number,
-            "type": "image",
-            "url": image_url,
-            "message": message_text if message_text else "Here is the image."
-        }
+        if not image_url or not image_url.startswith("http"):
+            logging.warning(f"Invalid image URL: {image_url}. Falling back to text.")
+            payload = {
+                "channel": "whatsapp",
+                "recipient": to_number,
+                "type": "text",
+                "message": message_text if message_text else "Image unavailable."
+            }
+        else:
+            payload = {
+                "channel": "whatsapp",
+                "recipient": to_number,
+                "type": "image",
+                "url": image_url,
+                "message": message_text if message_text else "Here is the image."
+            }
 
     try:
         response = requests.post(url, json=payload, headers=headers)
-        print(f"INFO - Sent {message_type}: {response.status_code}")
+        logging.info(f"Sent {message_type}: {response.status_code}")
+        if response.status_code >= 400:
+             logging.error(f"Zoko API Error: {response.text}")
         return response.json()
     except Exception as e:
-        print(f"ERROR - Failed to send message: {e}")
+        logging.error(f"Failed to send message: {e}")
         return None
 
 def cancel_timers(phone):
