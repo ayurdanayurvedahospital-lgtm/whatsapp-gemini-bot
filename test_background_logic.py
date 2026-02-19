@@ -15,7 +15,7 @@ class TestBackgroundLogic(unittest.TestCase):
             app.cancel_timers(phone)
         app.followup_timers.clear()
 
-    @patch('app.send_zoko_message')
+    @patch('app.send_whatsapp_message')
     @patch('app.get_ist_time_greeting')
     @patch('app.start_inactivity_timer') # Mock to prevent Thread.__init__ error in tests
     def test_audio_processing_error(self, mock_start_timer, mock_greeting, mock_send):
@@ -28,10 +28,11 @@ class TestBackgroundLogic(unittest.TestCase):
             with patch('threading.Thread', side_effect=lambda target, args: target(*args)):
                 app.handle_message(data)
 
-        # Expect error message
-        mock_send.assert_called_with(phone, text="I'm sorry, I couldn't hear that clearly. Could you please type your message?")
+        # Expect error message. The phone number will be stripped of + in the call.
+        expected_phone = '919999999999'
+        mock_send.assert_called_with(expected_phone, "I'm sorry, I couldn't hear that clearly. Could you please type your message?", "text")
 
-    @patch('app.send_zoko_message')
+    @patch('app.send_whatsapp_message')
     @patch('app.start_inactivity_timer') # Mock to prevent Thread.__init__ error in tests
     def test_file_cleanup(self, mock_start_timer, mock_send):
         # We can't easily test OS removal with mocks unless we mock os.remove and file existence

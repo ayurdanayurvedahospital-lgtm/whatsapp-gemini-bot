@@ -197,65 +197,38 @@ def get_current_time_str():
         logging.error(f"Time Str Error: {e}")
         return "Unknown Time"
 
-def send_zoko_message(phone, text=None, image_url=None, caption=None):
-    """
-    Sends message to Zoko. Handles Text vs Image split logic.
-    Always sends image first if available.
-    """
-    if not ZOKO_API_KEY:
-        logging.warning("Skipping Zoko Send: API Key missing")
-        return
-
-    if not text and not image_url:
-        return
-
-    # Crucial Fix: Clean phone number
-    recipient = phone.replace("+", "")
-    url = "https://chat.zoko.io/v2/message"
+def send_whatsapp_message(to_number, message_text, message_type="text", image_url=None):
+    url = "https://chatapi.zoko.io/v2/message"
     headers = {
-        'apikey': ZOKO_API_KEY,
-        'Content-Type': 'application/json'
+        "apikey": os.environ.get("ZOKO_API_KEY"),
+        "Content-Type": "application/json"
     }
 
-    # Send Image First if exists
-    if image_url:
-        try:
-            # Ensure caption is present
-            img_caption = caption if caption else "Ayurdan Ayurveda"
+    if message_type == "text":
+        payload = {
+            "channel": "whatsapp",
+            "recipient": to_number,
+            "type": "text",
+            "message": message_text
+        }
 
-            payload = {
-                "channel": "whatsapp",
-                "recipient": recipient,
-                "type": "image",
-                "url": image_url,
-                "message": img_caption
-            }
-            logging.info(f"Sending Image to {recipient} with caption: {img_caption}")
-            resp = requests.post(url, json=payload, headers=headers, timeout=10)
-            if resp.status_code != 200:
-                logging.error(f"Image Send Failed: {resp.status_code} - {resp.text}")
-            else:
-                logging.info(f"Image Sent: {resp.status_code}")
-                time.sleep(1) # Wait 1 second
-        except Exception as e:
-            # Robust Image Sending: Log error but DO NOT CRASH. Proceed to text.
-            logging.error(f"Failed to send image (Exception): {e}")
+    elif message_type == "image":
+        # FIX: The API explicitly demands the key 'message' for the caption, NOT 'caption'.
+        payload = {
+            "channel": "whatsapp",
+            "recipient": to_number,
+            "type": "image",
+            "url": image_url,
+            "message": message_text if message_text else "Here is the image."
+        }
 
-    # Send Text if exists
-    if text:
-        try:
-            payload = {
-                'channel': 'whatsapp',
-                'recipient': recipient,
-                'type': 'text',
-                'message': text
-            }
-            logging.info(f"Sending Text to {recipient}")
-            resp = requests.post(url, json=payload, headers=headers, timeout=10)
-            resp.raise_for_status()
-            logging.info(f"Text Sent: {resp.status_code}")
-        except Exception as e:
-            logging.error(f"Failed to send text: {e}")
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"INFO - Sent {message_type} to {to_number}: {response.status_code}")
+        return response.json()
+    except Exception as e:
+        print(f"ERROR - Failed to send message: {e}")
+        return None
 
 def cancel_timers(phone):
     """Cancels any pending inactivity timers for a user."""
@@ -276,7 +249,7 @@ def send_followup_1(phone):
         return
 
     logging.info(f"Sending Follow-up 1 to {phone}")
-    send_zoko_message(phone, text="Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.")
+    send_whatsapp_message(phone.replace("+", ""), "Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.", "text")
 
     # Start Timer 2 (5 mins from now)
     t = threading.Timer(300, send_followup_2, args=[phone]) # 5 mins = 300s
@@ -291,7 +264,7 @@ def send_followup_2(phone):
         return
 
     logging.info(f"Sending Follow-up 2 to {phone}")
-    send_zoko_message(phone, text="Your health deserves thoughtful attention. I’m here to guide you whenever you’re ready. Please feel free to ask me anything at any time.")
+    send_whatsapp_message(phone.replace("+", ""), "Your health deserves thoughtful attention. I’m here to guide you whenever you’re ready. Please feel free to ask me anything at any time.", "text")
 
     # Clean up
     if phone in followup_timers:
@@ -483,9 +456,9 @@ def handle_message(payload):
             if sender_phone in muted_users:
                 muted_users.discard(sender_phone)
                 logging.info(f"Bot resumed for {sender_phone} via 'START BOT' command.")
-                send_zoko_message(sender_phone, text="Bot resumed. How can I help?")
+                send_whatsapp_message(sender_phone.replace("+", ""), "Bot resumed. How can I help?", "text")
             else:
-                send_zoko_message(sender_phone, text="Bot is already active. How can I help?")
+                send_whatsapp_message(sender_phone.replace("+", ""), "Bot is already active. How can I help?", "text")
 
             # Start timer after resuming
             start_inactivity_timer(sender_phone)
@@ -504,7 +477,7 @@ def handle_message(payload):
         if text_body and text_body.strip().upper() == "STOP BOT":
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             muted_users.add(sender_phone)
-            send_zoko_message(sender_phone, text="Bot has been stopped for this chat.")
+            send_whatsapp_message(sender_phone.replace("+", ""), "Bot has been stopped for this chat.", "text")
             return
 
         # Loop Prevention
@@ -526,14 +499,14 @@ def handle_message(payload):
             potential_id = "".join(filter(str.isdigit, text_body))
             if len(potential_id) > 3:
                  status_msg = get_order_status(potential_id)
-                 send_zoko_message(sender_phone, text=status_msg)
+                 send_whatsapp_message(sender_phone.replace("+", ""), status_msg, "text")
                  # Reset state (Pivot back to AIVA implicitly)
                  user_order_state[sender_phone] = False
                  return
             else:
                  # Ask for details
                  user_order_state[sender_phone] = True
-                 send_zoko_message(sender_phone, text="Please enter the *Mobile Number* used for the order or your *Order Number*.")
+                 send_whatsapp_message(sender_phone.replace("+", ""), "Please enter the *Mobile Number* used for the order or your *Order Number*.", "text")
                  return
 
         # Case B: User is in Tracking Mode (waiting for input)
@@ -548,7 +521,7 @@ def handle_message(payload):
             else:
                 # Treat as Order ID/Phone
                 status_msg = get_order_status(text_body)
-                send_zoko_message(sender_phone, text=status_msg)
+                send_whatsapp_message(sender_phone.replace("+", ""), status_msg, "text")
                 user_order_state[sender_phone] = False
 
                 # Check if we should pivot back explicitly?
@@ -566,7 +539,7 @@ def handle_message(payload):
         if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
             greeting_msg = f"{time_greeting} I am AIVA, the Senior Ayurvedic Expert at Ayurdan Ayurveda Hospital. I am here to understand your health concerns and guide you to the right solution. You can type your message or send a Voice Note in *Any Language*. How may I help you today? 🌿"
-            send_zoko_message(sender_phone, text=greeting_msg)
+            send_whatsapp_message(sender_phone.replace("+", ""), greeting_msg, "text")
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
 
@@ -586,12 +559,12 @@ def handle_message(payload):
                 if key in lower_msg:
                     found_image_url = url
                     product_name = key.replace('_', ' ').title()
-                    send_zoko_message(sender_phone, image_url=found_image_url, caption=product_name)
+                    send_whatsapp_message(sender_phone.replace("+", ""), product_name, "image", image_url=found_image_url)
                     break
 
         # Audio vs Text Logic
         if msg_type == "audio" and file_url:
-            send_zoko_message(sender_phone, text="Listening... 🎧")
+            send_whatsapp_message(sender_phone.replace("+", ""), "Listening... 🎧", "text")
             response_text = process_audio(file_url, sender_phone)
         elif text_body or msg_type == "text":
             if sender_phone not in user_sessions:
@@ -611,14 +584,14 @@ def handle_message(payload):
             if "[HANDOVER]" in response_text:
                 clean_text = response_text.replace("[HANDOVER]", "").strip()
                 if clean_text:
-                    send_zoko_message(sender_phone, text=clean_text)
+                    send_whatsapp_message(sender_phone.replace("+", ""), clean_text, "text")
 
-                send_zoko_message(sender_phone, text="📞 You can contact our Expert Sreelekha directly at +91 9895900809.")
+                send_whatsapp_message(sender_phone.replace("+", ""), "📞 You can contact our Expert Sreelekha directly at +91 9895900809.", "text")
 
                 muted_users.add(sender_phone)
                 logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
             else:
-                send_zoko_message(sender_phone, text=response_text)
+                send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
 
             # Start timer after bot replies (expecting user follow-up)
             if sender_phone not in muted_users:

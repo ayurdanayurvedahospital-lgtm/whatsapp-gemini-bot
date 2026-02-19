@@ -6,7 +6,7 @@ class TestZokoLoop(unittest.TestCase):
     def setUp(self):
         app.user_sessions.clear()
 
-    @patch('app.send_zoko_message')
+    @patch('app.send_whatsapp_message')
     def test_zoko_ignores_own_message(self, mock_send):
         payload = {
             'direction': 'FROM_BUSINESS',
