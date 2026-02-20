@@ -376,8 +376,12 @@ def process_audio(file_url, sender_phone):
             prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
             response = chat.send_message([myfile, prompt])
             reply_text = response.text
-            # Strip internal AI thoughts regardless of language
-            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL).strip()
+            # 1. Strip <think> tags if the AI uses them correctly
+            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL | re.IGNORECASE)
+
+            # 2. Aggressively strip rogue paragraphs that start with "Think:", "തിങ്ക്:", "ദി യൂസർ" or "The user"
+            # This deletes the entire thought paragraph up to the line break where the actual reply begins.
+            reply_text = re.sub(r'^(?:തിങ്ക്|Think|THOUGHT|Thinking|The user|ദി യൂസർ).*?(?:\n|$)', '', reply_text, flags=re.MULTILINE | re.IGNORECASE).strip()
             return reply_text
 
         except Exception as e:
@@ -424,8 +428,12 @@ def get_ai_response(sender_phone, message_text, history):
 
         response = chat.send_message(message_text)
         reply_text = response.text
-        # Strip internal AI thoughts regardless of language
-        reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL).strip()
+        # 1. Strip <think> tags if the AI uses them correctly
+        reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL | re.IGNORECASE)
+
+        # 2. Aggressively strip rogue paragraphs that start with "Think:", "തിങ്ക്:", "ദി യൂസർ" or "The user"
+        # This deletes the entire thought paragraph up to the line break where the actual reply begins.
+        reply_text = re.sub(r'^(?:തിങ്ക്|Think|THOUGHT|Thinking|The user|ദി യൂസർ).*?(?:\n|$)', '', reply_text, flags=re.MULTILINE | re.IGNORECASE).strip()
         return reply_text
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
