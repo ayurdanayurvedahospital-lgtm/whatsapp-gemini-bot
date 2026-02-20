@@ -375,7 +375,10 @@ def process_audio(file_url, sender_phone):
 
             prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
             response = chat.send_message([myfile, prompt])
-            return response.text
+            reply_text = response.text
+            # Strip internal AI thoughts regardless of language
+            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL).strip()
+            return reply_text
 
         except Exception as e:
             logging.error(f"Gemini Audio API Error: {e}")
@@ -420,7 +423,10 @@ def get_ai_response(sender_phone, message_text, history):
         chat = model.start_chat(history=chat_history)
 
         response = chat.send_message(message_text)
-        return response.text
+        reply_text = response.text
+        # Strip internal AI thoughts regardless of language
+        reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL).strip()
+        return reply_text
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
