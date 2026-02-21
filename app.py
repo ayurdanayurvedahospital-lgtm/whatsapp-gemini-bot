@@ -574,9 +574,14 @@ def handle_message(payload):
         # Image Logic
         if text_body:
             lower_msg = text_body.lower()
-            for key, url in PRODUCT_IMAGES.items():
+            for key, val in PRODUCT_IMAGES.items():
                 if key in lower_msg:
-                    found_image_url = url
+                    found_image_url = val
+                    # Extract URL if it's in markdown format [url](url)
+                    match = re.search(r'\((https?://.*?)\)', val)
+                    if match:
+                        found_image_url = match.group(1)
+
                     product_name = key.replace('_', ' ').title()
                     send_whatsapp_message(sender_phone.replace("+", ""), product_name, "image", image_url=found_image_url)
                     break
