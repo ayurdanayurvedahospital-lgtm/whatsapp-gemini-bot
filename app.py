@@ -407,17 +407,9 @@ def get_ai_response(sender_phone, message_text, history):
         greeting = get_ist_time_greeting()
         current_time_str = get_current_time_str()
 
-        # Check if user wants to switch language (basic heuristic to override greeting bias)
-        is_language_request = any(lang in message_text.lower() for lang in ["malayalam", "tamil", "hindi", "english"])
-
         system_instruction = SYSTEM_PROMPT
-        # Inject context into the model's 'memory' of the system instruction or as immediate context
         context_injection = f" Current time in Kerala is {current_time_str}."
-
-        model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection}"
-
-        if is_language_request:
-            model_ack += " I will prioritize the Language Switch Protocol."
+        model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
         chat_history = [
             {"role": "user", "parts": [system_instruction]},
