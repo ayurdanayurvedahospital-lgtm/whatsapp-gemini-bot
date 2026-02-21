@@ -657,6 +657,5 @@ def bot():
 if __name__ == "__main__":
     # Render assigns a random port to the PORT environment variable
     # The app MUST listen on 0.0.0.0 to be accessible
-    # Defaulting to 8080 as it's a standard cloud port
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
