@@ -721,5 +721,5 @@ def bot():
 if __name__ == "__main__":
     # Render assigns a random port to the PORT environment variable
     # The app MUST listen on 0.0.0.0 to be accessible
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
