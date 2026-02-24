@@ -399,6 +399,67 @@ def process_audio(file_url, sender_phone):
             except Exception as e:
                 logging.error(f"Failed to cleanup temp file: {e}")
 
+def process_image(file_url, sender_phone, prompt_text):
+    local_filename = None
+    try:
+        logging.info(f"Downloading Image: {file_url}")
+        with requests.get(file_url, stream=True) as r:
+            r.raise_for_status()
+            ext = ".jpg"
+            if "png" in file_url.lower(): ext = ".png"
+            elif "webp" in file_url.lower(): ext = ".webp"
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                for chunk in r.iter_content(chunk_size=8192):
+                    tmp.write(chunk)
+                local_filename = tmp.name
+
+        logging.info("Uploading Image to Gemini...")
+        try:
+            myfile = genai.upload_file(local_filename)
+            while myfile.state.name == "PROCESSING":
+                time.sleep(1)
+                myfile = genai.get_file(myfile.name)
+
+            if myfile.state.name == "FAILED":
+                raise ValueError("Image processing failed in Gemini.")
+
+            greeting = get_ist_time_greeting()
+            current_time_str = get_current_time_str()
+            history = user_sessions.get(sender_phone, [])
+
+            chat = model.start_chat(history=[
+                {"role": "user", "parts": [SYSTEM_PROMPT]},
+                {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
+            ] + history)
+
+            user_prompt = prompt_text if prompt_text else "Please analyze this image regarding my health."
+            full_prompt = f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert."
+
+            response = chat.send_message([myfile, full_prompt])
+
+            try:
+                reply_text = response.text
+            except ValueError:
+                logging.warning(f"Gemini returned an empty image response.")
+                return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
+
+            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL | re.IGNORECASE)
+            reply_text = re.sub(r'^(?:തിങ്ക്|Think|THOUGHT|Thinking|The user|ദി യൂസർ).*?(?:\n|$)', '', reply_text, flags=re.MULTILINE | re.IGNORECASE).strip()
+            return reply_text
+
+        except Exception as e:
+            logging.error(f"Gemini Image API Error: {e}")
+            return "I'm sorry, I couldn't analyze the image properly. Could you please describe it?"
+
+    except Exception as e:
+        logging.error(f"Image Download/Process Error: {e}")
+        return "I'm sorry, I couldn't download the image. Could you please try again?"
+    finally:
+        if local_filename and os.path.exists(local_filename):
+            try:
+                os.remove(local_filename)
+            except Exception: pass
+
 def get_ai_response(sender_phone, message_text, history):
     try:
         if not model:
@@ -586,8 +647,11 @@ def handle_message(payload):
                     send_whatsapp_message(sender_phone.replace("+", ""), product_name, "image", image_url=found_image_url)
                     break
 
-        # Audio vs Text Logic
-        if msg_type == "audio" and file_url:
+        # Image, Audio vs Text Logic
+        if msg_type == "image" and file_url:
+            send_whatsapp_message(sender_phone.replace("+", ""), "Analyzing your image... 👁️", "text")
+            response_text = process_image(file_url, sender_phone, text_body)
+        elif msg_type == "audio" and file_url:
             send_whatsapp_message(sender_phone.replace("+", ""), "Listening... 🎧", "text")
             response_text = process_audio(file_url, sender_phone)
         elif text_body or msg_type == "text":
