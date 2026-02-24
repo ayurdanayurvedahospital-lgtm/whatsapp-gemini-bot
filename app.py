@@ -199,7 +199,7 @@ def get_current_time_str():
 
 def send_whatsapp_message(to_number, message_text, message_type="text", image_url=None):
     # FIX: Removed the leading space in the URL
-    url = "https://chatapi.zoko.io/v2/message"
+    url = "https://chat.zoko.io/v2/message"
 
     headers = {
         "apikey": os.environ.get("ZOKO_API_KEY"),
