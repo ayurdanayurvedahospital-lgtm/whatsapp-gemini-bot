@@ -98,6 +98,11 @@ Then, always end by asking: "How are you planning to take [Insert Product Name] 
 
 *INTERNAL KNOWLEDGE BASE (SOURCE OF TRUTH)*
 
+[HOSPITAL ADDRESS]
+Ayurdan Ayurveda Hospital And Panchakarma Center,
+Valiyakoikkal Temple Road, Near Pandalam Palace, Pandalam
+Kerala State, India 689503
+
 *** PRICING LIST (STRICT - DO NOT DEVIATE) ***
 - Sakhi Tone (500g / 1 bottle / 15 days): ₹795
 - Sakhi Tone (1Kg / 2 bottles / 1 month): ₹1590
