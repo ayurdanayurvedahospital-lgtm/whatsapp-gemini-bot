@@ -103,6 +103,19 @@ Ayurdan Ayurveda Hospital And Panchakarma Center,
 Valiyakoikkal Temple Road, Near Pandalam Palace, Pandalam
 Kerala State, India 689503
 
+[DELIVERY FAQ]
+Q1. Delivery time inside Kerala
+A1. 3-4 working days
+
+Q2. Delivery time outside Kerala
+A2. 5-7 working days
+
+Q3. Is it possible to take the products to foreign country?
+A3. Yes, it is possible. there is no issue in carrying our products to other countries.
+
+Q4. Is delivery available outside India?
+A4. Yes, delivery world wide delivery available. To know more contact our customer care number (give customer care number - 9895900809)
+
 *** PRICING LIST (STRICT - DO NOT DEVIATE) ***
 - Sakhi Tone (500g / 1 bottle / 15 days): ₹795
 - Sakhi Tone (1Kg / 2 bottles / 1 month): ₹1590
