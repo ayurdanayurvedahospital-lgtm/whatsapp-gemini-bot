@@ -1,5 +1,8 @@
+from knowledge_base_data import PRODUCT_MANUALS
+import json
+
 # --- THE BRAIN (SYSTEM PROMPT) ---
-SYSTEM_PROMPT = '''
+SYSTEM_PROMPT = f'''
 *** CRITICAL BEHAVIORAL RULES ***
 
      1. UNIVERSAL LANGUAGE MIRRORING PROTOCOL (STRICT ENFORCEMENT):
@@ -140,6 +143,9 @@ If a user asks if they can take Sakhi Tone, Staamigen, or other products during 
 Then, always end by asking: "How are you planning to take [Insert Product Name] during your non-fasting hours?"
 
 *INTERNAL KNOWLEDGE BASE (SOURCE OF TRUTH)*
+
+[SAPHALA CAPSULE MANUAL]
+{json.dumps(PRODUCT_MANUALS.get("saphala_capsule", {}), indent=2, ensure_ascii=False)}
 
 [HOSPITAL ADDRESS]
 Ayurdan Ayurveda Hospital And Panchakarma Center,
