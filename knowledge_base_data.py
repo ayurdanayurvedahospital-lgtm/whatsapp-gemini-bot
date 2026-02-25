@@ -1,6 +1,6 @@
 # --- CONFIGURATION ---
 AGENTS = [
-    {"name": "Sreelekha", "role": "Senior Consultant", "phone": "+91 9895900809"},
+    {"name": "Aswathy", "role": "Senior Consultant", "phone": "+91 9895900809"},
     {"name": "Savitha", "role": "Support Agent", "phone": "+91 99463 88900"}
 ]
 
