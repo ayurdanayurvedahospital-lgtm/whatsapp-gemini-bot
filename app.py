@@ -8,6 +8,8 @@ import requests
 import flask
 import google.generativeai as genai
 import tempfile
+import io
+import PyPDF2
 from datetime import datetime
 import pytz
 from flask import Flask, request, jsonify
@@ -460,6 +462,32 @@ def process_image(file_url, sender_phone, prompt_text):
                 os.remove(local_filename)
             except Exception: pass
 
+def process_pdf(file_url, sender_phone):
+    try:
+        logging.info(f"Downloading PDF: {file_url}")
+        response = requests.get(file_url)
+        response.raise_for_status()
+
+        with io.BytesIO(response.content) as f:
+            reader = PyPDF2.PdfReader(f)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+
+        if not text.strip():
+            return "I received your document, but I am unable to read its contents. Could you please send it as a clear image or type out the details?"
+
+        logging.info("Extracted text from PDF. Sending to Gemini...")
+
+        prompt = f"The user uploaded a document with this text: {text}. Respond accordingly."
+
+        history = user_sessions.get(sender_phone, [])
+        return get_ai_response(sender_phone, prompt, history)
+
+    except Exception as e:
+        logging.error(f"PDF Processing Error: {e}")
+        return "I received your document, but I am unable to read its contents. Could you please send it as a clear image or type out the details?"
+
 def get_ai_response(sender_phone, message_text, history):
     try:
         if not model:
@@ -647,8 +675,11 @@ def handle_message(payload):
                     send_whatsapp_message(sender_phone.replace("+", ""), product_name, "image", image_url=found_image_url)
                     break
 
-        # Image, Audio vs Text Logic
-        if msg_type == "image" and file_url:
+        # Image, Audio, PDF vs Text Logic
+        if msg_type == "document" and file_url and file_url.lower().endswith(".pdf"):
+            send_whatsapp_message(sender_phone.replace("+", ""), "Reading your document... 📄", "text")
+            response_text = process_pdf(file_url, sender_phone)
+        elif msg_type == "image" and file_url:
             send_whatsapp_message(sender_phone.replace("+", ""), "Analyzing your image... 👁️", "text")
             response_text = process_image(file_url, sender_phone, text_body)
         elif msg_type == "audio" and file_url:
