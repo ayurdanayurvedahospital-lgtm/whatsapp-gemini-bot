@@ -200,7 +200,6 @@ def get_current_time_str():
         return "Unknown Time"
 
 def send_whatsapp_message(to_number, message_text, message_type="text", image_url=None):
-    # FIX: Removed the leading space in the URL
     url = "https://chat.zoko.io/v2/message"
 
     headers = {
@@ -217,7 +216,6 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
         }
 
     elif message_type == "image":
-        # FIX: Ensure 'message' key is used for captions (not 'caption')
         if not image_url or not image_url.startswith("http"):
             logging.warning(f"Invalid image URL: {image_url}. Falling back to text.")
             payload = {
