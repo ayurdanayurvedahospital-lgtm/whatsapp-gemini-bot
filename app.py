@@ -703,7 +703,7 @@ def handle_message(payload):
                 if clean_text:
                     send_whatsapp_message(sender_phone.replace("+", ""), clean_text, "text")
 
-                send_whatsapp_message(sender_phone.replace("+", ""), "📞 You can contact our Expert Aswathy directly at +91 9895900809.", "text")
+                send_whatsapp_message(sender_phone.replace("+", ""), "📞 You can contact our Expert Aswathy directly at +91 9072727201 (Note: Call only, No WhatsApp).", "text")
 
                 muted_users.add(sender_phone)
                 logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
