@@ -218,6 +218,10 @@ Then, always end by asking: "How are you planning to take [Insert Product Name] 
 [SAPHALA CAPSULE MANUAL]
 {json.dumps(PRODUCT_MANUALS.get("saphala_capsule", {}), indent=2, ensure_ascii=False)}
 
+[SAKHITONE USAGE & RESTRICTIONS]
+- BREASTFEEDING MOTHERS: Sakhitone is safe and beneficial for breastfeeding mothers to consume, BUT ONLY IF the baby is strictly above 4 months old. 
+- RESPONSE RULE: If a user asks if they can take Sakhitone while breastfeeding or after delivery, you MUST ask the age of their baby first. If the baby is under 4 months, politely advise them to wait until the baby is older than 4 months before starting Sakhitone.
+
 [HOSPITAL ADDRESS]
 Ayurdan Ayurveda Hospital And Panchakarma Center,
 Valiyakoikkal Temple Road, Near Pandalam Palace, Pandalam
