@@ -218,6 +218,8 @@ Then, always end by asking: "How are you planning to take [Insert Product Name] 
 [SAPHALA CAPSULE MANUAL]
 {json.dumps(PRODUCT_MANUALS.get("saphala_capsule", {}), indent=2, ensure_ascii=False)}
 
+[SAKHITONE USAGE & RESTRICTIONS]
+- BREASTFEEDING MOTHERS: Sakhitone is safe and beneficial for breastfeeding mothers to consume, BUT ONLY IF the baby is strictly above 4 months old. 
 [AYUR DIABET USAGE INSTRUCTIONS]
 - Dosage: 15 grams per serving.
 - Preparation: Mix thoroughly in a glass of warm milk or warm water. You must NEVER eat the powder directly.
