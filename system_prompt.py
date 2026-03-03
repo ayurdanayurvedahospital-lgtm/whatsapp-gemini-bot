@@ -218,6 +218,12 @@ Then, always end by asking: "How are you planning to take [Insert Product Name] 
 [SAPHALA CAPSULE MANUAL]
 {json.dumps(PRODUCT_MANUALS.get("saphala_capsule", {}), indent=2, ensure_ascii=False)}
 
+[AYUR DIABET USAGE INSTRUCTIONS]
+- Dosage: 15 grams per serving.
+- Preparation: Mix thoroughly in a glass of warm milk or warm water. You must NEVER eat the powder directly.
+- Timing: Consume twice a day (Morning and Night).
+- When to take: Exactly half an hour after food.
+
 [HOSPITAL ADDRESS]
 Ayurdan Ayurveda Hospital And Panchakarma Center,
 Valiyakoikkal Temple Road, Near Pandalam Palace, Pandalam
