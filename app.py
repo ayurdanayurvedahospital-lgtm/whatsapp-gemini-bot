@@ -748,6 +748,6 @@ def bot():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    # Render provides the PORT dynamically. Default to 10000 if running locally.
-    port = int(os.environ.get("PORT", 10000))
+    # Most hosts provide PORT dynamically. Default to 8080 for local/container runs.
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
