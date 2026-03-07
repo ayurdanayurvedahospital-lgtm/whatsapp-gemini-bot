@@ -375,14 +375,9 @@ def process_audio(file_url, sender_phone):
 
             prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
             response = chat.send_message([myfile, prompt])
-            reply_text = response.text
-            # 1. Strip <think> tags if the AI uses them correctly
-            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL | re.IGNORECASE)
-
-            # 2. Aggressively strip rogue paragraphs that start with "Think:", "തിങ്ക്:", "ദി യൂസർ" or "The user"
-            # This deletes the entire thought paragraph up to the line break where the actual reply begins.
-            reply_text = re.sub(r'^(?:തിങ്ക്|Think|THOUGHT|Thinking|The user|ദി യൂസർ).*?(?:\n|$)', '', reply_text, flags=re.MULTILINE | re.IGNORECASE).strip()
-            return reply_text
+            raw_gemini_text = response.text
+            clean_message = re.sub(r'<think>.*?</think>', '', raw_gemini_text, flags=re.DOTALL).strip()
+            return clean_message
 
         except Exception as e:
             logging.error(f"Gemini Audio API Error: {e}")
@@ -438,14 +433,13 @@ def process_image(file_url, sender_phone, prompt_text):
             response = chat.send_message([myfile, full_prompt])
 
             try:
-                reply_text = response.text
+                raw_gemini_text = response.text
             except ValueError:
                 logging.warning(f"Gemini returned an empty image response.")
                 return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
 
-            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL | re.IGNORECASE)
-            reply_text = re.sub(r'^(?:തിങ്ക്|Think|THOUGHT|Thinking|The user|ദി യൂസർ).*?(?:\n|$)', '', reply_text, flags=re.MULTILINE | re.IGNORECASE).strip()
-            return reply_text
+            clean_message = re.sub(r'<think>.*?</think>', '', raw_gemini_text, flags=re.DOTALL).strip()
+            return clean_message
 
         except Exception as e:
             logging.error(f"Gemini Image API Error: {e}")
@@ -506,14 +500,9 @@ def get_ai_response(sender_phone, message_text, history):
         chat = model.start_chat(history=chat_history)
 
         response = chat.send_message(message_text)
-        reply_text = response.text
-        # 1. Strip <think> tags if the AI uses them correctly
-        reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL | re.IGNORECASE)
-
-        # 2. Aggressively strip rogue paragraphs that start with "Think:", "തിങ്ക്:", "ദി യൂസർ" or "The user"
-        # This deletes the entire thought paragraph up to the line break where the actual reply begins.
-        reply_text = re.sub(r'^(?:തിങ്ക്|Think|THOUGHT|Thinking|The user|ദി യൂസർ).*?(?:\n|$)', '', reply_text, flags=re.MULTILINE | re.IGNORECASE).strip()
-        return reply_text
+        raw_gemini_text = response.text
+        clean_message = re.sub(r'<think>.*?</think>', '', raw_gemini_text, flags=re.DOTALL).strip()
+        return clean_message
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
