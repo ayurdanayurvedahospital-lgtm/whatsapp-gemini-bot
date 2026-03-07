@@ -400,11 +400,19 @@ def process_audio(file_url, sender_phone):
 
             prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
             response = chat.send_message([myfile, prompt])
+            raw_msg = response.text
+
+            # THE HARD DELIMITER SPLIT
+            if "===FINAL_MESSAGE===" in raw_msg:
+                clean_msg = raw_msg.split("===FINAL_MESSAGE===")[-1].strip()
+            else:
+                paragraphs = raw_msg.strip().split("\n\n")
+                clean_msg = paragraphs[-1].strip()
             raw_message = response.text
 
             clean_message = panic_mode_clean_response(raw_message)
 
-            return clean_message
+            return clean_msg
 
         except Exception as e:
             logging.error(f"Gemini Audio API Error: {e}")
@@ -460,14 +468,20 @@ def process_image(file_url, sender_phone, prompt_text):
             response = chat.send_message([myfile, full_prompt])
 
             try:
-                raw_message = response.text
+                raw_msg = response.text
             except ValueError:
                 logging.warning(f"Gemini returned an empty image response.")
                 return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
 
+            # THE HARD DELIMITER SPLIT
+            if "===FINAL_MESSAGE===" in raw_msg:
+                clean_msg = raw_msg.split("===FINAL_MESSAGE===")[-1].strip()
+            else:
+                paragraphs = raw_msg.strip().split("\n\n")
+                clean_msg = paragraphs[-1].strip()
             clean_message = panic_mode_clean_response(raw_message)
 
-            return clean_message
+            return clean_msg
 
         except Exception as e:
             logging.error(f"Gemini Image API Error: {e}")
@@ -528,11 +542,19 @@ def get_ai_response(sender_phone, message_text, history):
         chat = model.start_chat(history=chat_history)
 
         response = chat.send_message(message_text)
+        raw_msg = response.text
+
+        # THE HARD DELIMITER SPLIT
+        if "===FINAL_MESSAGE===" in raw_msg:
+            clean_msg = raw_msg.split("===FINAL_MESSAGE===")[-1].strip()
+        else:
+            paragraphs = raw_msg.strip().split("\n\n")
+            clean_msg = paragraphs[-1].strip()
         raw_message = response.text
 
         clean_message = panic_mode_clean_response(raw_message)
 
-        return clean_message
+        return clean_msg
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
