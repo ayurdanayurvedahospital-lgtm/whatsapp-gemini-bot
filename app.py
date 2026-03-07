@@ -375,8 +375,17 @@ def process_audio(file_url, sender_phone):
 
             prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
             response = chat.send_message([myfile, prompt])
-            raw_gemini_text = response.text
-            clean_message = re.sub(r'<think>.*?</think>', '', raw_gemini_text, flags=re.DOTALL).strip()
+            raw_message = response.text
+
+            # Bulletproof Tag Stripper:
+            if "</think>" in raw_message:
+                clean_message = raw_message.split("</think>")[-1].strip()
+            elif "<think>" in raw_message:
+                parts = raw_message.replace("<think>", "").strip().split("\n\n")
+                clean_message = parts[-1].strip() if len(parts) > 1 else raw_message.replace("<think>", "").strip()
+            else:
+                clean_message = raw_message.strip()
+
             return clean_message
 
         except Exception as e:
@@ -433,12 +442,20 @@ def process_image(file_url, sender_phone, prompt_text):
             response = chat.send_message([myfile, full_prompt])
 
             try:
-                raw_gemini_text = response.text
+                raw_message = response.text
             except ValueError:
                 logging.warning(f"Gemini returned an empty image response.")
                 return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
 
-            clean_message = re.sub(r'<think>.*?</think>', '', raw_gemini_text, flags=re.DOTALL).strip()
+            # Bulletproof Tag Stripper:
+            if "</think>" in raw_message:
+                clean_message = raw_message.split("</think>")[-1].strip()
+            elif "<think>" in raw_message:
+                parts = raw_message.replace("<think>", "").strip().split("\n\n")
+                clean_message = parts[-1].strip() if len(parts) > 1 else raw_message.replace("<think>", "").strip()
+            else:
+                clean_message = raw_message.strip()
+
             return clean_message
 
         except Exception as e:
@@ -500,8 +517,17 @@ def get_ai_response(sender_phone, message_text, history):
         chat = model.start_chat(history=chat_history)
 
         response = chat.send_message(message_text)
-        raw_gemini_text = response.text
-        clean_message = re.sub(r'<think>.*?</think>', '', raw_gemini_text, flags=re.DOTALL).strip()
+        raw_message = response.text
+
+        # Bulletproof Tag Stripper:
+        if "</think>" in raw_message:
+            clean_message = raw_message.split("</think>")[-1].strip()
+        elif "<think>" in raw_message:
+            parts = raw_message.replace("<think>", "").strip().split("\n\n")
+            clean_message = parts[-1].strip() if len(parts) > 1 else raw_message.replace("<think>", "").strip()
+        else:
+            clean_message = raw_message.strip()
+
         return clean_message
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
