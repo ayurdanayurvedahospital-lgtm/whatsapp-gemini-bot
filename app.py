@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import threading
 import time
@@ -199,31 +200,6 @@ def get_current_time_str():
         logging.error(f"Time Str Error: {e}")
         return "Unknown Time"
 
-def panic_mode_clean_response(raw_msg):
-    """
-    Panic-mode response sanitizer to prevent internal reasoning leaks.
-    """
-    if not raw_msg:
-        return ""
-
-    if "</think>" in raw_msg:
-        # If tags are correctly closed, keep only content after the final close tag.
-        clean_msg = raw_msg.split("</think>")[-1].strip()
-    elif "<think>" in raw_msg:
-        # If think tag is opened but not closed, fallback to last paragraph.
-        parts = raw_msg.split("\n\n")
-        clean_msg = parts[-1].replace("<think>", "").strip()
-    else:
-        # Remove leaked internal headers such as "Identified Error:" variants.
-        lines = raw_msg.split("\n")
-        clean_lines = [
-            line for line in lines
-            if not (line.strip().endswith(":") and len(line.strip()) < 60)
-        ]
-        clean_msg = "\n".join(clean_lines).strip()
-
-    return clean_msg
-
 def send_whatsapp_message(to_number, message_text, message_type="text", image_url=None):
     url = "https://chat.zoko.io/v2/message"
 
@@ -402,15 +378,21 @@ def process_audio(file_url, sender_phone):
             response = chat.send_message([myfile, prompt])
             raw_msg = response.text
 
-            # THE HARD DELIMITER SPLIT
-            if "===FINAL_MESSAGE===" in raw_msg:
-                clean_msg = raw_msg.split("===FINAL_MESSAGE===")[-1].strip()
-            else:
+            # Clean markdown if the LLM accidentally includes it
+            if raw_msg.startswith("```json"):
+                raw_msg = raw_msg[7:-3].strip()
+            elif raw_msg.startswith("```"):
+                raw_msg = raw_msg[3:-3].strip()
+
+            # JSON PARSING
+            try:
+                response_data = json.loads(raw_msg)
+                clean_msg = response_data.get("whatsapp_message", "")
+                if not clean_msg:
+                    clean_msg = raw_msg
+            except json.JSONDecodeError:
                 paragraphs = raw_msg.strip().split("\n\n")
                 clean_msg = paragraphs[-1].strip()
-            raw_message = response.text
-
-            clean_message = panic_mode_clean_response(raw_message)
 
             return clean_msg
 
@@ -473,13 +455,21 @@ def process_image(file_url, sender_phone, prompt_text):
                 logging.warning(f"Gemini returned an empty image response.")
                 return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
 
-            # THE HARD DELIMITER SPLIT
-            if "===FINAL_MESSAGE===" in raw_msg:
-                clean_msg = raw_msg.split("===FINAL_MESSAGE===")[-1].strip()
-            else:
+            # Clean markdown if the LLM accidentally includes it
+            if raw_msg.startswith("```json"):
+                raw_msg = raw_msg[7:-3].strip()
+            elif raw_msg.startswith("```"):
+                raw_msg = raw_msg[3:-3].strip()
+
+            # JSON PARSING
+            try:
+                response_data = json.loads(raw_msg)
+                clean_msg = response_data.get("whatsapp_message", "")
+                if not clean_msg:
+                    clean_msg = raw_msg
+            except json.JSONDecodeError:
                 paragraphs = raw_msg.strip().split("\n\n")
                 clean_msg = paragraphs[-1].strip()
-            clean_message = panic_mode_clean_response(raw_message)
 
             return clean_msg
 
@@ -544,15 +534,21 @@ def get_ai_response(sender_phone, message_text, history):
         response = chat.send_message(message_text)
         raw_msg = response.text
 
-        # THE HARD DELIMITER SPLIT
-        if "===FINAL_MESSAGE===" in raw_msg:
-            clean_msg = raw_msg.split("===FINAL_MESSAGE===")[-1].strip()
-        else:
+        # Clean markdown if the LLM accidentally includes it
+        if raw_msg.startswith("```json"):
+            raw_msg = raw_msg[7:-3].strip()
+        elif raw_msg.startswith("```"):
+            raw_msg = raw_msg[3:-3].strip()
+
+        # JSON PARSING
+        try:
+            response_data = json.loads(raw_msg)
+            clean_msg = response_data.get("whatsapp_message", "")
+            if not clean_msg:
+                clean_msg = raw_msg
+        except json.JSONDecodeError:
             paragraphs = raw_msg.strip().split("\n\n")
             clean_msg = paragraphs[-1].strip()
-        raw_message = response.text
-
-        clean_message = panic_mode_clean_response(raw_message)
 
         return clean_msg
     except Exception as e:
@@ -788,22 +784,7 @@ def bot():
         logging.error(f"Webhook Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-def get_server_port(default=8080):
-    """
-    Resolve the HTTP port from common hosting environment variables.
-    """
-    for key in ("PORT", "WEBSITES_PORT", "SERVER_PORT"):
-        value = os.environ.get(key)
-        if value:
-            try:
-                return int(value)
-            except ValueError:
-                logging.warning(f"Ignoring invalid {key} value: {value}")
-
-    return default
-
-
 if __name__ == '__main__':
-    port = get_server_port()
-    logging.info(f"Starting Flask server on 0.0.0.0:{port}")
+    # Render provides the PORT dynamically. Default to 10000 if running locally.
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
