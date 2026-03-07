@@ -199,6 +199,31 @@ def get_current_time_str():
         logging.error(f"Time Str Error: {e}")
         return "Unknown Time"
 
+def panic_mode_clean_response(raw_msg):
+    """
+    Panic-mode response sanitizer to prevent internal reasoning leaks.
+    """
+    if not raw_msg:
+        return ""
+
+    if "</think>" in raw_msg:
+        # If tags are correctly closed, keep only content after the final close tag.
+        clean_msg = raw_msg.split("</think>")[-1].strip()
+    elif "<think>" in raw_msg:
+        # If think tag is opened but not closed, fallback to last paragraph.
+        parts = raw_msg.split("\n\n")
+        clean_msg = parts[-1].replace("<think>", "").strip()
+    else:
+        # Remove leaked internal headers such as "Identified Error:" variants.
+        lines = raw_msg.split("\n")
+        clean_lines = [
+            line for line in lines
+            if not (line.strip().endswith(":") and len(line.strip()) < 60)
+        ]
+        clean_msg = "\n".join(clean_lines).strip()
+
+    return clean_msg
+
 def send_whatsapp_message(to_number, message_text, message_type="text", image_url=None):
     url = "https://chat.zoko.io/v2/message"
 
@@ -377,14 +402,7 @@ def process_audio(file_url, sender_phone):
             response = chat.send_message([myfile, prompt])
             raw_message = response.text
 
-            # Bulletproof Tag Stripper:
-            if "</think>" in raw_message:
-                clean_message = raw_message.split("</think>")[-1].strip()
-            elif "<think>" in raw_message:
-                parts = raw_message.replace("<think>", "").strip().split("\n\n")
-                clean_message = parts[-1].strip() if len(parts) > 1 else raw_message.replace("<think>", "").strip()
-            else:
-                clean_message = raw_message.strip()
+            clean_message = panic_mode_clean_response(raw_message)
 
             return clean_message
 
@@ -447,14 +465,7 @@ def process_image(file_url, sender_phone, prompt_text):
                 logging.warning(f"Gemini returned an empty image response.")
                 return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
 
-            # Bulletproof Tag Stripper:
-            if "</think>" in raw_message:
-                clean_message = raw_message.split("</think>")[-1].strip()
-            elif "<think>" in raw_message:
-                parts = raw_message.replace("<think>", "").strip().split("\n\n")
-                clean_message = parts[-1].strip() if len(parts) > 1 else raw_message.replace("<think>", "").strip()
-            else:
-                clean_message = raw_message.strip()
+            clean_message = panic_mode_clean_response(raw_message)
 
             return clean_message
 
@@ -519,14 +530,7 @@ def get_ai_response(sender_phone, message_text, history):
         response = chat.send_message(message_text)
         raw_message = response.text
 
-        # Bulletproof Tag Stripper:
-        if "</think>" in raw_message:
-            clean_message = raw_message.split("</think>")[-1].strip()
-        elif "<think>" in raw_message:
-            parts = raw_message.replace("<think>", "").strip().split("\n\n")
-            clean_message = parts[-1].strip() if len(parts) > 1 else raw_message.replace("<think>", "").strip()
-        else:
-            clean_message = raw_message.strip()
+        clean_message = panic_mode_clean_response(raw_message)
 
         return clean_message
     except Exception as e:
