@@ -264,8 +264,8 @@ def send_followup_1(phone):
     logging.info(f"Sending Follow-up 1 to {phone}")
     send_whatsapp_message(phone.replace("+", ""), "Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.", "text")
 
-    # Start Timer 2 (5 mins from now)
-    t = threading.Timer(300, send_followup_2, args=[phone]) # 5 mins = 300s
+    # Start Timer 2 (30 mins from now)
+    t = threading.Timer(1800, send_followup_2, args=[phone]) # 30 mins = 1800s
     t.daemon = True # ensure it doesn't block exit
     if phone in followup_timers: # Check if still relevant
         followup_timers[phone]['t2'] = t
