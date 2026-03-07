@@ -766,7 +766,22 @@ def bot():
         logging.error(f"Webhook Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def get_server_port(default=8080):
+    """
+    Resolve the HTTP port from common hosting environment variables.
+    """
+    for key in ("PORT", "WEBSITES_PORT", "SERVER_PORT"):
+        value = os.environ.get(key)
+        if value:
+            try:
+                return int(value)
+            except ValueError:
+                logging.warning(f"Ignoring invalid {key} value: {value}")
+
+    return default
+
+
 if __name__ == '__main__':
-    # Most hosts provide PORT dynamically. Default to 8080 for local/container runs.
-    port = int(os.environ.get("PORT", 8080))
+    port = get_server_port()
+    logging.info(f"Starting Flask server on 0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port)
