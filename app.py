@@ -272,7 +272,7 @@ def send_followup_1(phone):
         t.start()
 
 def send_followup_2(phone):
-    """Second followup after 5 minutes."""
+    """Second followup after 30 minutes."""
     if phone in muted_users or check_stop_bot(phone):
         return
 
@@ -626,7 +626,7 @@ def handle_message(payload):
 
         if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
-            greeting_msg = f"{time_greeting}! *I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital.*\nPlease share your health concern so I can guide you to the right solution."
+            greeting_msg = f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital.\nPlease share your health concern so I can guide you to the right solution."
             send_whatsapp_message(sender_phone.replace("+", ""), greeting_msg, "text")
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
