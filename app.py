@@ -1,5 +1,4 @@
 import os
-import json
 import logging
 import threading
 import time
@@ -376,25 +375,7 @@ def process_audio(file_url, sender_phone):
 
             prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
             response = chat.send_message([myfile, prompt])
-            raw_msg = response.text
-
-            # Clean markdown if the LLM accidentally includes it
-            if raw_msg.startswith("```json"):
-                raw_msg = raw_msg[7:-3].strip()
-            elif raw_msg.startswith("```"):
-                raw_msg = raw_msg[3:-3].strip()
-
-            # JSON PARSING
-            try:
-                response_data = json.loads(raw_msg)
-                clean_msg = response_data.get("whatsapp_message", "")
-                if not clean_msg:
-                    clean_msg = raw_msg
-            except json.JSONDecodeError:
-                paragraphs = raw_msg.strip().split("\n\n")
-                clean_msg = paragraphs[-1].strip()
-
-            return clean_msg
+            return response.text
 
         except Exception as e:
             logging.error(f"Gemini Audio API Error: {e}")
@@ -450,28 +431,10 @@ def process_image(file_url, sender_phone, prompt_text):
             response = chat.send_message([myfile, full_prompt])
 
             try:
-                raw_msg = response.text
+                return response.text
             except ValueError:
                 logging.warning(f"Gemini returned an empty image response.")
                 return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
-
-            # Clean markdown if the LLM accidentally includes it
-            if raw_msg.startswith("```json"):
-                raw_msg = raw_msg[7:-3].strip()
-            elif raw_msg.startswith("```"):
-                raw_msg = raw_msg[3:-3].strip()
-
-            # JSON PARSING
-            try:
-                response_data = json.loads(raw_msg)
-                clean_msg = response_data.get("whatsapp_message", "")
-                if not clean_msg:
-                    clean_msg = raw_msg
-            except json.JSONDecodeError:
-                paragraphs = raw_msg.strip().split("\n\n")
-                clean_msg = paragraphs[-1].strip()
-
-            return clean_msg
 
         except Exception as e:
             logging.error(f"Gemini Image API Error: {e}")
@@ -532,25 +495,7 @@ def get_ai_response(sender_phone, message_text, history):
         chat = model.start_chat(history=chat_history)
 
         response = chat.send_message(message_text)
-        raw_msg = response.text
-
-        # Clean markdown if the LLM accidentally includes it
-        if raw_msg.startswith("```json"):
-            raw_msg = raw_msg[7:-3].strip()
-        elif raw_msg.startswith("```"):
-            raw_msg = raw_msg[3:-3].strip()
-
-        # JSON PARSING
-        try:
-            response_data = json.loads(raw_msg)
-            clean_msg = response_data.get("whatsapp_message", "")
-            if not clean_msg:
-                clean_msg = raw_msg
-        except json.JSONDecodeError:
-            paragraphs = raw_msg.strip().split("\n\n")
-            clean_msg = paragraphs[-1].strip()
-
-        return clean_msg
+        return response.text
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
