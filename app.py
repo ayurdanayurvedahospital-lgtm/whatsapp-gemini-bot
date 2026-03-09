@@ -6,7 +6,8 @@ import re
 import traceback
 import requests
 import flask
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import tempfile
 import io
 import PyPDF2
@@ -47,13 +48,6 @@ SHOPIFY_DOMAIN = os.environ.get("SHOPIFY_DOMAIN")
 SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID")
 SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET")
 
-if GEMINI_API_KEY:
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-    except Exception as e:
-        logging.error(f"Gemini Configure Error: {e}")
-else:
-    logging.warning("GEMINI_API_KEY not set!")
 
 if not ZOKO_API_KEY:
     logging.warning("ZOKO_API_KEY not set!")
@@ -61,12 +55,15 @@ if not ZOKO_API_KEY:
 if not all([SHOPIFY_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET]):
     logging.warning("Shopify Credentials missing! Order tracking will fail.")
 
-# Initialize Gemini Model
-try:
-    model = genai.GenerativeModel("gemini-2.5-flash")
-except Exception as e:
-    logging.error(f"Failed to initialize Gemini Model: {e}")
-    model = None
+# Initialize Gemini Client
+client = None
+if GEMINI_API_KEY:
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        logging.error(f"Gemini Client Init Error: {e}")
+else:
+    logging.warning("GEMINI_API_KEY not set!")
 
 # --- GLOBAL STATE ---
 user_sessions = {}
@@ -338,6 +335,40 @@ def check_stop_bot(phone):
     stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
     return is_stopped
 
+def call_gemini_with_retry(contents):
+    """
+    Helper to call Gemini with exponential backoff and thinking config.
+    """
+    if not client:
+        return "I am currently undergoing maintenance. Please try again later."
+
+    max_retries = 4
+    for i in range(max_retries):
+        try:
+            config = types.GenerateContentConfig(
+                thinking_config=types.ThinkingConfig(
+                    include_thoughts=False,
+                    thinking_budget=1024
+                )
+            )
+            response = client.models.generate_content(
+                model="gemini-2.5-pro",
+                contents=contents,
+                config=config
+            )
+            return response.text
+        except Exception as e:
+            err_str = str(e).lower()
+            # Retry on 429 (Rate Limit) or 503 (Service Unavailable)
+            if ("429" in err_str or "503" in err_str or "resource_exhausted" in err_str) and i < max_retries - 1:
+                wait_time = 2 ** (i + 1)
+                logging.warning(f"Gemini Rate Limit/Service Error: {e}. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                continue
+            logging.error(f"Gemini Final Error: {e}")
+            # Final Fallback Message
+            return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+
 def process_audio(file_url, sender_phone):
     """
     Process audio file via Gemini with robust error handling.
@@ -355,27 +386,36 @@ def process_audio(file_url, sender_phone):
         logging.info("Uploading Audio to Gemini...")
 
         try:
-            myfile = genai.upload_file(local_filename, mime_type='audio/ogg')
+            myfile = client.files.upload(path=local_filename, config={'mime_type': 'audio/ogg'})
 
-            while myfile.state.name == "PROCESSING":
+            while myfile.state == "PROCESSING":
                 time.sleep(1)
-                myfile = genai.get_file(myfile.name)
+                myfile = client.files.get(name=myfile.name)
 
-            if myfile.state.name == "FAILED":
+            if myfile.state == "FAILED":
                 raise ValueError("Audio processing failed in Gemini.")
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
-
             history = user_sessions.get(sender_phone, [])
-            chat = model.start_chat(history=[
-                {"role": "user", "parts": [SYSTEM_PROMPT]},
-                {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
-            ] + history)
 
-            prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
-            response = chat.send_message([myfile, prompt])
-            return response.text
+            # Construct conversation with history
+            contents = [
+                types.Content(role="user", parts=[types.Part.from_text(SYSTEM_PROMPT)]),
+                types.Content(role="model", parts=[types.Part.from_text(f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
+            ]
+
+            # Map history to types.Content
+            for h in history:
+                role = "user" if h["role"] == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(h["parts"][0])]))
+
+            # Add final audio part and prompt
+            audio_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='audio/ogg')
+            text_part = types.Part.from_text(f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant.")
+            contents.append(types.Content(role="user", parts=[audio_part, text_part]))
+
+            return call_gemini_with_retry(contents)
 
         except Exception as e:
             logging.error(f"Gemini Audio API Error: {e}")
@@ -408,33 +448,33 @@ def process_image(file_url, sender_phone, prompt_text):
 
         logging.info("Uploading Image to Gemini...")
         try:
-            myfile = genai.upload_file(local_filename)
-            while myfile.state.name == "PROCESSING":
+            myfile = client.files.upload(path=local_filename)
+            while myfile.state == "PROCESSING":
                 time.sleep(1)
-                myfile = genai.get_file(myfile.name)
+                myfile = client.files.get(name=myfile.name)
 
-            if myfile.state.name == "FAILED":
+            if myfile.state == "FAILED":
                 raise ValueError("Image processing failed in Gemini.")
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
             history = user_sessions.get(sender_phone, [])
 
-            chat = model.start_chat(history=[
-                {"role": "user", "parts": [SYSTEM_PROMPT]},
-                {"role": "model", "parts": [f"Understood. I am AIVA. Current Time Greeting is: {greeting}."]}
-            ] + history)
+            contents = [
+                types.Content(role="user", parts=[types.Part.from_text(SYSTEM_PROMPT)]),
+                types.Content(role="model", parts=[types.Part.from_text(f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
+            ]
+
+            for h in history:
+                role = "user" if h["role"] == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(h["parts"][0])]))
 
             user_prompt = prompt_text if prompt_text else "Please analyze this image regarding my health."
-            full_prompt = f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert."
+            image_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='image/jpeg') # mime_type is optional/auto
+            text_part = types.Part.from_text(f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert.")
+            contents.append(types.Content(role="user", parts=[image_part, text_part]))
 
-            response = chat.send_message([myfile, full_prompt])
-
-            try:
-                return response.text
-            except ValueError:
-                logging.warning(f"Gemini returned an empty image response.")
-                return "I'm sorry, I couldn't quite process that image. Could you please describe it?"
+            return call_gemini_with_retry(contents)
 
         except Exception as e:
             logging.error(f"Gemini Image API Error: {e}")
@@ -477,9 +517,6 @@ def process_pdf(file_url, sender_phone):
 
 def get_ai_response(sender_phone, message_text, history):
     try:
-        if not model:
-            return "I am currently undergoing maintenance. Please try again later."
-
         greeting = get_ist_time_greeting()
         current_time_str = get_current_time_str()
 
@@ -487,15 +524,18 @@ def get_ai_response(sender_phone, message_text, history):
         context_injection = f" Current time in Kerala is {current_time_str}."
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
-        chat_history = [
-            {"role": "user", "parts": [system_instruction]},
-            {"role": "model", "parts": [model_ack]}
-        ] + history
+        contents = [
+            types.Content(role="user", parts=[types.Part.from_text(system_instruction)]),
+            types.Content(role="model", parts=[types.Part.from_text(model_ack)])
+        ]
 
-        chat = model.start_chat(history=chat_history)
+        for h in history:
+            role = "user" if h["role"] == "user" else "model"
+            contents.append(types.Content(role=role, parts=[types.Part.from_text(h["parts"][0])]))
 
-        response = chat.send_message(message_text)
-        return response.text
+        contents.append(types.Content(role="user", parts=[types.Part.from_text(message_text)]))
+
+        return call_gemini_with_retry(contents)
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
@@ -626,7 +666,7 @@ def handle_message(payload):
 
         if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
-            greeting_msg = f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital.\nPlease share your health concern so I can guide you to the right solution."
+            greeting_msg = f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital. Please share your health concern so I can guide you to the right solution."
             send_whatsapp_message(sender_phone.replace("+", ""), greeting_msg, "text")
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
@@ -685,7 +725,7 @@ def handle_message(payload):
                 if clean_text:
                     send_whatsapp_message(sender_phone.replace("+", ""), clean_text, "text")
 
-                send_whatsapp_message(sender_phone.replace("+", ""), "📞 You can contact our Expert Aswathy directly at +91 9072727201 (Note: Call only, No WhatsApp).", "text")
+                send_whatsapp_message(sender_phone.replace("+", ""), "📞 You can contact our Senior Health Expert directly at +91 9072727201 (Note: Call only, No WhatsApp).", "text")
 
                 muted_users.add(sender_phone)
                 logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
