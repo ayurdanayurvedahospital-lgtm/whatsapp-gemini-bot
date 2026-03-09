@@ -401,18 +401,18 @@ def process_audio(file_url, sender_phone):
 
             # Construct conversation with history
             contents = [
-                types.Content(role="user", parts=[types.Part.from_text(SYSTEM_PROMPT)]),
-                types.Content(role="model", parts=[types.Part.from_text(f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
+                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
+                types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
             # Map history to types.Content
             for h in history:
                 role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(h["parts"][0])]))
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
 
             # Add final audio part and prompt
             audio_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='audio/ogg')
-            text_part = types.Part.from_text(f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant.")
+            text_part = types.Part.from_text(text=f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant.")
             contents.append(types.Content(role="user", parts=[audio_part, text_part]))
 
             return call_gemini_with_retry(contents)
@@ -461,17 +461,17 @@ def process_image(file_url, sender_phone, prompt_text):
             history = user_sessions.get(sender_phone, [])
 
             contents = [
-                types.Content(role="user", parts=[types.Part.from_text(SYSTEM_PROMPT)]),
-                types.Content(role="model", parts=[types.Part.from_text(f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
+                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
+                types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
             for h in history:
                 role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(h["parts"][0])]))
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
 
             user_prompt = prompt_text if prompt_text else "Please analyze this image regarding my health."
             image_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='image/jpeg') # mime_type is optional/auto
-            text_part = types.Part.from_text(f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert.")
+            text_part = types.Part.from_text(text=f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert.")
             contents.append(types.Content(role="user", parts=[image_part, text_part]))
 
             return call_gemini_with_retry(contents)
@@ -525,15 +525,15 @@ def get_ai_response(sender_phone, message_text, history):
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
         contents = [
-            types.Content(role="user", parts=[types.Part.from_text(system_instruction)]),
-            types.Content(role="model", parts=[types.Part.from_text(model_ack)])
+            types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
+            types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
         ]
 
         for h in history:
             role = "user" if h["role"] == "user" else "model"
-            contents.append(types.Content(role=role, parts=[types.Part.from_text(h["parts"][0])]))
+            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
 
-        contents.append(types.Content(role="user", parts=[types.Part.from_text(message_text)]))
+        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
 
         return call_gemini_with_retry(contents)
     except Exception as e:
