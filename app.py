@@ -386,7 +386,7 @@ def process_audio(file_url, sender_phone):
         logging.info("Uploading Audio to Gemini...")
 
         try:
-            myfile = client.files.upload(path=local_filename, config={'mime_type': 'audio/ogg'})
+            myfile = client.files.upload(file=local_filename, config={'mime_type': 'audio/ogg'})
 
             while myfile.state == "PROCESSING":
                 time.sleep(1)
@@ -448,7 +448,7 @@ def process_image(file_url, sender_phone, prompt_text):
 
         logging.info("Uploading Image to Gemini...")
         try:
-            myfile = client.files.upload(path=local_filename)
+            myfile = client.files.upload(file=local_filename)
             while myfile.state == "PROCESSING":
                 time.sleep(1)
                 myfile = client.files.get(name=myfile.name)
@@ -666,7 +666,11 @@ def handle_message(payload):
 
         if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
-            greeting_msg = f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital. Please share your health concern so I can guide you to the right solution."
+            greeting_msg = (
+                f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital.\n"
+                "Please share your health concern in *Any Language* so I can guide you to the right solution.\n\n"
+                "നിങ്ങളുടെ ആരോഗ്യപരമായ എന്ത് ബുദ്ധിമുട്ടുകളും *ഏത് ഭാഷയിലും* ഞങ്ങളോട് പങ്കുവെക്കാവുന്നതാണ് "
+            )
             send_whatsapp_message(sender_phone.replace("+", ""), greeting_msg, "text")
             last_greeted[sender_phone] = current_time
             logging.info(f"Sent 12h greeting to {sender_phone}")
