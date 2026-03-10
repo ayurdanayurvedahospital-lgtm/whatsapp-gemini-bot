@@ -365,6 +365,8 @@ def call_gemini_with_retry(contents):
                 logging.warning(f"Gemini Rate Limit/Service Error: {e}. Retrying in {wait_time}s...")
                 time.sleep(wait_time)
                 continue
+            # Log the exact error to the Render console
+            print(f"CRITICAL SDK ERROR: {str(e)}")
             logging.error(f"Gemini Final Error: {e}")
             # Final Fallback Message
             return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
