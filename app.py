@@ -9,8 +9,6 @@ import flask
 from google import genai
 from google.genai import types
 import tempfile
-import io
-import PyPDF2
 from datetime import datetime
 import pytz
 from flask import Flask, request, jsonify
@@ -376,9 +374,10 @@ def process_audio(file_url, sender_phone):
     Process audio file via Gemini with robust error handling.
     """
     local_filename = None
+    headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading Audio: {file_url}")
-        with requests.get(file_url, stream=True) as r:
+        with requests.get(file_url, stream=True, headers=headers) as r:
             r.raise_for_status()
             with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
                 for chunk in r.iter_content(chunk_size=8192):
@@ -436,9 +435,10 @@ def process_audio(file_url, sender_phone):
 
 def process_image(file_url, sender_phone, prompt_text):
     local_filename = None
+    headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading Image: {file_url}")
-        with requests.get(file_url, stream=True) as r:
+        with requests.get(file_url, stream=True, headers=headers) as r:
             r.raise_for_status()
             ext = ".jpg"
             if "png" in file_url.lower(): ext = ".png"
@@ -492,30 +492,58 @@ def process_image(file_url, sender_phone, prompt_text):
             except Exception: pass
 
 def process_pdf(file_url, sender_phone):
+    local_filename = None
+    headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading PDF: {file_url}")
-        response = requests.get(file_url)
-        response.raise_for_status()
+        with requests.get(file_url, stream=True, headers=headers) as r:
+            r.raise_for_status()
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                for chunk in r.iter_content(chunk_size=8192):
+                    tmp.write(chunk)
+                local_filename = tmp.name
 
-        with io.BytesIO(response.content) as f:
-            reader = PyPDF2.PdfReader(f)
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
+        logging.info("Uploading PDF to Gemini...")
+        try:
+            myfile = client.files.upload(file=local_filename)
+            while myfile.state == "PROCESSING":
+                time.sleep(1)
+                myfile = client.files.get(name=myfile.name)
 
-        if not text.strip():
+            if myfile.state == "FAILED":
+                raise ValueError("PDF processing failed in Gemini.")
+
+            greeting = get_ist_time_greeting()
+            current_time_str = get_current_time_str()
+            history = user_sessions.get(sender_phone, [])
+
+            contents = [
+                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
+                types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
+            ]
+
+            for h in history:
+                role = "user" if h["role"] == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+
+            pdf_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='application/pdf')
+            text_part = types.Part.from_text(text=f"The user uploaded a medical document. Current time in Kerala is {current_time_str}. Please analyze the findings and respond as an expert.")
+            contents.append(types.Content(role="user", parts=[pdf_part, text_part]))
+
+            return call_gemini_with_retry(contents)
+
+        except Exception as e:
+            logging.error(f"Gemini PDF API Error: {e}")
             return "I received your document, but I am unable to read its contents. Could you please send it as a clear image or type out the details?"
 
-        logging.info("Extracted text from PDF. Sending to Gemini...")
-
-        prompt = f"The user uploaded a document with this text: {text}. Respond accordingly."
-
-        history = user_sessions.get(sender_phone, [])
-        return get_ai_response(sender_phone, prompt, history)
-
     except Exception as e:
-        logging.error(f"PDF Processing Error: {e}")
+        logging.error(f"PDF Download/Process Error: {e}")
         return "I received your document, but I am unable to read its contents. Could you please send it as a clear image or type out the details?"
+    finally:
+        if local_filename and os.path.exists(local_filename):
+            try:
+                os.remove(local_filename)
+            except Exception: pass
 
 def get_ai_response(sender_phone, message_text, history):
     try:
