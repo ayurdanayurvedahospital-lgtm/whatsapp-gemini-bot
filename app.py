@@ -390,7 +390,7 @@ def call_gemini_with_retry(contents):
     try:
         # 1. Attempt with Primary Model (Gemini 3 Flash)
         response = client.models.generate_content(
-            model="gemini-3-flash-001",
+            model="gemini-3-flash-preview",
             contents=contents,
             config=flash_config
         )
@@ -408,8 +408,8 @@ def call_gemini_with_retry(contents):
                     config=pro_config
                 )
                 raw_text = response.text
-            except Exception as flash_e:
-                print(f"CRITICAL SDK ERROR (Flash Fallback Failed): {str(flash_e)}")
+            except Exception as pro_e:
+                print(f"CRITICAL SDK ERROR (Pro Fallback Failed): {str(pro_e)}")
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
         else:
             # 3. Handle Other Errors immediately
