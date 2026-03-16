@@ -390,11 +390,17 @@ def call_gemini_with_retry(contents):
         if "429" in err_str or "quota" in err_str:
             print("PRO QUOTA EXCEEDED (429). Falling back to Flash...")
             try:
-                # Nested fallback to Flash
+                # Nested fallback to Flash with native ThinkingConfig
+                flash_config = types.GenerateContentConfig(
+                    thinking_config=types.ThinkingConfig(
+                        include_thoughts=False,
+                        thinking_budget=-1
+                    )
+                )
                 response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=contents,
-                    config=config
+                    config=flash_config
                 )
                 return response.text
             except Exception as flash_e:
