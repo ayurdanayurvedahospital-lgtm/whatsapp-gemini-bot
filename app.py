@@ -75,25 +75,54 @@ last_greeted = {} # phone -> timestamp (tracks last greeting time for 12h rule)
 followup_timers = {} # phone -> {'t1': Timer, 't2': Timer}
 user_order_state = {} # phone -> boolean (True if expecting order details)
 
+# Shopify Token Cache
+shopify_token_cache = {"access_token": None, "expires_at": 0}
+shopify_token_lock = threading.Lock()
+
 # --- HELPER FUNCTIONS ---
 
 def get_shopify_token():
     """
-    Obtains a temporary access token via Client Credentials Flow.
+    Obtains a temporary access token via Client Credentials Flow, with caching.
+    Uses double-checked locking to minimize lock contention.
     """
-    try:
-        url = f"https://{SHOPIFY_DOMAIN}/admin/oauth/access_token"
-        payload = {
-            "client_id": SHOPIFY_CLIENT_ID,
-            "client_secret": SHOPIFY_CLIENT_SECRET,
-            "grant_type": "client_credentials"
-        }
-        resp = requests.post(url, json=payload, timeout=10)
-        resp.raise_for_status()
-        return resp.json().get("access_token")
-    except Exception as e:
-        logging.error(f"Shopify Token Error: {e}")
-        return None
+    global shopify_token_cache
+
+    now = time.time()
+    # Fast path: check without lock
+    if shopify_token_cache["access_token"] and shopify_token_cache["expires_at"] > now + 60:
+        return shopify_token_cache["access_token"]
+
+    with shopify_token_lock:
+        # Second check after acquiring lock
+        now = time.time()
+        if shopify_token_cache["access_token"] and shopify_token_cache["expires_at"] > now + 60:
+            return shopify_token_cache["access_token"]
+
+        try:
+            url = f"https://{SHOPIFY_DOMAIN}/admin/oauth/access_token"
+            payload = {
+                "client_id": SHOPIFY_CLIENT_ID,
+                "client_secret": SHOPIFY_CLIENT_SECRET,
+                "grant_type": "client_credentials"
+            }
+            resp = requests.post(url, json=payload, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            token = data.get("access_token")
+            # Default to 3600 seconds if 'expires_in' is not provided
+            expires_in = data.get("expires_in", 3600)
+
+            if token:
+                shopify_token_cache = {
+                    "access_token": token,
+                    "expires_at": now + expires_in
+                }
+            return token
+        except Exception as e:
+            logging.error(f"Shopify Token Error: {e}")
+            return None
 
 def get_order_status(identifier):
     """
@@ -335,38 +364,46 @@ def check_stop_bot(phone):
 
 def call_gemini_with_retry(contents):
     """
-    Helper to call Gemini with exponential backoff and thinking config.
+    Helper to call Gemini with automatic fallback to Flash on quota exhaustion.
     """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    max_retries = 4
-    for i in range(max_retries):
-        try:
-            config = types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(
-                    include_thoughts=False,
-                    thinking_budget=1024
+    config = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(
+            include_thoughts=False,
+            thinking_budget=1024
+        )
+    )
+
+    try:
+        # 1. Attempt with Primary Model (Pro)
+        response = client.models.generate_content(
+            model="gemini-2.5-pro",
+            contents=contents,
+            config=config
+        )
+        return response.text
+    except Exception as e:
+        err_str = str(e).lower()
+        # 2. Handle Quota/Rate Limit (429) via Fallback to Flash
+        if "429" in err_str or "quota" in err_str:
+            print("PRO QUOTA EXCEEDED (429). Falling back to Flash...")
+            try:
+                # Nested fallback to Flash
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=contents,
+                    config=config
                 )
-            )
-            response = client.models.generate_content(
-                model="gemini-2.5-pro",
-                contents=contents,
-                config=config
-            )
-            return response.text
-        except Exception as e:
-            err_str = str(e).lower()
-            # Retry on 429 (Rate Limit) or 503 (Service Unavailable)
-            if ("429" in err_str or "503" in err_str or "resource_exhausted" in err_str) and i < max_retries - 1:
-                wait_time = 2 ** (i + 1)
-                logging.warning(f"Gemini Rate Limit/Service Error: {e}. Retrying in {wait_time}s...")
-                time.sleep(wait_time)
-                continue
-            # Log the exact error to the Render console
+                return response.text
+            except Exception as flash_e:
+                print(f"CRITICAL SDK ERROR (Flash Fallback Failed): {str(flash_e)}")
+                return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+        else:
+            # 3. Handle Other Errors immediately
             print(f"CRITICAL SDK ERROR: {str(e)}")
-            logging.error(f"Gemini Final Error: {e}")
-            # Final Fallback Message
+            logging.error(f"Gemini Error: {e}")
             return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
 
 def process_audio(file_url, sender_phone):
