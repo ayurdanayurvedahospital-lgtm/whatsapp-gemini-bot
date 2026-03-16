@@ -402,7 +402,9 @@ def call_gemini_with_retry(contents):
                     contents=contents,
                     config=flash_config
                 )
-                return response.text
+                raw_flash_text = response.text
+                cleaned_flash_text = re.sub(r'<!--.*?-->', '', raw_flash_text, flags=re.DOTALL).strip()
+                return cleaned_flash_text
             except Exception as flash_e:
                 print(f"CRITICAL SDK ERROR (Flash Fallback Failed): {str(flash_e)}")
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
