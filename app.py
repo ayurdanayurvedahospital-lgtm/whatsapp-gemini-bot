@@ -364,47 +364,50 @@ def check_stop_bot(phone):
 
 def call_gemini_with_retry(contents):
     """
-    Helper to call Gemini with automatic fallback to Flash on quota exhaustion.
+    Helper to call Gemini with automatic fallback on quota exhaustion.
+    Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Pro as Fallback.
     """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    config = types.GenerateContentConfig(
+    # Action 1: Gemini 3 Flash Primary Config
+    flash_config = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(
+            thinking_level="minimal",
+            include_thoughts=False
+        )
+    )
+
+    # Action 2: Gemini 2.5 Pro Fallback Config (Preserved)
+    pro_config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             include_thoughts=False,
             thinking_budget=1024
         )
     )
 
+    raw_text = ""
     try:
-        # 1. Attempt with Primary Model (Pro)
+        # 1. Attempt with Primary Model (Gemini 3 Flash)
         response = client.models.generate_content(
-            model="gemini-2.5-pro",
+            model="gemini-3.0-flash",
             contents=contents,
-            config=config
+            config=flash_config
         )
-        return response.text
+        raw_text = response.text
     except Exception as e:
         err_str = str(e).lower()
-        # 2. Handle Quota/Rate Limit (429) via Fallback to Flash
+        # 2. Handle Quota/Rate Limit (429) via Fallback to Pro
         if "429" in err_str or "quota" in err_str:
-            print("PRO QUOTA EXCEEDED (429). Falling back to Flash...")
+            print("FLASH QUOTA EXCEEDED (429). Falling back to Pro...")
             try:
-                # Nested fallback to Flash with native ThinkingConfig
-                flash_config = types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(
-                        include_thoughts=False,
-                        thinking_budget=-1
-                    )
-                )
+                # Nested fallback to Pro
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-2.5-pro",
                     contents=contents,
-                    config=flash_config
+                    config=pro_config
                 )
-                raw_flash_text = response.text
-                cleaned_flash_text = re.sub(r'<!--.*?-->', '', raw_flash_text, flags=re.DOTALL).strip()
-                return cleaned_flash_text
+                raw_text = response.text
             except Exception as flash_e:
                 print(f"CRITICAL SDK ERROR (Flash Fallback Failed): {str(flash_e)}")
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
@@ -413,6 +416,10 @@ def call_gemini_with_retry(contents):
             print(f"CRITICAL SDK ERROR: {str(e)}")
             logging.error(f"Gemini Error: {e}")
             return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+
+    # Action 3: Global HTML Comment Stripper
+    final_output = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL).strip()
+    return final_output
 
 def process_audio(file_url, sender_phone):
     """
