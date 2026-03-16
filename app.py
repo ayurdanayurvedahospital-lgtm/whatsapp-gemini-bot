@@ -390,7 +390,7 @@ def call_gemini_with_retry(contents):
     try:
         # 1. Attempt with Primary Model (Gemini 3 Flash)
         response = client.models.generate_content(
-            model="gemini-3.0-flash",
+            model="gemini-3-flash-001",
             contents=contents,
             config=flash_config
         )
