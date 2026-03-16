@@ -376,6 +376,11 @@ Ayurdan Ayurveda Hospital And Panchakarma Center,
 Valiyakoikkal Temple Road, Near Pandalam Palace, Pandalam
 Kerala State, India 689503
 
+[TRUST AND AVAILABILITY]
+- Flipkart: https://www.flipkart.com/health-care/home-medicines/general-wellness/ayurvedic/alpha-ayurveda~brand/pr?sid=hlc,ah4,iav,jnk&marketplace=FLIPKART
+- Amazon: https://www.amazon.in/stores/AlphaAyurveda/page/163B3404-EBC5-4B76-9252-28F8821A7DC1?lp_asin=B08Y7R83SW&ref_=ast_bln&store_ref=bl_ast_dp_brandlogo_sto&bl_grd_status=override
+- STRICT USAGE RULE: AIVA must ONLY provide these marketplace links if a user explicitly asks, "Is this available on Flipkart/Amazon?" or "Where else can I buy this?". Do NOT include these links in standard product inquiries or greetings.
+
 [DELIVERY FAQ]
 Q1. Delivery time inside Kerala
 A1. 3-4 working days
