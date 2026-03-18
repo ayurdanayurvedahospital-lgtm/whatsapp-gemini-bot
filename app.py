@@ -419,7 +419,9 @@ def call_gemini_with_retry(contents):
 
     # Action 3: Global Anti-Leak Filter (HTML Comments + Structural Labels)
     clean_text = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL)
-    final_output = re.sub(r'(?i)\*?(AEAC|Awareness|Education|Authority|Closing|അവബോധം|വിദ്യാഭ്യാസം|അധികാരം|ക്ലോസിംഗ്|Thought)\*?:?\s*', '', clean_text).strip()
+    filtered_text = re.sub(r'(?i)\*?(AEAC|Awareness|Education|Authority|Closing|അവബോധം|വിദ്യാഭ്യാസം|അധികാരം|ക്ലോസിംഗ്|Thought)\*?:?\s*', '', clean_text).strip()
+    # Action 4: WhatsApp Formatting Fix (Double Asterisks -> Single Asterisks)
+    final_output = filtered_text.replace('**', '*')
     return final_output
 
 def process_audio(file_url, sender_phone):
