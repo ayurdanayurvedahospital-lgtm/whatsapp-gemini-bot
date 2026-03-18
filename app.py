@@ -417,8 +417,9 @@ def call_gemini_with_retry(contents):
             logging.error(f"Gemini Error: {e}")
             return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
 
-    # Action 3: Global HTML Comment Stripper
-    final_output = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL).strip()
+    # Action 3: Global Anti-Leak Filter (HTML Comments + Structural Labels)
+    clean_text = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL)
+    final_output = re.sub(r'(?i)\*?(AEAC|Awareness|Education|Authority|Closing|അവബോധം|വിദ്യാഭ്യാസം|അധികാരം|ക്ലോസിംഗ്|Thought)\*?:?\s*', '', clean_text).strip()
     return final_output
 
 def process_audio(file_url, sender_phone):
