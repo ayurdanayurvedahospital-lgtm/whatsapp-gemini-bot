@@ -1,6 +1,7 @@
 import sys
 from unittest.mock import MagicMock, patch
 import time
+import re
 
 # Comprehensive Mocking
 mock_google = MagicMock()
@@ -63,6 +64,31 @@ def test_html_stripping():
         assert output == "Hello world  How are you?"
     print("✅ HTML Stripping works.")
 
+def test_structural_leak_filter():
+    print("Testing Structural Leak Filter...")
+    test_cases = [
+        ("AEAC: Hello", "Hello"),
+        ("Awareness: I see you are struggling", "I see you are struggling"),
+        ("*Education*: This is important", "This is important"),
+        ("അവബോധം: നമസ്കാരം", "നമസ്കാരം"),
+        ("Thought: I should recommend Sakhitone", "I should recommend Sakhitone"),
+        ("thought: internal process", "internal process"),
+        ("*Closing*: Have a nice day", "Have a nice day"),
+        ("Normal message with no leaks", "Normal message with no leaks"),
+        ("I thought you would like this", "I you would like this"),
+        ("AEAC Education Closing", "")
+    ]
+
+    with patch('app.client') as mock_client:
+        for input_raw, expected in test_cases:
+            mock_response = MagicMock()
+            mock_response.text = input_raw
+            mock_client.models.generate_content.return_value = mock_response
+
+            output = app.call_gemini_with_retry([{"parts": [{"text": "test"}]}])
+            assert output == expected, f"Failed for '{input_raw}'. Got: '{output}', Expected: '{expected}'"
+    print("✅ Structural Leak Filter works.")
+
 def test_fallback_logic():
     print("Testing Fallback Logic (Flash -> Pro)...")
 
@@ -91,6 +117,7 @@ if __name__ == "__main__":
     try:
         test_shopify_caching()
         test_html_stripping()
+        test_structural_leak_filter()
         test_fallback_logic()
         print("\nALL SYSTEM TESTS PASSED")
     except Exception as e:
