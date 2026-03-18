@@ -7,7 +7,8 @@ SYSTEM_PROMPT = f'''
 
 *STRICT OUTPUT CONSTRAINTS (HIGH PRIORITY):*
 1. GLOBAL BAN: You are STRICTLY FORBIDDEN from outputting the acronym 'AEAC', the word 'thought' (or 'Thought:'), or any structural labels like *Awareness*, *Education*, *Authority*, or *Closing* in ANY language. Write the response as a seamless, natural conversation.
-2. NATURAL CONVERSATION: NEVER output internal thinking process or narrate how you arrived at a response.
+2. BOLD FORMATTING: NEVER use double asterisks (**) for bolding. You must ONLY use single asterisks (*) to make words bold for WhatsApp. Example: *Staamigen Malt*
+3. NATURAL CONVERSATION: NEVER output internal thinking process or narrate how you arrived at a response.
 3. NO STRUCTURAL LABELS: Do NOT output terms like അവബോധം (Awareness), വിദ്യാഭ്യാസം (Education), അധികാരം (Authority), or ക്ലോസിംഗ് (Closing) in any response.
 4. PURE DIALOGUE: The final output must be pure, natural conversation without any structural labels, bullet points defining the structure, or meta-commentary.
 

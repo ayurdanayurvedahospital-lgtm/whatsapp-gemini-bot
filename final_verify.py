@@ -89,6 +89,25 @@ def test_structural_leak_filter():
             assert output == expected, f"Failed for '{input_raw}'. Got: '{output}', Expected: '{expected}'"
     print("✅ Structural Leak Filter works.")
 
+def test_bold_formatting_fix():
+    print("Testing Bold Formatting Fix...")
+    test_cases = [
+        ("**Staamigen Malt**", "*Staamigen Malt*"),
+        ("Try our **product** today!", "Try our *product* today!"),
+        ("Single *asterisk* remains", "Single *asterisk* remains"),
+        ("Mixing *single* and **double**", "Mixing *single* and *double*")
+    ]
+
+    with patch('app.client') as mock_client:
+        for input_raw, expected in test_cases:
+            mock_response = MagicMock()
+            mock_response.text = input_raw
+            mock_client.models.generate_content.return_value = mock_response
+
+            output = app.call_gemini_with_retry([{"parts": [{"text": "test"}]}])
+            assert output == expected, f"Failed for '{input_raw}'. Got: '{output}', Expected: '{expected}'"
+    print("✅ Bold Formatting Fix works.")
+
 def test_fallback_logic():
     print("Testing Fallback Logic (Flash -> Pro)...")
 
@@ -118,6 +137,7 @@ if __name__ == "__main__":
         test_shopify_caching()
         test_html_stripping()
         test_structural_leak_filter()
+        test_bold_formatting_fix()
         test_fallback_logic()
         print("\nALL SYSTEM TESTS PASSED")
     except Exception as e:
