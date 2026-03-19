@@ -64,7 +64,8 @@ else:
     logging.warning("GEMINI_API_KEY not set!")
 
 # --- GLOBAL STATE ---
-user_sessions = {}
+user_sessions = {} # phone -> list of messages
+user_last_active = {} # phone -> timestamp
 stop_bot_cache = {}
 CACHE_TTL = 300
 processed_messages = set()
@@ -80,6 +81,29 @@ shopify_token_cache = {"access_token": None, "expires_at": 0}
 shopify_token_lock = threading.Lock()
 
 # --- HELPER FUNCTIONS ---
+
+def get_user_history(phone):
+    """
+    Retrieves history for a user, clearing it if inactive for >12 hours.
+    Returns a rolling window of the last 14 messages.
+    """
+    now = time.time()
+    last_active = user_last_active.get(phone, 0)
+
+    # Action 2: 12-hour inactivity clearing
+    if now - last_active > 12 * 3600:
+        user_sessions[phone] = []
+
+    history = user_sessions.get(phone, [])
+    # Action 2: Strict rolling window (last 14)
+    return history[-14:]
+
+def save_user_history(phone, history):
+    """
+    Updates user history and activity timestamp.
+    """
+    user_sessions[phone] = history[-14:]
+    user_last_active[phone] = time.time()
 
 def get_shopify_token():
     """
@@ -424,7 +448,7 @@ def call_gemini_with_retry(contents):
     final_output = filtered_text.replace('**', '*')
     return final_output
 
-def process_audio(file_url, sender_phone):
+def process_audio(file_url, sender_phone, history):
     """
     Process audio file via Gemini with robust error handling.
     """
@@ -453,7 +477,6 @@ def process_audio(file_url, sender_phone):
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
-            history = user_sessions.get(sender_phone, [])
 
             # Construct conversation with history
             contents = [
@@ -488,7 +511,7 @@ def process_audio(file_url, sender_phone):
             except Exception as e:
                 logging.error(f"Failed to cleanup temp file: {e}")
 
-def process_image(file_url, sender_phone, prompt_text):
+def process_image(file_url, sender_phone, prompt_text, history):
     local_filename = None
     headers = {'apikey': ZOKO_API_KEY}
     try:
@@ -515,7 +538,6 @@ def process_image(file_url, sender_phone, prompt_text):
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
-            history = user_sessions.get(sender_phone, [])
 
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
@@ -546,7 +568,7 @@ def process_image(file_url, sender_phone, prompt_text):
                 os.remove(local_filename)
             except Exception: pass
 
-def process_pdf(file_url, sender_phone):
+def process_pdf(file_url, sender_phone, history):
     local_filename = None
     headers = {'apikey': ZOKO_API_KEY}
     try:
@@ -570,7 +592,6 @@ def process_pdf(file_url, sender_phone):
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
-            history = user_sessions.get(sender_phone, [])
 
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
@@ -769,6 +790,10 @@ def handle_message(payload):
         response_text = ""
         found_image_url = None
 
+        # Action 1: Retrieve Session History
+        history = get_user_history(sender_phone)
+        user_input_for_history = text_body
+
         # Image Logic
         if text_body:
             lower_msg = text_body.lower()
@@ -787,24 +812,24 @@ def handle_message(payload):
         # Image, Audio, PDF vs Text Logic
         if msg_type == "document" and file_url and file_url.lower().endswith(".pdf"):
             send_whatsapp_message(sender_phone.replace("+", ""), "Reading your document... 📄", "text")
-            response_text = process_pdf(file_url, sender_phone)
+            response_text = process_pdf(file_url, sender_phone, history)
+            if not user_input_for_history: user_input_for_history = "[Sent a PDF document]"
         elif msg_type == "image" and file_url:
             send_whatsapp_message(sender_phone.replace("+", ""), "Analyzing your image... 👁️", "text")
-            response_text = process_image(file_url, sender_phone, text_body)
+            response_text = process_image(file_url, sender_phone, text_body, history)
+            if not user_input_for_history: user_input_for_history = "[Sent an image]"
         elif msg_type == "audio" and file_url:
             send_whatsapp_message(sender_phone.replace("+", ""), "Listening... 🎧", "text")
-            response_text = process_audio(file_url, sender_phone)
+            response_text = process_audio(file_url, sender_phone, history)
+            if not user_input_for_history: user_input_for_history = "[Sent an audio message]"
         elif text_body or msg_type == "text":
-            if sender_phone not in user_sessions:
-                user_sessions[sender_phone] = []
-            history = user_sessions[sender_phone]
-
             response_text = get_ai_response(sender_phone, text_body, history)
 
-            history.append({"role": "user", "parts": [text_body]})
+        if response_text:
+            # Action 1: Update and Save History
+            history.append({"role": "user", "parts": [user_input_for_history]})
             history.append({"role": "model", "parts": [response_text]})
-            if len(history) > 20:
-                user_sessions[sender_phone] = history[-20:]
+            save_user_history(sender_phone, history)
 
         logging.info("STEP 6: Sending AI Response")
 
