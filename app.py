@@ -1,3 +1,6 @@
+# ==========================================
+# Bot Architecture & Logic Created By: Balamurali V,  for Ayurdan Ayurveda Hospital
+# ==========================================
 import os
 import logging
 import threading
