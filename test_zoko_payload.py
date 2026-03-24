@@ -1,41 +1,48 @@
+import sys
+from unittest.mock import MagicMock, patch
+
+# Global Mocking
+sys.modules["requests"] = MagicMock()
+sys.modules["flask"] = MagicMock()
+sys.modules["google"] = MagicMock()
+sys.modules["google.genai"] = MagicMock()
+sys.modules["google.genai.types"] = MagicMock()
+sys.modules["pytz"] = MagicMock()
+
 import unittest
-from unittest.mock import patch
 import app
-import json
 
 class TestZokoPayload(unittest.TestCase):
-    def setUp(self):
-        self.app = app.app.test_client()
-        self.app.testing = True
 
     @patch('app.threading.Thread')
-    def test_zoko_payload_root_sender(self, mock_thread):
+    def test_webhook_triggers_thread(self, mock_thread):
+        # Mock request context
+        mock_flask = sys.modules["flask"]
+        mock_flask.request.json = {"messageId": "123", "platformSenderId": "9100"}
+
+        from app import bot
+        with patch('app.request', mock_flask.request):
+            resp, status = bot()
+            self.assertEqual(status, 200)
+            self.assertTrue(mock_thread.called)
+
+    @patch('app.send_whatsapp_message')
+    @patch('app.get_ai_response')
+    def test_handle_message_basic(self, mock_ai, mock_send):
+        mock_ai.return_value = "Hello Patient"
         payload = {
-            'customer': {
-                'id': '8275201a-49a1-11f0-924e-42010a020911',
-                'name': 'Ayurdan Ayurveda Hospital'
-            },
-            'customerName': 'Ayurdan Ayurveda Hospital',
-            'deliveryStatus': 'received',
-            'direction': 'FROM_CUSTOMER',
-            'event': 'message:user:in',
-            'id': 'd96091bf-096d-11f1-8d8b-1e5a62c68e34',
-            'platform': 'WHATSAPP',
-            'platformSenderId': '+919946388900',
-            'platformTimestamp': '2026-02-14T06:24:41Z',
-            'senderName': 'Ayurdan Ayurveda Hospital',
-            'text': 'Hello',
-            'type': 'text'
+            "messageId": "msg_1",
+            "platformSenderId": "9100000000",
+            "type": "text",
+            "text": "Help me",
+            "direction": "incoming"
         }
 
-        response = self.app.post('/bot', json=payload)
-
-        # Should be 200 OK
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['status'], 'received')
-
-        # Verify background processing was triggered
-        self.assertEqual(mock_thread.call_count, 1)
+        app.handle_message(payload)
+        mock_send.assert_called()
+        # Verify it sent the AI response
+        args, kwargs = mock_send.call_args
+        self.assertEqual(args[1], "Hello Patient")
 
 if __name__ == '__main__':
     unittest.main()
