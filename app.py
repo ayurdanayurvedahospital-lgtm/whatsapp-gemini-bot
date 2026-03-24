@@ -93,12 +93,12 @@ def get_user_history(phone):
     now = time.time()
     last_active = user_last_active.get(phone, 0)
 
-    # Action 2: 12-hour inactivity clearing
+    # 12-hour inactivity clearing
     if now - last_active > 12 * 3600:
         user_sessions[phone] = []
 
     history = user_sessions.get(phone, [])
-    # Action 2: Strict rolling window (last 14)
+    # Strict rolling window (last 14)
     return history[-14:]
 
 def save_user_history(phone, history):
@@ -397,7 +397,7 @@ def call_gemini_with_retry(contents):
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    # Action 1: Gemini 3 Flash Primary Config
+    # Gemini 3 Flash Primary Config
     flash_config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             thinking_level="minimal",
@@ -405,7 +405,7 @@ def call_gemini_with_retry(contents):
         )
     )
 
-    # Action 2: Gemini 2.5 Pro Fallback Config (Preserved)
+    # Gemini 2.5 Pro Fallback Config
     pro_config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             include_thoughts=False,
@@ -444,10 +444,10 @@ def call_gemini_with_retry(contents):
             logging.error(f"Gemini Error: {e}")
             return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
 
-    # Action 3: Global Anti-Leak Filter (HTML Comments + Structural Labels)
+    # Global Anti-Leak Filter (HTML Comments + Structural Labels)
     clean_text = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL)
     filtered_text = re.sub(r'(?i)\*?(AEAC|Awareness|Education|Authority|Closing|അവബോധം|വിദ്യാഭ്യാസം|അധികാരം|ക്ലോസിംഗ്|Thought)\*?:?\s*', '', clean_text).strip()
-    # Action 4: WhatsApp Formatting Fix (Double Asterisks -> Single Asterisks)
+    # WhatsApp Formatting Fix (Double Asterisks -> Single Asterisks)
     final_output = filtered_text.replace('**', '*')
     return final_output
 
@@ -793,7 +793,7 @@ def handle_message(payload):
         response_text = ""
         found_image_url = None
 
-        # Action 1: Retrieve Session History
+        # Retrieve Session History
         history = get_user_history(sender_phone)
         user_input_for_history = text_body
 
@@ -829,7 +829,7 @@ def handle_message(payload):
             response_text = get_ai_response(sender_phone, text_body, history)
 
         if response_text:
-            # Action 1: Update and Save History
+            # Update and Save History
             history.append({"role": "user", "parts": [user_input_for_history]})
             history.append({"role": "model", "parts": [response_text]})
             save_user_history(sender_phone, history)
