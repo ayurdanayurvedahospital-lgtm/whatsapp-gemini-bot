@@ -43,6 +43,7 @@ except ImportError as e:
 # --- CONFIGURATION ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ZOKO_API_KEY = os.environ.get("ZOKO_API_KEY")
+GEMINI_PROCESSING_TIMEOUT = 60 # Seconds to wait for file processing
 
 # Shopify Config
 SHOPIFY_DOMAIN = os.environ.get("SHOPIFY_DOMAIN")
@@ -471,12 +472,15 @@ def process_audio(file_url, sender_phone, history):
         try:
             myfile = client.files.upload(file=local_filename, config={'mime_type': 'audio/ogg'})
 
+            start_time = time.time()
             while myfile.state == "PROCESSING":
-                time.sleep(1)
+                if time.time() - start_time > GEMINI_PROCESSING_TIMEOUT:
+                     raise TimeoutError("Gemini file processing timed out.")
+                time.sleep(2)
                 myfile = client.files.get(name=myfile.name)
 
-            if myfile.state == "FAILED":
-                raise ValueError("Audio processing failed in Gemini.")
+            if myfile.state != "ACTIVE":
+                raise ValueError(f"Audio processing failed or incomplete. State: {myfile.state}")
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
@@ -532,12 +536,15 @@ def process_image(file_url, sender_phone, prompt_text, history):
         logging.info("Uploading Image to Gemini...")
         try:
             myfile = client.files.upload(file=local_filename)
+            start_time = time.time()
             while myfile.state == "PROCESSING":
-                time.sleep(1)
+                if time.time() - start_time > GEMINI_PROCESSING_TIMEOUT:
+                     raise TimeoutError("Gemini file processing timed out.")
+                time.sleep(2)
                 myfile = client.files.get(name=myfile.name)
 
-            if myfile.state == "FAILED":
-                raise ValueError("Image processing failed in Gemini.")
+            if myfile.state != "ACTIVE":
+                raise ValueError(f"Image processing failed or incomplete. State: {myfile.state}")
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
@@ -586,12 +593,15 @@ def process_pdf(file_url, sender_phone, history):
         logging.info("Uploading PDF to Gemini...")
         try:
             myfile = client.files.upload(file=local_filename)
+            start_time = time.time()
             while myfile.state == "PROCESSING":
-                time.sleep(1)
+                if time.time() - start_time > GEMINI_PROCESSING_TIMEOUT:
+                     raise TimeoutError("Gemini file processing timed out.")
+                time.sleep(2)
                 myfile = client.files.get(name=myfile.name)
 
-            if myfile.state == "FAILED":
-                raise ValueError("PDF processing failed in Gemini.")
+            if myfile.state != "ACTIVE":
+                raise ValueError(f"PDF processing failed or incomplete. State: {myfile.state}")
 
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
