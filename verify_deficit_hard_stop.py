@@ -21,9 +21,9 @@ class TestDeficitHardStop(unittest.TestCase):
         self.assertIn("PATH A: IF WEIGHT DEFICIT IS 15 KG OR MORE:", SYSTEM_PROMPT)
         self.assertIn("[PACING FIREWALL]", SYSTEM_PROMPT)
         self.assertIn("[STRICT PAUSE MANDATE]", SYSTEM_PROMPT)
-        self.assertIn("The response MUST end immediately after the question mark of the hook.", SYSTEM_PROMPT)
-        self.assertIn("ask ONLY the hook question", SYSTEM_PROMPT)
-        self.assertIn("STOP and wait for the user to reply specifically to the \"skinny\" question", SYSTEM_PROMPT)
+        self.assertIn("The response MUST end immediately after the hook statement.", SYSTEM_PROMPT)
+        self.assertIn("output the authoritative hook EXACTLY", SYSTEM_PROMPT)
+        self.assertIn("STOP and wait for the user to reply to the \"skinny\" statement", SYSTEM_PROMPT)
 
     def test_path_b_bundling(self):
         # Verify Path B bundling rules
