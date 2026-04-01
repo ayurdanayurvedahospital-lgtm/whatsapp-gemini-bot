@@ -22,8 +22,8 @@ class TestDeficitHardStop(unittest.TestCase):
         self.assertIn("[PACING FIREWALL]", SYSTEM_PROMPT)
         self.assertIn("[STRICT PAUSE MANDATE]", SYSTEM_PROMPT)
         self.assertIn("The response MUST end immediately after the hook statement.", SYSTEM_PROMPT)
-        self.assertIn("output the authoritative hook EXACTLY", SYSTEM_PROMPT)
-        self.assertIn("STOP and wait for the user to reply to the \"skinny\" statement", SYSTEM_PROMPT)
+        self.assertIn("output the authoritative diagnostic hook EXACTLY as per these emotional blueprints", SYSTEM_PROMPT)
+        self.assertIn("STOP and wait for the user to reply and commit to the \"skinny\" statement", SYSTEM_PROMPT)
 
     def test_path_b_bundling(self):
         # Verify Path B bundling rules
