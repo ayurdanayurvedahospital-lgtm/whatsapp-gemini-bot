@@ -40,6 +40,26 @@ except ImportError as e:
     LINKS = {}
     SYSTEM_PROMPT = "You are AIVA."
 
+# --- PERFORMANCE OPTIMIZATION: Pre-compute Product Image Regex ---
+PRODUCT_IMAGE_URLS = {}
+PRODUCT_IMAGE_PATTERN = None
+
+def _precompute_product_images():
+    global PRODUCT_IMAGE_PATTERN
+    if PRODUCT_IMAGES:
+        # Sort keys by length descending to match longest first (e.g., 'staamigen malt' before 'staamigen')
+        # This prevents partial matches if a shorter product name is a substring of a longer one.
+        sorted_keys = sorted(PRODUCT_IMAGES.keys(), key=len, reverse=True)
+        PRODUCT_IMAGE_PATTERN = re.compile('|'.join(re.escape(k) for k in sorted_keys), re.IGNORECASE)
+
+        for key, val in PRODUCT_IMAGES.items():
+            # Extract URL if it's in markdown format [url](url)
+            url_match = re.search(r'\((https?://.*?)\)', val)
+            # Store lowercased key for easy lookup
+            PRODUCT_IMAGE_URLS[key.lower()] = url_match.group(1) if url_match else val
+
+_precompute_product_images()
+
 # --- CONFIGURATION ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ZOKO_API_KEY = os.environ.get("ZOKO_API_KEY")
@@ -808,19 +828,14 @@ def handle_message(payload):
         user_input_for_history = text_body
 
         # Image Logic
-        if text_body:
-            lower_msg = text_body.lower()
-            for key, val in PRODUCT_IMAGES.items():
-                if key in lower_msg:
-                    found_image_url = val
-                    # Extract URL if it's in markdown format [url](url)
-                    match = re.search(r'\((https?://.*?)\)', val)
-                    if match:
-                        found_image_url = match.group(1)
-
-                    product_name = key.replace('_', ' ').title()
+        if text_body and PRODUCT_IMAGE_PATTERN:
+            match = PRODUCT_IMAGE_PATTERN.search(text_body)
+            if match:
+                matched_key = match.group(0).lower()
+                found_image_url = PRODUCT_IMAGE_URLS.get(matched_key)
+                if found_image_url:
+                    product_name = matched_key.replace('_', ' ').title()
                     send_whatsapp_message(sender_phone.replace("+", ""), product_name, "image", image_url=found_image_url)
-                    break
 
         # Image, Audio, PDF vs Text Logic
         if msg_type == "document" and file_url and file_url.lower().endswith(".pdf"):
