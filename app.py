@@ -433,25 +433,27 @@ def check_stop_bot(phone):
 def call_gemini_with_retry(contents, system_instruction=None, cached_content=None):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
-    Primary: Gemini 3 Flash Preview, Fallback: Gemini 2.5 Preview.
+    Primary: Gemini 3.1 Flash Lite Preview, Fallback: Gemini 2.5 Flash.
     """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    primary_model = "gemini-3-flash-preview"
-    fallback_model = "gemini-2.5-preview"
+    primary_model = "gemini-3.1-flash-lite-preview"
+    fallback_model = "gemini-2.5-flash"
 
-    # Primary Config (Flash)
+    # Primary Config (Lite)
     flash_config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         cached_content=cached_content,
-        max_output_tokens=300
+        max_output_tokens=300,
+        thinking_config=types.ThinkingConfig(include_thoughts=False)
     )
 
-    # Fallback Config (Preview)
+    # Fallback Config (Flash)
     pro_config = types.GenerateContentConfig(
         system_instruction=system_instruction if not cached_content else SYSTEM_PROMPT,
-        max_output_tokens=300
+        max_output_tokens=300,
+        thinking_config=types.ThinkingConfig(include_thoughts=False)
     )
 
     raw_text = ""
@@ -581,7 +583,7 @@ def process_audio(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+            cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
             model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
             contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
@@ -645,7 +647,7 @@ def process_image(file_url, sender_phone, prompt_text, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+            cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
             model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
             contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
@@ -706,7 +708,7 @@ def process_pdf(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+            cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
             model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
             contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
@@ -744,7 +746,7 @@ def get_ai_response(sender_phone, message_text, history):
         current_time_str = get_current_time_str()
 
         # Try to get cache for primary model
-        cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+        cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
         model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}. I am actively monitoring the user's language."
         contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
