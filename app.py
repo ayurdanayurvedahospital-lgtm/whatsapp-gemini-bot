@@ -433,22 +433,22 @@ def check_stop_bot(phone):
 def call_gemini_with_retry(contents, system_instruction=None, cached_content=None):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
-    Primary: Gemini 2.0 Flash, Fallback: Gemini 1.5 Pro.
+    Primary: Gemini 3 Flash Preview, Fallback: Gemini 2.5 Preview.
     """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    primary_model = "gemini-2.0-flash"
-    fallback_model = "gemini-1.5-pro"
+    primary_model = "gemini-3-flash-preview"
+    fallback_model = "gemini-2.5-preview"
 
-    # Gemini 2.0 Flash Primary Config
+    # Primary Config (Flash)
     flash_config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         cached_content=cached_content,
         max_output_tokens=300
     )
 
-    # Gemini 1.5 Pro Fallback Config
+    # Fallback Config (Preview)
     pro_config = types.GenerateContentConfig(
         system_instruction=system_instruction if not cached_content else SYSTEM_PROMPT,
         max_output_tokens=300
@@ -496,11 +496,17 @@ def get_contents_with_history(history, model_ack, cache_active):
     """
     Constructs a Gemini-compatible contents list from history.
     Ensures strict User -> Model alternation.
-    Filters out inactivity reminders.
+    Filters out automated follow-up messages from the LLM context.
     Correctly attributes model_ack context to the Model role.
     """
     contents = []
     last_role = None
+
+    # Automated system reminders to be filtered
+    REMINDERS = [
+        "Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.",
+        "Your health deserves thoughtful attention. I’m here to guide you whenever you’re ready. Please feel free to ask me anything at any time."
+    ]
 
     if not cache_active:
         # System Prompt Turn
@@ -510,8 +516,8 @@ def get_contents_with_history(history, model_ack, cache_active):
 
     for h in history:
         text = h["parts"][0]
-        # Filter Reminders
-        if h["role"] == "model" and any(rem in text for rem in REMINDER_MESSAGES):
+        # Strict Exclusion for automated follow-ups
+        if h["role"] == "model" and any(rem in text for rem in REMINDERS):
             continue
 
         role = "user" if h["role"] == "user" else "model"
@@ -575,7 +581,7 @@ def process_audio(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-2.0-flash")
+            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
 
             model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
             contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
@@ -639,7 +645,7 @@ def process_image(file_url, sender_phone, prompt_text, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-2.0-flash")
+            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
 
             model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
             contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
@@ -700,7 +706,7 @@ def process_pdf(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-2.0-flash")
+            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
 
             model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
             contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
@@ -738,7 +744,7 @@ def get_ai_response(sender_phone, message_text, history):
         current_time_str = get_current_time_str()
 
         # Try to get cache for primary model
-        cache_name = get_cached_system_prompt_name("gemini-2.0-flash")
+        cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
 
         model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}. I am actively monitoring the user's language."
         contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
@@ -880,7 +886,12 @@ def handle_message(payload):
 
         is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
 
-        if is_greeting_keyword and (current_time - last_time > 12 * 3600):
+        # Check if user's opening message already contains Age and Gender (e.g. "Hi I am 25 male")
+        has_age = text_body and any(char.isdigit() for char in text_body)
+        has_gender = text_body and any(g in text_body.lower() for g in ["male", "female", "man", "woman", "boy", "girl", "പുരുഷൻ", "സ്ത്രീ"])
+        opening_contains_demographics = has_age and has_gender
+
+        if is_greeting_keyword and (current_time - last_time > 12 * 3600) and not opening_contains_demographics:
             time_greeting = get_ist_time_greeting()
             greeting_msg = (
                 f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital.\n"
