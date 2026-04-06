@@ -104,6 +104,12 @@ last_greeted = {} # phone -> timestamp (tracks last greeting time for 12h rule)
 followup_timers = {} # phone -> {'t1': Timer, 't2': Timer}
 user_order_state = {} # phone -> boolean (True if expecting order details)
 
+# Automated Reminder Strings for filtering from AI context
+REMINDER_MESSAGES = [
+    "Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.",
+    "Your health deserves thoughtful attention. I’m here to guide you whenever you’re ready. Please feel free to ask me anything at any time."
+]
+
 # Shopify Token Cache
 shopify_token_cache = {"access_token": None, "expires_at": 0}
 shopify_token_lock = threading.Lock()
@@ -447,37 +453,32 @@ def check_stop_bot(phone):
 def call_gemini_with_retry(contents, system_instruction=None, cached_content=None):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
-    Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Pro as Fallback.
+    Primary: Gemini 3.1 Flash Lite Preview, Fallback: Gemini 2.5 Flash.
     """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    primary_model = "gemini-3-flash-preview"
-    fallback_model = "gemini-2.5-pro"
+    primary_model = "gemini-3.1-flash-lite-preview"
+    fallback_model = "gemini-2.5-flash"
 
-    # Gemini 3 Flash Primary Config
+    # Primary Config (Lite)
     flash_config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         cached_content=cached_content,
-        thinking_config=types.ThinkingConfig(
-            thinking_level="minimal",
-            include_thoughts=False
-        )
+        max_output_tokens=300,
+        thinking_config=types.ThinkingConfig(include_thoughts=False)
     )
 
-    # Gemini 2.5 Pro Fallback Config
-    # NOTE: We do NOT pass the primary model's cache to the fallback model
+    # Fallback Config (Flash)
     pro_config = types.GenerateContentConfig(
         system_instruction=system_instruction if not cached_content else SYSTEM_PROMPT,
-        thinking_config=types.ThinkingConfig(
-            include_thoughts=False,
-            thinking_budget=1024
-        )
+        max_output_tokens=300,
+        thinking_config=types.ThinkingConfig(include_thoughts=False)
     )
 
     raw_text = ""
     try:
-        # 1. Attempt with Primary Model (Gemini 3 Flash)
+        # 1. Attempt with Primary Model
         logging.info(f"Generating content with primary model: {primary_model}")
         response = client.models.generate_content(
             model=primary_model,
@@ -488,7 +489,7 @@ def call_gemini_with_retry(contents, system_instruction=None, cached_content=Non
     except Exception as e:
         err_str = str(e).lower()
         # 2. Automatic Fallback on 429, 5xx or Timeouts
-        if any(x in err_str for x in ["429", "quota", "500", "503", "timeout", "deadline"]):
+        if any(x in err_str for x in ["429", "quota", "500", "503", "timeout"]):
             logging.warning(f"Primary Model failed ({err_str}). Falling back to {fallback_model}...")
             try:
                 # Fallback to Pro
@@ -500,11 +501,11 @@ def call_gemini_with_retry(contents, system_instruction=None, cached_content=Non
                 raw_text = response.text
             except Exception as pro_e:
                 logging.error(f"CRITICAL SDK ERROR (Pro Fallback Failed): {str(pro_e)}")
-                return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+                return "I am just double-checking your details with our senior experts. Give me just a moment!"
         else:
             # 3. Handle Other Errors immediately
             logging.error(f"CRITICAL SDK ERROR: {str(e)}")
-            return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+            return "I am just double-checking your details with our senior experts. Give me just a moment!"
 
     # Global Anti-Leak Filter (HTML Comments + Structural Labels)
     clean_text = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL)
@@ -513,20 +514,75 @@ def call_gemini_with_retry(contents, system_instruction=None, cached_content=Non
     final_output = filtered_text.replace('**', '*')
     return final_output
 
+def get_contents_with_history(history, model_ack, cache_active):
+    """
+    Constructs a Gemini-compatible contents list from history.
+    Ensures strict User -> Model alternation.
+    Filters out automated follow-up messages from the LLM context.
+    Correctly attributes model_ack context to the Model role.
+    """
+    contents = []
+    last_role = None
+
+    # Automated system reminders to be filtered
+    REMINDERS = [
+        "Just checking in 😊 Whenever you're comfortable, you can share the details. I'm here to help.",
+        "Your health deserves thoughtful attention. I’m here to guide you whenever you’re ready. Please feel free to ask me anything at any time."
+    ]
+
+    if not cache_active:
+        # System Prompt Turn
+        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
+        contents.append(types.Content(role="model", parts=[types.Part.from_text(text=model_ack)]))
+        last_role = "model"
+
+    for h in history:
+        text = h["parts"][0]
+        # Strict Exclusion for automated follow-ups
+        if h["role"] == "model" and any(rem in text for rem in REMINDERS):
+            continue
+
+        role = "user" if h["role"] == "user" else "model"
+
+        if role == last_role:
+            # Merge consecutive same roles
+            if contents:
+                contents[-1].parts[0].text += f"\n{text}"
+            continue
+
+        contents.append(types.Content(role=role, parts=[types.Part.from_text(text=text)]))
+        last_role = role
+
+    ack_injected = False
+    if cache_active:
+        # We need to inject model_ack into history as a MODEL turn for correct attribution
+        # Find first user message to append it after
+        for i, c in enumerate(contents):
+            if c.role == "user":
+                if i + 1 < len(contents) and contents[i+1].role == "model":
+                    contents[i+1].parts[0].text = f"{model_ack}\n\n{contents[i+1].parts[0].text}"
+                else:
+                    contents.insert(i+1, types.Content(role="model", parts=[types.Part.from_text(text=model_ack)]))
+                    if last_role == "user" and i+1 == len(contents)-1:
+                        last_role = "model"
+                ack_injected = True
+                break
+
+    return contents, last_role, ack_injected
+
 def process_audio(file_url, sender_phone, history):
     """
     Process audio file via Gemini with robust error handling.
     """
     local_filename = None
-    headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading Audio: {file_url}")
-        with requests.get(file_url, stream=True, headers=headers) as r:
-            r.raise_for_status()
-            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
-                for chunk in r.iter_content(chunk_size=8192):
-                    tmp.write(chunk)
-                local_filename = tmp.name
+        r = requests.get(file_url, stream=True, headers={'apikey': ZOKO_API_KEY})
+        r.raise_for_status()
+        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
+            for chunk in r.iter_content(chunk_size=8192):
+                tmp.write(chunk)
+            local_filename = tmp.name
 
         logging.info("Uploading Audio to Gemini...")
 
@@ -547,23 +603,23 @@ def process_audio(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+            cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
-            # Construct conversation with history
-            contents = []
-            if not cache_name:
-                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
-                contents.append(types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),)
-
-            # Map history to types.Content
-            for h in history:
-                role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+            model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
+            contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
 
             # Add final audio part and prompt
+            final_prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant."
+            if not ack_injected:
+                 final_prompt = f"{model_ack}\n\n{final_prompt}"
+
             audio_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='audio/ogg')
-            text_part = types.Part.from_text(text=f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant.")
-            contents.append(types.Content(role="user", parts=[audio_part, text_part]))
+            text_part = types.Part.from_text(text=final_prompt)
+
+            if last_role == "user":
+                 contents[-1].parts.extend([audio_part, text_part])
+            else:
+                 contents.append(types.Content(role="user", parts=[audio_part, text_part]))
 
             return call_gemini_with_retry(contents, cached_content=cache_name)
 
@@ -578,24 +634,21 @@ def process_audio(file_url, sender_phone, history):
         if local_filename and os.path.exists(local_filename):
             try:
                 os.remove(local_filename)
-                logging.info(f"Cleaned up temp file: {local_filename}")
-            except Exception as e:
-                logging.error(f"Failed to cleanup temp file: {e}")
+            except Exception: pass
 
 def process_image(file_url, sender_phone, prompt_text, history):
     local_filename = None
-    headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading Image: {file_url}")
-        with requests.get(file_url, stream=True, headers=headers) as r:
-            r.raise_for_status()
-            ext = ".jpg"
-            if "png" in file_url.lower(): ext = ".png"
-            elif "webp" in file_url.lower(): ext = ".webp"
-            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-                for chunk in r.iter_content(chunk_size=8192):
-                    tmp.write(chunk)
-                local_filename = tmp.name
+        r = requests.get(file_url, stream=True, headers={'apikey': ZOKO_API_KEY})
+        r.raise_for_status()
+        ext = ".jpg"
+        if "png" in file_url.lower(): ext = ".png"
+        elif "webp" in file_url.lower(): ext = ".webp"
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            for chunk in r.iter_content(chunk_size=8192):
+                tmp.write(chunk)
+            local_filename = tmp.name
 
         logging.info("Uploading Image to Gemini...")
         try:
@@ -614,21 +667,23 @@ def process_image(file_url, sender_phone, prompt_text, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+            cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
-            contents = []
-            if not cache_name:
-                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
-                contents.append(types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),)
-
-            for h in history:
-                role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+            model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
+            contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
 
             user_prompt = prompt_text if prompt_text else "Please analyze this image regarding my health."
+            final_prompt = f"Look at this image. User says: {user_prompt}. Current time in Kerala is {current_time_str}. Apply the Universal Language Protocol and answer as an expert."
+            if not ack_injected:
+                 final_prompt = f"{model_ack}\n\n{final_prompt}"
+
             image_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='image/jpeg') # mime_type is optional/auto
-            text_part = types.Part.from_text(text=f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert.")
-            contents.append(types.Content(role="user", parts=[image_part, text_part]))
+            text_part = types.Part.from_text(text=final_prompt)
+
+            if last_role == "user":
+                 contents[-1].parts.extend([image_part, text_part])
+            else:
+                 contents.append(types.Content(role="user", parts=[image_part, text_part]))
 
             return call_gemini_with_retry(contents, cached_content=cache_name)
 
@@ -647,15 +702,14 @@ def process_image(file_url, sender_phone, prompt_text, history):
 
 def process_pdf(file_url, sender_phone, history):
     local_filename = None
-    headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading PDF: {file_url}")
-        with requests.get(file_url, stream=True, headers=headers) as r:
-            r.raise_for_status()
-            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                for chunk in r.iter_content(chunk_size=8192):
-                    tmp.write(chunk)
-                local_filename = tmp.name
+        r = requests.get(file_url, stream=True, headers={'apikey': ZOKO_API_KEY})
+        r.raise_for_status()
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            for chunk in r.iter_content(chunk_size=8192):
+                tmp.write(chunk)
+            local_filename = tmp.name
 
         logging.info("Uploading PDF to Gemini...")
         try:
@@ -674,20 +728,22 @@ def process_pdf(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Try to get cache for primary model
-            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+            cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
-            contents = []
-            if not cache_name:
-                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
-                contents.append(types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),)
+            model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}."
+            contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
 
-            for h in history:
-                role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+            final_prompt = f"The user uploaded a medical document. Current time in Kerala is {current_time_str}. Please analyze the findings and respond as an expert."
+            if not ack_injected:
+                 final_prompt = f"{model_ack}\n\n{final_prompt}"
 
             pdf_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='application/pdf')
-            text_part = types.Part.from_text(text=f"The user uploaded a medical document. Current time in Kerala is {current_time_str}. Please analyze the findings and respond as an expert.")
-            contents.append(types.Content(role="user", parts=[pdf_part, text_part]))
+            text_part = types.Part.from_text(text=final_prompt)
+
+            if last_role == "user":
+                 contents[-1].parts.extend([pdf_part, text_part])
+            else:
+                 contents.append(types.Content(role="user", parts=[pdf_part, text_part]))
 
             return call_gemini_with_retry(contents, cached_content=cache_name)
 
@@ -710,26 +766,18 @@ def get_ai_response(sender_phone, message_text, history):
         current_time_str = get_current_time_str()
 
         # Try to get cache for primary model
-        cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+        cache_name = get_cached_system_prompt_name("gemini-3.1-flash-lite-preview")
 
-        context_injection = f" Current time in Kerala is {current_time_str}."
-        model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
+        model_ack = f"Understood. I am AIVA. {greeting}. Current time in Kerala is {current_time_str}. I am actively monitoring the user's language."
+        contents, last_role, ack_injected = get_contents_with_history(history, model_ack, bool(cache_name))
 
-        contents = []
-        if not cache_name:
-            contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
-            contents.append(types.Content(role="model", parts=[types.Part.from_text(text=model_ack)]))
+        if not ack_injected:
+             message_text = f"{model_ack}\n\n{message_text}"
+
+        if last_role == "user":
+            contents[-1].parts[0].text += f"\n{message_text}"
         else:
-            # If cached, we still need to provide the dynamic model_ack as context if it's not in the cache
-            # But the instructions say cache the static SYSTEM_PROMPT.
-            # We'll add the model_ack as the first turn after the cache.
-            contents.append(types.Content(role="model", parts=[types.Part.from_text(text=model_ack)]))
-
-        for h in history:
-            role = "user" if h["role"] == "user" else "model"
-            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
-
-        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
+            contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
 
         return call_gemini_with_retry(contents, cached_content=cache_name)
     except Exception as e:
@@ -860,12 +908,16 @@ def handle_message(payload):
 
         is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
 
-        if is_greeting_keyword and (current_time - last_time > 12 * 3600):
+        # Check if user's opening message already contains Age and Gender (e.g. "Hi I am 25 male")
+        has_age = text_body and any(char.isdigit() for char in text_body)
+        has_gender = text_body and any(g in text_body.lower() for g in ["male", "female", "man", "woman", "boy", "girl", "പുരുഷൻ", "സ്ത്രീ"])
+        opening_contains_demographics = has_age and has_gender
+
+        if is_greeting_keyword and (current_time - last_time > 12 * 3600) and not opening_contains_demographics:
             time_greeting = get_ist_time_greeting()
             greeting_msg = (
                 f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital.\n"
-                "Please share your health concern in *Any Language* so I can guide you to the right solution.\n\n"
-                "നിങ്ങളുടെ ആരോഗ്യപരമായ എന്ത് ബുദ്ധിമുട്ടുകളും *ഏത് ഭാഷയിലും* ഞങ്ങളോട് പങ്കുവെക്കാവുന്നതാണ് "
+                "To recommend the best Ayurvedic treatment for you, please let me know your age and whether you are male or female."
             )
             send_whatsapp_message(sender_phone.replace("+", ""), greeting_msg, "text")
             last_greeted[sender_phone] = current_time
