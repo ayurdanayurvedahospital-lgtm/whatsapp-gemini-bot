@@ -68,6 +68,10 @@ else:
     logging.warning("GEMINI_API_KEY not set!")
 
 # --- GLOBAL STATE ---
+cached_system_prompt = None
+cache_expiry = 0
+system_prompt_lock = threading.Lock()
+
 user_sessions = {} # phone -> list of messages
 user_last_active = {} # phone -> timestamp
 stop_bot_cache = {}
@@ -86,10 +90,40 @@ shopify_token_lock = threading.Lock()
 
 # --- HELPER FUNCTIONS ---
 
+def get_cached_system_prompt_name(model_name):
+    """
+    Creates or retrieves a Gemini Context Cache for the SYSTEM_PROMPT.
+    Minimum 32k tokens required; SYSTEM_PROMPT is ~40k tokens.
+    """
+    global cached_system_prompt, cache_expiry
+
+    now = time.time()
+    with system_prompt_lock:
+        if cached_system_prompt and cache_expiry > now + 300:
+            return cached_system_prompt
+
+        try:
+            logging.info(f"Creating Context Cache for model: {model_name}...")
+            cache = client.caches.create(
+                model=model_name,
+                config=types.CreateCachedContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    ttl="3600s",
+                    display_name="AIVA_SYSTEM_PROMPT_CACHE"
+                )
+            )
+            cached_system_prompt = cache.name
+            cache_expiry = now + 3600
+            logging.info(f"Cache created successfully: {cached_system_prompt}")
+            return cached_system_prompt
+        except Exception as e:
+            logging.error(f"Context Caching Error: {e}")
+            return None
+
 def get_user_history(phone):
     """
     Retrieves history for a user, clearing it if inactive for >12 hours.
-    Returns a rolling window of the last 14 messages.
+    Returns a rolling window of the last 10 relevant messages.
     """
     now = time.time()
     last_active = user_last_active.get(phone, 0)
@@ -99,14 +133,14 @@ def get_user_history(phone):
         user_sessions[phone] = []
 
     history = user_sessions.get(phone, [])
-    # Strict rolling window (last 14)
-    return history[-14:]
+    # Strict rolling window (last 10) to optimize cost
+    return history[-10:]
 
 def save_user_history(phone, history):
     """
     Updates user history and activity timestamp.
     """
-    user_sessions[phone] = history[-14:]
+    user_sessions[phone] = history[-10:]
     user_last_active[phone] = time.time()
 
 def get_shopify_token():
@@ -390,7 +424,7 @@ def check_stop_bot(phone):
     stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
     return is_stopped
 
-def call_gemini_with_retry(contents):
+def call_gemini_with_retry(contents, system_instruction=None, cached_content=None):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
     Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Pro as Fallback.
@@ -398,8 +432,13 @@ def call_gemini_with_retry(contents):
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
+    primary_model = "gemini-3-flash-preview"
+    fallback_model = "gemini-2.5-pro"
+
     # Gemini 3 Flash Primary Config
     flash_config = types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        cached_content=cached_content,
         thinking_config=types.ThinkingConfig(
             thinking_level="minimal",
             include_thoughts=False
@@ -407,7 +446,9 @@ def call_gemini_with_retry(contents):
     )
 
     # Gemini 2.5 Pro Fallback Config
+    # NOTE: We do NOT pass the primary model's cache to the fallback model
     pro_config = types.GenerateContentConfig(
+        system_instruction=system_instruction if not cached_content else SYSTEM_PROMPT,
         thinking_config=types.ThinkingConfig(
             include_thoughts=False,
             thinking_budget=1024
@@ -417,32 +458,32 @@ def call_gemini_with_retry(contents):
     raw_text = ""
     try:
         # 1. Attempt with Primary Model (Gemini 3 Flash)
+        logging.info(f"Generating content with primary model: {primary_model}")
         response = client.models.generate_content(
-            model="gemini-3-flash-preview",
+            model=primary_model,
             contents=contents,
             config=flash_config
         )
         raw_text = response.text
     except Exception as e:
         err_str = str(e).lower()
-        # 2. Handle Quota/Rate Limit (429) via Fallback to Pro
-        if "429" in err_str or "quota" in err_str:
-            print("FLASH QUOTA EXCEEDED (429). Falling back to Pro...")
+        # 2. Automatic Fallback on 429, 5xx or Timeouts
+        if any(x in err_str for x in ["429", "quota", "500", "503", "timeout", "deadline"]):
+            logging.warning(f"Primary Model failed ({err_str}). Falling back to {fallback_model}...")
             try:
-                # Nested fallback to Pro
+                # Fallback to Pro
                 response = client.models.generate_content(
-                    model="gemini-2.5-pro",
+                    model=fallback_model,
                     contents=contents,
                     config=pro_config
                 )
                 raw_text = response.text
             except Exception as pro_e:
-                print(f"CRITICAL SDK ERROR (Pro Fallback Failed): {str(pro_e)}")
+                logging.error(f"CRITICAL SDK ERROR (Pro Fallback Failed): {str(pro_e)}")
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
         else:
             # 3. Handle Other Errors immediately
-            print(f"CRITICAL SDK ERROR: {str(e)}")
-            logging.error(f"Gemini Error: {e}")
+            logging.error(f"CRITICAL SDK ERROR: {str(e)}")
             return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
 
     # Global Anti-Leak Filter (HTML Comments + Structural Labels)
@@ -485,11 +526,14 @@ def process_audio(file_url, sender_phone, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
+            # Try to get cache for primary model
+            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+
             # Construct conversation with history
-            contents = [
-                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
-                types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
-            ]
+            contents = []
+            if not cache_name:
+                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
+                contents.append(types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),)
 
             # Map history to types.Content
             for h in history:
@@ -501,7 +545,7 @@ def process_audio(file_url, sender_phone, history):
             text_part = types.Part.from_text(text=f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant.")
             contents.append(types.Content(role="user", parts=[audio_part, text_part]))
 
-            return call_gemini_with_retry(contents)
+            return call_gemini_with_retry(contents, cached_content=cache_name)
 
         except Exception as e:
             logging.error(f"Gemini Audio API Error: {e}")
@@ -549,10 +593,13 @@ def process_image(file_url, sender_phone, prompt_text, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
-            contents = [
-                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
-                types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
-            ]
+            # Try to get cache for primary model
+            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+
+            contents = []
+            if not cache_name:
+                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
+                contents.append(types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),)
 
             for h in history:
                 role = "user" if h["role"] == "user" else "model"
@@ -563,7 +610,7 @@ def process_image(file_url, sender_phone, prompt_text, history):
             text_part = types.Part.from_text(text=f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert.")
             contents.append(types.Content(role="user", parts=[image_part, text_part]))
 
-            return call_gemini_with_retry(contents)
+            return call_gemini_with_retry(contents, cached_content=cache_name)
 
         except Exception as e:
             logging.error(f"Gemini Image API Error: {e}")
@@ -606,10 +653,13 @@ def process_pdf(file_url, sender_phone, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
-            contents = [
-                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
-                types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
-            ]
+            # Try to get cache for primary model
+            cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+
+            contents = []
+            if not cache_name:
+                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
+                contents.append(types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),)
 
             for h in history:
                 role = "user" if h["role"] == "user" else "model"
@@ -619,7 +669,7 @@ def process_pdf(file_url, sender_phone, history):
             text_part = types.Part.from_text(text=f"The user uploaded a medical document. Current time in Kerala is {current_time_str}. Please analyze the findings and respond as an expert.")
             contents.append(types.Content(role="user", parts=[pdf_part, text_part]))
 
-            return call_gemini_with_retry(contents)
+            return call_gemini_with_retry(contents, cached_content=cache_name)
 
         except Exception as e:
             logging.error(f"Gemini PDF API Error: {e}")
@@ -639,14 +689,21 @@ def get_ai_response(sender_phone, message_text, history):
         greeting = get_ist_time_greeting()
         current_time_str = get_current_time_str()
 
-        system_instruction = SYSTEM_PROMPT
+        # Try to get cache for primary model
+        cache_name = get_cached_system_prompt_name("gemini-3-flash-preview")
+
         context_injection = f" Current time in Kerala is {current_time_str}."
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
-        contents = [
-            types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
-            types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
-        ]
+        contents = []
+        if not cache_name:
+            contents.append(types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]))
+            contents.append(types.Content(role="model", parts=[types.Part.from_text(text=model_ack)]))
+        else:
+            # If cached, we still need to provide the dynamic model_ack as context if it's not in the cache
+            # But the instructions say cache the static SYSTEM_PROMPT.
+            # We'll add the model_ack as the first turn after the cache.
+            contents.append(types.Content(role="model", parts=[types.Part.from_text(text=model_ack)]))
 
         for h in history:
             role = "user" if h["role"] == "user" else "model"
@@ -654,7 +711,7 @@ def get_ai_response(sender_phone, message_text, history):
 
         contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
 
-        return call_gemini_with_retry(contents)
+        return call_gemini_with_retry(contents, cached_content=cache_name)
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
