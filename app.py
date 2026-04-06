@@ -467,7 +467,7 @@ def call_gemini_with_retry(contents, system_instruction=None, cached_content=Non
     except Exception as e:
         err_str = str(e).lower()
         # 2. Automatic Fallback on 429, 5xx or Timeouts
-        if any(x in err_str for x in ["429", "quota", "500", "503", "timeout", "deadline"]):
+        if any(x in err_str for x in ["429", "quota", "500", "503", "timeout"]):
             logging.warning(f"Primary Model failed ({err_str}). Falling back to {fallback_model}...")
             try:
                 # Fallback to Pro
@@ -479,11 +479,11 @@ def call_gemini_with_retry(contents, system_instruction=None, cached_content=Non
                 raw_text = response.text
             except Exception as pro_e:
                 logging.error(f"CRITICAL SDK ERROR (Pro Fallback Failed): {str(pro_e)}")
-                return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+                return "I am just double-checking your details with our senior experts. Give me just a moment!"
         else:
             # 3. Handle Other Errors immediately
             logging.error(f"CRITICAL SDK ERROR: {str(e)}")
-            return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+            return "I am just double-checking your details with our senior experts. Give me just a moment!"
 
     # Global Anti-Leak Filter (HTML Comments + Structural Labels)
     clean_text = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL)
