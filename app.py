@@ -9,6 +9,8 @@ import re
 import traceback
 import requests
 import flask
+import sqlite3
+import json
 from google import genai
 from google.genai import types
 import tempfile
@@ -28,6 +30,31 @@ if __name__ != '__main__':
     app.logger.setLevel(gunicorn_logger.level)
 
 logging.info("App Starting...")
+
+DB_FILE = "aiva_sessions.db"
+
+def db_init():
+    """Initializes the SQLite database for session persistence."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sessions (
+                phone TEXT PRIMARY KEY,
+                history TEXT,
+                last_active REAL,
+                last_greeted REAL,
+                is_muted INTEGER DEFAULT 0,
+                is_tracking INTEGER DEFAULT 0
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logging.info("SQLite DB Initialized.")
+    except Exception as e:
+        logging.error(f"DB Init Error: {e}")
+
+db_init()
 
 # Import modularized data and prompt
 try:
@@ -88,17 +115,12 @@ else:
     logging.warning("GEMINI_API_KEY not set!")
 
 # --- GLOBAL STATE ---
-user_sessions = {} # phone -> list of messages
-user_last_active = {} # phone -> timestamp
 stop_bot_cache = {}
 CACHE_TTL = 300
 processed_messages = set()
 processed_messages_lock = threading.Lock()
 user_last_messages = {}
-muted_users = set()  # Tracks users currently talking to a human agent
-last_greeted = {} # phone -> timestamp (tracks last greeting time for 12h rule)
 followup_timers = {} # phone -> {'t1': Timer, 't2': Timer}
-user_order_state = {} # phone -> boolean (True if expecting order details)
 
 # Shopify Token Cache
 shopify_token_cache = {"access_token": None, "expires_at": 0}
@@ -106,28 +128,95 @@ shopify_token_lock = threading.Lock()
 
 # --- HELPER FUNCTIONS ---
 
+def get_user_session(phone):
+    """Retrieves the full session data for a user."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('SELECT history, last_active, last_greeted, is_muted, is_tracking FROM sessions WHERE phone = ?', (phone,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "history": json.loads(row[0]) if row[0] else [],
+                "last_active": row[1] or 0,
+                "last_greeted": row[2] or 0,
+                "is_muted": bool(row[3]),
+                "is_tracking": bool(row[4])
+            }
+    except Exception as e:
+        logging.error(f"Error getting session for {phone}: {e}")
+    return {"history": [], "last_active": 0, "last_greeted": 0, "is_muted": False, "is_tracking": False}
+
 def get_user_history(phone):
     """
     Retrieves history for a user, clearing it if inactive for >12 hours.
     Returns a rolling window of the last 14 messages.
     """
+    session = get_user_session(phone)
     now = time.time()
-    last_active = user_last_active.get(phone, 0)
 
     # 12-hour inactivity clearing
-    if now - last_active > 12 * 3600:
-        user_sessions[phone] = []
+    if now - session["last_active"] > 12 * 3600:
+        return []
 
-    history = user_sessions.get(phone, [])
     # Strict rolling window (last 14)
-    return history[-14:]
+    return session["history"][-14:]
 
 def save_user_history(phone, history):
-    """
-    Updates user history and activity timestamp.
-    """
-    user_sessions[phone] = history[-14:]
-    user_last_active[phone] = time.time()
+    """Updates user history and activity timestamp in SQLite."""
+    try:
+        now = time.time()
+        history_json = json.dumps(history[-14:])
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO sessions (phone, history, last_active)
+            VALUES (?, ?, ?)
+            ON CONFLICT(phone) DO UPDATE SET
+                history = excluded.history,
+                last_active = excluded.last_active
+        ''', (phone, history_json, now))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.error(f"Error saving history for {phone}: {e}")
+
+def update_last_greeted(phone, timestamp):
+    """Updates the last_greeted timestamp in SQLite."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO sessions (phone, last_greeted)
+            VALUES (?, ?)
+            ON CONFLICT(phone) DO UPDATE SET
+                last_greeted = excluded.last_greeted
+        ''', (phone, timestamp))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.error(f"Error updating last_greeted for {phone}: {e}")
+
+def update_session_flags(phone, is_muted=None, is_tracking=None):
+    """Updates boolean flags in the session table."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        if is_muted is not None:
+            cursor.execute('''
+                INSERT INTO sessions (phone, is_muted) VALUES (?, ?)
+                ON CONFLICT(phone) DO UPDATE SET is_muted = excluded.is_muted
+            ''', (phone, int(is_muted)))
+        if is_tracking is not None:
+            cursor.execute('''
+                INSERT INTO sessions (phone, is_tracking) VALUES (?, ?)
+                ON CONFLICT(phone) DO UPDATE SET is_tracking = excluded.is_tracking
+            ''', (phone, int(is_tracking)))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logging.error(f"Error updating flags for {phone}: {e}")
 
 def get_shopify_token():
     """
@@ -330,7 +419,8 @@ def cancel_timers(phone):
 
 def send_followup_1(phone):
     """First followup after 2 minutes."""
-    if phone in muted_users or check_stop_bot(phone):
+    session = get_user_session(phone)
+    if session["is_muted"] or check_stop_bot(phone):
         return
 
     logging.info(f"Sending Follow-up 1 to {phone}")
@@ -345,7 +435,8 @@ def send_followup_1(phone):
 
 def send_followup_2(phone):
     """Second followup after 30 minutes."""
-    if phone in muted_users or check_stop_bot(phone):
+    session = get_user_session(phone)
+    if session["is_muted"] or check_stop_bot(phone):
         return
 
     logging.info(f"Sending Follow-up 2 to {phone}")
@@ -718,10 +809,13 @@ def handle_message(payload):
         text_body = payload.get("text", "")
         file_url = payload.get("fileUrl")
 
+        # Retrieve Session Data
+        session = get_user_session(sender_phone)
+
         # --- STEP 1: RESUME COMMAND (Priority) ---
         if text_body and text_body.strip().upper() == "START BOT":
-            if sender_phone in muted_users:
-                muted_users.discard(sender_phone)
+            if session["is_muted"]:
+                update_session_flags(sender_phone, is_muted=False)
                 logging.info(f"Bot resumed for {sender_phone} via 'START BOT' command.")
                 send_whatsapp_message(sender_phone.replace("+", ""), "Bot resumed. How can I help?", "text")
             else:
@@ -732,7 +826,7 @@ def handle_message(payload):
             return
 
         # --- STEP 2: CHECK MUTE STATUS ---
-        if sender_phone in muted_users:
+        if session["is_muted"]:
             logging.info(f"User {sender_phone} is muted (talking to human). Ignoring message.")
             return
 
@@ -743,7 +837,7 @@ def handle_message(payload):
 
         if text_body and text_body.strip().upper() == "STOP BOT":
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
-            muted_users.add(sender_phone)
+            update_session_flags(sender_phone, is_muted=True)
             send_whatsapp_message(sender_phone.replace("+", ""), "Bot has been stopped for this chat.", "text")
             return
 
@@ -768,28 +862,28 @@ def handle_message(payload):
                  status_msg = get_order_status(potential_id)
                  send_whatsapp_message(sender_phone.replace("+", ""), status_msg, "text")
                  # Reset state (Pivot back to AIVA implicitly)
-                 user_order_state[sender_phone] = False
+                 update_session_flags(sender_phone, is_tracking=False)
                  return
             else:
                  # Ask for details
-                 user_order_state[sender_phone] = True
+                 update_session_flags(sender_phone, is_tracking=True)
                  send_whatsapp_message(sender_phone.replace("+", ""), "Please enter the *Mobile Number* used for the order or your *Order Number*.", "text")
                  return
 
         # Case B: User is in Tracking Mode (waiting for input)
-        if user_order_state.get(sender_phone):
+        if session["is_tracking"]:
             # Check if user is trying to pivot back to health (Health keyword check)
             # Simple heuristic: If it contains medical keywords or is long text
             is_health_query = any(k in text_body.lower() for k in ["pain", "weight", "hair", "skin", "diabetes", "sugar", "gain", "loss", "sleep"])
 
             if is_health_query:
-                user_order_state[sender_phone] = False
+                update_session_flags(sender_phone, is_tracking=False)
                 # Fall through to AIVA logic below
             else:
                 # Treat as Order ID/Phone
                 status_msg = get_order_status(text_body)
                 send_whatsapp_message(sender_phone.replace("+", ""), status_msg, "text")
-                user_order_state[sender_phone] = False
+                update_session_flags(sender_phone, is_tracking=False)
 
                 # Check if we should pivot back explicitly?
                 # "Post-Lookup: After providing details, if they ask a health question, pivot back..."
@@ -799,7 +893,8 @@ def handle_message(payload):
 
         # --- STEP 4: SMART GREETING LOGIC (12 HOUR RULE) ---
         current_time = time.time()
-        last_time = last_greeted.get(sender_phone, 0)
+        session = get_user_session(sender_phone)
+        last_time = session["last_greeted"]
 
         is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
 
@@ -811,7 +906,7 @@ def handle_message(payload):
                 "നിങ്ങളുടെ ആരോഗ്യപരമായ എന്ത് ബുദ്ധിമുട്ടുകളും *ഏത് ഭാഷയിലും* ഞങ്ങളോട് പങ്കുവെക്കാവുന്നതാണ് "
             )
             send_whatsapp_message(sender_phone.replace("+", ""), greeting_msg, "text")
-            last_greeted[sender_phone] = current_time
+            update_last_greeted(sender_phone, current_time)
             logging.info(f"Sent 12h greeting to {sender_phone}")
 
             # Start timer after greeting
@@ -869,13 +964,14 @@ def handle_message(payload):
 
                 send_whatsapp_message(sender_phone.replace("+", ""), "📞 You can contact our Senior Health Expert directly at +91 9072727201 (Note: Call only, No WhatsApp).", "text")
 
-                muted_users.add(sender_phone)
+                update_session_flags(sender_phone, is_muted=True)
                 logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
             else:
                 send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
 
             # Start timer after bot replies (expecting user follow-up)
-            if sender_phone not in muted_users:
+            session = get_user_session(sender_phone)
+            if not session["is_muted"]:
                 start_inactivity_timer(sender_phone)
 
     except Exception as e:
