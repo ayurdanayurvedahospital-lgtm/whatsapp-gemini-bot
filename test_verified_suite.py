@@ -15,9 +15,14 @@ import app
 class TestExistingLogic(unittest.TestCase):
 
     def setUp(self):
-        app.user_sessions.clear()
+        # Clear database for each test
+        conn = app.sqlite3.connect(app.DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions")
+        conn.commit()
+        conn.close()
+
         app.processed_messages.clear()
-        app.muted_users.clear()
         app.stop_bot_cache.clear()
 
     @patch('app.send_whatsapp_message')
@@ -40,8 +45,6 @@ class TestExistingLogic(unittest.TestCase):
 
     def test_memory_rolling_window(self):
         phone = "+9100000000"
-        app.user_sessions[phone] = []
-        app.user_last_active[phone] = 1000 # old time
 
         # Fill with 20 messages
         for i in range(20):
