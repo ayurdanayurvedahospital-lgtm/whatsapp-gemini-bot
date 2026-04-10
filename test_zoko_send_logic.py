@@ -1,9 +1,18 @@
+import sys
+from unittest.mock import MagicMock, patch
+
+# Global Mocking
+sys.modules["flask"] = MagicMock()
+sys.modules["google"] = MagicMock()
+sys.modules["google.genai"] = MagicMock()
+sys.modules["google.genai.types"] = MagicMock()
+sys.modules["pytz"] = MagicMock()
+
 import unittest
-from unittest.mock import patch, MagicMock
 import app
 
 class TestSendMessage(unittest.TestCase):
-    @patch('app.requests.post')
+    @patch('app.zoko_session.post')
     def test_send_text(self, mock_post):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -17,7 +26,7 @@ class TestSendMessage(unittest.TestCase):
         self.assertEqual(kwargs['json']['message'], "Hello")
         self.assertEqual(kwargs['json']['type'], "text")
 
-    @patch('app.requests.post')
+    @patch('app.zoko_session.post')
     def test_send_image_valid(self, mock_post):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -30,7 +39,7 @@ class TestSendMessage(unittest.TestCase):
         self.assertEqual(kwargs['json']['type'], "image")
         self.assertEqual(kwargs['json']['url'], "http://example.com/img.png")
 
-    @patch('app.requests.post')
+    @patch('app.zoko_session.post')
     def test_send_image_invalid(self, mock_post):
         mock_response = MagicMock()
         mock_response.status_code = 200

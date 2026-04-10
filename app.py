@@ -115,6 +115,7 @@ else:
     logging.warning("GEMINI_API_KEY not set!")
 
 # --- GLOBAL STATE ---
+zoko_session = requests.Session()
 stop_bot_cache = {}
 CACHE_TTL = 300
 processed_messages = set()
@@ -395,7 +396,7 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
             }
 
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = zoko_session.post(url, json=payload, headers=headers)
         logging.info(f"Sent {message_type}: {response.status_code}")
         if response.status_code >= 400:
              logging.error(f"Zoko API Error: {response.text}")
@@ -474,7 +475,7 @@ def check_stop_bot(phone):
     try:
         url = f"https://chat.zoko.io/v2/chats?phone={phone}"
         headers = {'apikey': ZOKO_API_KEY}
-        resp = requests.get(url, headers=headers, timeout=5)
+        resp = zoko_session.get(url, headers=headers, timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             chat_data = data.get('data', []) if isinstance(data, dict) else data
