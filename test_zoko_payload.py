@@ -20,10 +20,13 @@ class TestZokoPayload(unittest.TestCase):
         mock_flask = sys.modules["flask"]
         mock_flask.request.json = {"messageId": "123", "platformSenderId": "9100"}
 
-        from app import bot
+        # Mock jsonify to return a tuple or just the mock itself
+        app.jsonify = MagicMock(side_effect=lambda x: x)
+
         with patch('app.request', mock_flask.request):
-            resp, status = bot()
-            self.assertEqual(status, 200)
+            result = app.bot()
+            self.assertIsInstance(result, tuple)
+            self.assertEqual(result[1], 200)
             self.assertTrue(mock_thread.called)
 
     @patch('app.send_whatsapp_message')
