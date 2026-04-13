@@ -598,8 +598,17 @@ def process_audio(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Construct conversation with history
+            user_lang = "malayalam" # default for audio/image if unknown, or maybe english
+            if history:
+                for h in reversed(history):
+                    if h["role"] == "user":
+                        user_lang = detect_language(h["parts"][0])
+                        if user_lang == "malayalam":
+                            break
+
+            system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
             contents = [
-                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
+                types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
@@ -661,8 +670,17 @@ def process_image(file_url, sender_phone, prompt_text, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
+            user_lang = "malayalam" # default for audio/image if unknown, or maybe english
+            if history:
+                for h in reversed(history):
+                    if h["role"] == "user":
+                        user_lang = detect_language(h["parts"][0])
+                        if user_lang == "malayalam":
+                            break
+
+            system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
             contents = [
-                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
+                types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
@@ -718,8 +736,17 @@ def process_pdf(file_url, sender_phone, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
+            user_lang = "malayalam" # default for audio/image if unknown, or maybe english
+            if history:
+                for h in reversed(history):
+                    if h["role"] == "user":
+                        user_lang = detect_language(h["parts"][0])
+                        if user_lang == "malayalam":
+                            break
+
+            system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
             contents = [
-                types.Content(role="user", parts=[types.Part.from_text(text=SYSTEM_PROMPT)]),
+                types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
@@ -746,12 +773,55 @@ def process_pdf(file_url, sender_phone, history):
                 os.remove(local_filename)
             except Exception: pass
 
+
+def detect_language(text):
+    if not text:
+        return "english"
+    malayalam_chars = [c for c in text if 'ഀ' <= c <= 'ൿ']
+    if len(malayalam_chars) > 0:
+        return "malayalam"
+
+    text_lower = text.lower()
+    manglish_words = ["njan", "enth", "eppol", "evide", "aanu", "und", "illa", "kure", "varunnu", "nokkam", "marunnu", "kazhikkan", "kurav", "kooduthal", "vendiyanu", "kure", "nalayitt", "oru", "athu", "ithu", "karanam", "vishesham", "sugham", "nalla", "kurachu", "valare"]
+    words = set(re.findall(r'\b\w+\b', text_lower))
+    if any(w in words for w in manglish_words):
+        return "malayalam"
+
+    return "english"
+
+def filter_system_prompt_by_language(system_prompt, language):
+    '''
+    Dynamically strips the unused language blueprints from the system prompt to prevent language bleed.
+    '''
+    lines = system_prompt.split('\n')
+    filtered_lines = []
+
+    for line in lines:
+        if language == "english":
+            if "- Malayalam Blueprint:" in line or "Exact Malayalam Blueprint" in line or "* Malayalam:" in line:
+                continue
+        elif language == "malayalam":
+            if "- English Blueprint:" in line or "Exact English Blueprint" in line or "* English:" in line:
+                continue
+        filtered_lines.append(line)
+
+    return '\n'.join(filtered_lines)
+
 def get_ai_response(sender_phone, message_text, history):
     try:
         greeting = get_ist_time_greeting()
         current_time_str = get_current_time_str()
 
-        system_instruction = SYSTEM_PROMPT
+        user_lang = detect_language(message_text)
+        if user_lang == "english" and history:
+            # check history for language to be safe if current message is short
+            for h in reversed(history):
+                if h["role"] == "user":
+                    user_lang = detect_language(h["parts"][0])
+                    if user_lang == "malayalam":
+                        break
+
+        system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
         context_injection = f" Current time in Kerala is {current_time_str}."
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
