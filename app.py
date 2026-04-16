@@ -909,7 +909,18 @@ def handle_message(payload):
         if text_body and text_body.strip().upper() == "STOP BOT":
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             update_session_flags(sender_phone, is_muted=True)
+            cancel_timers(sender_phone)
             send_whatsapp_message(sender_phone.replace("+", ""), "Bot has been stopped for this chat.", "text")
+            return
+
+        # DND Protocol (Fix 62)
+        dnd_keywords = ["stop", "don't message me", "dont message me", "leave me alone", "do not disturb"]
+        if text_body and any(k in text_body.lower() for k in dnd_keywords):
+            stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
+            update_session_flags(sender_phone, is_muted=True)
+            cancel_timers(sender_phone)
+            send_whatsapp_message(sender_phone.replace("+", ""), "ശരി, ഞങ്ങൾ ഇനി മെസ്സേജ് അയക്കുന്നതല്ല. നിങ്ങളുടെ സമയത്തിന് നന്ദി.", "text")
+            logging.info(f"DND Triggered for {sender_phone}. All timers cancelled and muted.")
             return
 
         # Loop Prevention
