@@ -505,12 +505,12 @@ def check_stop_bot(phone):
 def call_gemini_with_retry(contents):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
-    Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Pro as Fallback.
+    Inverted Architecture: Gemini 2.5 Flash as Primary, 2.5 Pro as Fallback.
     """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    # Gemini 3 Flash Primary Config
+    # Gemini 2.5 Flash Primary Config
     flash_config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             thinking_level="minimal",
@@ -528,9 +528,9 @@ def call_gemini_with_retry(contents):
 
     raw_text = ""
     try:
-        # 1. Attempt with Primary Model (Gemini 3 Flash)
+        # 1. Attempt with Primary Model (Gemini 2.5 Flash)
         response = client.models.generate_content(
-            model="gemini-3-flash-preview",
+            model="gemini-2.5-flash",
             contents=contents,
             config=flash_config
         )
