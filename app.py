@@ -973,6 +973,41 @@ def handle_message(payload):
                 # If they say "Thanks", the next message will hit AIVA.
                 return
 
+
+        # --- CRITICAL HOTFIX 61.1: HARD-CODED TRIAGE BYPASS ---
+        triage_bypass_keywords = [
+            'staamigen malt', 'sakhitone', 'gainplus capsule', 'strength plus', 'staamigen powder',
+            'junior staamigen malt', 'ayurdiabet powder', 'ayur-diabetics-powder', 'vrindatone',
+            'kanya tone', 'medigas syrup', 'saphala capsules', 'muktanjan pain relief oil'
+        ]
+        is_triage_bypass = False
+        detected_product = None
+        if text_body:
+            lower_body = text_body.lower()
+            for kw in triage_bypass_keywords:
+                if kw in lower_body or kw.replace(" ", "-") in lower_body or kw.replace(" ", "") in lower_body:
+                    is_triage_bypass = True
+                    detected_product = kw
+                    break
+
+        session = get_user_session(sender_phone)
+        if is_triage_bypass and not session["history"]:
+            # Hard short-circuit: Ask ONLY for age and gender (Fix 59 pacing)
+            bypass_msg = f"I see your enquiry about {detected_product.title()}. To recommend the best Ayurvedic treatment for you, please let me know your age and whether you are male or female."
+            user_lang = detect_language(text_body)
+            if user_lang == "malayalam":
+                bypass_msg = f"{detected_product.title()}-നെ കുറിച്ചുള്ള വിവരങ്ങൾ അറിയാനാണെന്ന് മനസ്സിലാക്കുന്നു. നിങ്ങൾക്ക് കൃത്യമായ നിർദ്ദേശങ്ങൾ നൽകുന്നതിനായി, നിങ്ങളുടെ പ്രായവും പുരുഷനാണോ സ്ത്രീയാണോ എന്നതും ദയവായി ഒന്ന് പങ്കുവെക്കാമോ?"
+
+            send_whatsapp_message(sender_phone.replace("+", ""), bypass_msg, "text")
+            update_last_greeted(sender_phone, time.time())
+
+            # Save history so next time it won't trigger this bypass
+            history = [{"role": "user", "parts": [text_body]}, {"role": "model", "parts": [bypass_msg]}]
+            save_user_history(sender_phone, history)
+            start_inactivity_timer(sender_phone)
+            logging.info(f"Triage Bypass triggered for {sender_phone} on product {detected_product}")
+            return
+
         # --- STEP 4: SMART GREETING LOGIC (12 HOUR RULE) ---
         current_time = time.time()
         session = get_user_session(sender_phone)
