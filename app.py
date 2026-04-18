@@ -52,6 +52,10 @@ def db_init():
             cursor.execute('ALTER TABLE sessions ADD COLUMN is_dnd_active INTEGER DEFAULT 0')
         except Exception:
             pass # Column already exists
+        try:
+            cursor.execute('ALTER TABLE sessions ADD COLUMN is_blacklisted INTEGER DEFAULT 0')
+        except Exception:
+            pass # Column already exists
         conn.commit()
         conn.close()
         logging.info("SQLite DB Initialized.")
@@ -138,7 +142,7 @@ def get_user_session(phone):
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        cursor.execute('SELECT history, last_active, last_greeted, is_muted, is_tracking, is_dnd_active FROM sessions WHERE phone = ?', (phone,))
+        cursor.execute('SELECT history, last_active, last_greeted, is_muted, is_tracking, is_dnd_active, is_blacklisted FROM sessions WHERE phone = ?', (phone,))
         row = cursor.fetchone()
         conn.close()
         if row:
@@ -148,11 +152,12 @@ def get_user_session(phone):
                 "last_greeted": row[2] or 0,
                 "is_muted": bool(row[3]),
                 "is_tracking": bool(row[4]),
-                "is_dnd_active": bool(row[5]) if len(row) > 5 and row[5] is not None else False
+                "is_dnd_active": bool(row[5]) if len(row) > 5 and row[5] is not None else False,
+                "is_blacklisted": bool(row[6]) if len(row) > 6 and row[6] is not None else False
             }
     except Exception as e:
         logging.error(f"Error getting session for {phone}: {e}")
-    return {"history": [], "last_active": 0, "last_greeted": 0, "is_muted": False, "is_tracking": False, "is_dnd_active": False}
+    return {"history": [], "last_active": 0, "last_greeted": 0, "is_muted": False, "is_tracking": False, "is_dnd_active": False, "is_blacklisted": False}
 
 def get_user_history(phone):
     """
@@ -204,7 +209,7 @@ def update_last_greeted(phone, timestamp):
     except Exception as e:
         logging.error(f"Error updating last_greeted for {phone}: {e}")
 
-def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=None):
+def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=None, is_blacklisted=None):
     """Updates boolean flags in the session table."""
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -224,6 +229,11 @@ def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=N
                 INSERT INTO sessions (phone, is_dnd_active) VALUES (?, ?)
                 ON CONFLICT(phone) DO UPDATE SET is_dnd_active = excluded.is_dnd_active
             ''', (phone, int(is_dnd_active)))
+        if is_blacklisted is not None:
+            cursor.execute('''
+                INSERT INTO sessions (phone, is_blacklisted) VALUES (?, ?)
+                ON CONFLICT(phone) DO UPDATE SET is_blacklisted = excluded.is_blacklisted
+            ''', (phone, int(is_blacklisted)))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -893,6 +903,11 @@ def handle_message(payload):
         # Retrieve Session Data
         session = get_user_session(sender_phone)
 
+        # --- THE SILENT WALL PROTOCOL (FIX 71) ---
+        if session.get("is_blacklisted"):
+            logging.info(f"Blacklisted user {sender_phone} tried to send a message. Ghosting active.")
+            return
+
         # --- STEP 1: RESUME COMMAND (Priority) ---
         if text_body and text_body.strip().upper() == "START BOT":
             if session["is_muted"]:
@@ -933,14 +948,25 @@ def handle_message(payload):
             logging.info(f"DND Triggered for {sender_phone}. All timers cancelled, muted, and DND active flag set.")
             return
 
-        # Loop Prevention
+        # --- COMPREHENSIVE SANITY FILTER: HARASSMENT & SPAM (FIX 71) ---
         if text_body:
+            # 1. HARASSMENT INTENT DETECTION
+            harassment_keywords = ['sexy', 'kiss', 'flirt', 'send pic', 'send nude', 'kambi', 'pooru', 'myre', 'fck', 'fuck', 'bitch', 'asshole']
+            is_harassment = any(kw in text_body.lower() for kw in harassment_keywords)
+
+            # 2. SPAM/LOOP DETECTION
             last_msgs = user_last_messages.get(sender_phone, [])
             last_msgs.append(text_body)
             if len(last_msgs) > 3: last_msgs.pop(0)
             user_last_messages[sender_phone] = last_msgs
-            if len(last_msgs) == 3 and all(m == last_msgs[0] for m in last_msgs):
-                logging.warning(f"Loop detected for {sender_phone}. Ignoring.")
+            is_spam_loop = (len(last_msgs) == 3 and all(m == last_msgs[0] for m in last_msgs))
+
+            # 3. THE BLACKLIST FLAG & SILENT WALL PROTOCOL
+            if is_harassment or is_spam_loop:
+                logging.warning(f"Sanity Filter triggered for {sender_phone}. Harassment: {is_harassment}, Spam: {is_spam_loop}. Ghosting activated.")
+                update_session_flags(sender_phone, is_blacklisted=True, is_dnd_active=True, is_muted=True)
+                cancel_timers(sender_phone)
+                stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
                 return
 
         # --- STEP 3: ORDER TRACKING PROTOCOL ---
