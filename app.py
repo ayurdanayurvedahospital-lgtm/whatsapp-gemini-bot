@@ -48,6 +48,10 @@ def db_init():
                 is_tracking INTEGER DEFAULT 0
             )
         ''')
+        try:
+            cursor.execute('ALTER TABLE sessions ADD COLUMN is_dnd_active INTEGER DEFAULT 0')
+        except Exception:
+            pass # Column already exists
         conn.commit()
         conn.close()
         logging.info("SQLite DB Initialized.")
@@ -134,7 +138,7 @@ def get_user_session(phone):
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        cursor.execute('SELECT history, last_active, last_greeted, is_muted, is_tracking FROM sessions WHERE phone = ?', (phone,))
+        cursor.execute('SELECT history, last_active, last_greeted, is_muted, is_tracking, is_dnd_active FROM sessions WHERE phone = ?', (phone,))
         row = cursor.fetchone()
         conn.close()
         if row:
@@ -143,11 +147,12 @@ def get_user_session(phone):
                 "last_active": row[1] or 0,
                 "last_greeted": row[2] or 0,
                 "is_muted": bool(row[3]),
-                "is_tracking": bool(row[4])
+                "is_tracking": bool(row[4]),
+                "is_dnd_active": bool(row[5]) if len(row) > 5 and row[5] is not None else False
             }
     except Exception as e:
         logging.error(f"Error getting session for {phone}: {e}")
-    return {"history": [], "last_active": 0, "last_greeted": 0, "is_muted": False, "is_tracking": False}
+    return {"history": [], "last_active": 0, "last_greeted": 0, "is_muted": False, "is_tracking": False, "is_dnd_active": False}
 
 def get_user_history(phone):
     """
@@ -199,7 +204,7 @@ def update_last_greeted(phone, timestamp):
     except Exception as e:
         logging.error(f"Error updating last_greeted for {phone}: {e}")
 
-def update_session_flags(phone, is_muted=None, is_tracking=None):
+def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=None):
     """Updates boolean flags in the session table."""
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -214,6 +219,11 @@ def update_session_flags(phone, is_muted=None, is_tracking=None):
                 INSERT INTO sessions (phone, is_tracking) VALUES (?, ?)
                 ON CONFLICT(phone) DO UPDATE SET is_tracking = excluded.is_tracking
             ''', (phone, int(is_tracking)))
+        if is_dnd_active is not None:
+            cursor.execute('''
+                INSERT INTO sessions (phone, is_dnd_active) VALUES (?, ?)
+                ON CONFLICT(phone) DO UPDATE SET is_dnd_active = excluded.is_dnd_active
+            ''', (phone, int(is_dnd_active)))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -421,7 +431,7 @@ def cancel_timers(phone):
 def send_followup_1(phone):
     """First followup after 2 minutes."""
     session = get_user_session(phone)
-    if session["is_muted"] or check_stop_bot(phone):
+    if session.get("is_dnd_active") == True or session["is_muted"] or check_stop_bot(phone):
         return
 
     logging.info(f"Sending Follow-up 1 to {phone}")
@@ -437,7 +447,7 @@ def send_followup_1(phone):
 def send_followup_2(phone):
     """Second followup after 30 minutes."""
     session = get_user_session(phone)
-    if session["is_muted"] or check_stop_bot(phone):
+    if session.get("is_dnd_active") == True or session["is_muted"] or check_stop_bot(phone):
         return
 
     logging.info(f"Sending Follow-up 2 to {phone}")
@@ -913,14 +923,14 @@ def handle_message(payload):
             send_whatsapp_message(sender_phone.replace("+", ""), "Bot has been stopped for this chat.", "text")
             return
 
-        # DND Protocol (Fix 62)
-        dnd_keywords = ["stop", "don't message me", "dont message me", "leave me alone", "do not disturb"]
+        # DND Protocol (Fix 62.1)
+        dnd_keywords = ["stop", "don't message me", "dont message me", "leave me alone", "do not disturb", "ശല്യം ചെയ്യരുത്", "venda", "ini venda"]
         if text_body and any(k in text_body.lower() for k in dnd_keywords):
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
-            update_session_flags(sender_phone, is_muted=True)
+            update_session_flags(sender_phone, is_muted=True, is_dnd_active=True)
             cancel_timers(sender_phone)
             send_whatsapp_message(sender_phone.replace("+", ""), "ശരി, ഞങ്ങൾ ഇനി മെസ്സേജ് അയക്കുന്നതല്ല. നിങ്ങളുടെ സമയത്തിന് നന്ദി.", "text")
-            logging.info(f"DND Triggered for {sender_phone}. All timers cancelled and muted.")
+            logging.info(f"DND Triggered for {sender_phone}. All timers cancelled, muted, and DND active flag set.")
             return
 
         # Loop Prevention
