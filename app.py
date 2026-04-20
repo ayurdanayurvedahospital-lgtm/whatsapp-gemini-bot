@@ -56,6 +56,10 @@ def db_init():
             cursor.execute('ALTER TABLE sessions ADD COLUMN is_blacklisted INTEGER DEFAULT 0')
         except Exception:
             pass # Column already exists
+        try:
+            cursor.execute('ALTER TABLE sessions ADD COLUMN is_flow_complete INTEGER DEFAULT 0')
+        except Exception:
+            pass # Column already exists
         conn.commit()
         conn.close()
         logging.info("SQLite DB Initialized.")
@@ -142,7 +146,7 @@ def get_user_session(phone):
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        cursor.execute('SELECT history, last_active, last_greeted, is_muted, is_tracking, is_dnd_active, is_blacklisted FROM sessions WHERE phone = ?', (phone,))
+        cursor.execute('SELECT history, last_active, last_greeted, is_muted, is_tracking, is_dnd_active, is_blacklisted, is_flow_complete FROM sessions WHERE phone = ?', (phone,))
         row = cursor.fetchone()
         conn.close()
         if row:
@@ -153,11 +157,12 @@ def get_user_session(phone):
                 "is_muted": bool(row[3]),
                 "is_tracking": bool(row[4]),
                 "is_dnd_active": bool(row[5]) if len(row) > 5 and row[5] is not None else False,
-                "is_blacklisted": bool(row[6]) if len(row) > 6 and row[6] is not None else False
+                "is_blacklisted": bool(row[6]) if len(row) > 6 and row[6] is not None else False,
+                "is_flow_complete": bool(row[7]) if len(row) > 7 and row[7] is not None else False
             }
     except Exception as e:
         logging.error(f"Error getting session for {phone}: {e}")
-    return {"history": [], "last_active": 0, "last_greeted": 0, "is_muted": False, "is_tracking": False, "is_dnd_active": False, "is_blacklisted": False}
+    return {"history": [], "last_active": 0, "last_greeted": 0, "is_muted": False, "is_tracking": False, "is_dnd_active": False, "is_blacklisted": False, "is_flow_complete": False}
 
 def get_user_history(phone):
     """
@@ -209,7 +214,7 @@ def update_last_greeted(phone, timestamp):
     except Exception as e:
         logging.error(f"Error updating last_greeted for {phone}: {e}")
 
-def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=None, is_blacklisted=None):
+def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=None, is_blacklisted=None, is_flow_complete=None):
     """Updates boolean flags in the session table."""
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -234,6 +239,11 @@ def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=N
                 INSERT INTO sessions (phone, is_blacklisted) VALUES (?, ?)
                 ON CONFLICT(phone) DO UPDATE SET is_blacklisted = excluded.is_blacklisted
             ''', (phone, int(is_blacklisted)))
+        if is_flow_complete is not None:
+            cursor.execute('''
+                INSERT INTO sessions (phone, is_flow_complete) VALUES (?, ?)
+                ON CONFLICT(phone) DO UPDATE SET is_flow_complete = excluded.is_flow_complete
+            ''', (phone, int(is_flow_complete)))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -441,7 +451,7 @@ def cancel_timers(phone):
 def send_followup_1(phone):
     """First followup after 2 minutes."""
     session = get_user_session(phone)
-    if session.get("is_dnd_active") == True or session["is_muted"] or check_stop_bot(phone):
+    if session.get("is_dnd_active") == True or session.get("is_flow_complete") == True or session["is_muted"] or check_stop_bot(phone):
         return
 
     logging.info(f"Sending Follow-up 1 to {phone}")
@@ -457,7 +467,7 @@ def send_followup_1(phone):
 def send_followup_2(phone):
     """Second followup after 30 minutes."""
     session = get_user_session(phone)
-    if session.get("is_dnd_active") == True or session["is_muted"] or check_stop_bot(phone):
+    if session.get("is_dnd_active") == True or session.get("is_flow_complete") == True or session["is_muted"] or check_stop_bot(phone):
         return
 
     logging.info(f"Sending Follow-up 2 to {phone}")
@@ -939,7 +949,7 @@ def handle_message(payload):
             return
 
         # DND Protocol (Fix 62.1)
-        dnd_keywords = ["stop", "don't message me", "dont message me", "leave me alone", "do not disturb", "ശല്യം ചെയ്യരുത്", "venda", "ini venda"]
+        dnd_keywords = ["don't message me", "dont message me", "leave me alone", "do not disturb", "ശല്യം ചെയ്യരുത്", "message nirthu", "ini ayakkanda"]
         if text_body and any(k in text_body.lower() for k in dnd_keywords):
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             update_session_flags(sender_phone, is_muted=True, is_dnd_active=True)
@@ -1122,9 +1132,15 @@ def handle_message(payload):
             else:
                 send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
 
+            # FIX 62.4: MULTI-LINGUAL GRACEFUL EXIT (TIMER KILL-SWITCH)
+            terminal_phrases = ['ശുഭദിനം നേരുന്നു! 🌿', 'ശുഭദിനം!', 'have a good day', 'have a great day', 'shubhadinam']
+            if any(phrase in response_text.lower() for phrase in [p.lower() for p in terminal_phrases]):
+                update_session_flags(sender_phone, is_flow_complete=True)
+                logging.info(f"Flow complete for {sender_phone}. Timers disabled.")
+
             # Start timer after bot replies (expecting user follow-up)
             session = get_user_session(sender_phone)
-            if not session["is_muted"]:
+            if not session["is_muted"] and not session.get("is_flow_complete"):
                 start_inactivity_timer(sender_phone)
 
     except Exception as e:
