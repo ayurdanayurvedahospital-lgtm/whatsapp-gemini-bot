@@ -980,7 +980,7 @@ def handle_message(payload):
                 return
 
         # --- STEP 3: ORDER TRACKING PROTOCOL ---
-        is_tracking_intent = text_body and any(k in text_body.lower() for k in ["where is my order", "track my order", "order status", "track order", "status of my order"])
+        is_tracking_intent = text_body and any(k in text_body.lower() for k in ["where is my order", "track my order", "order status", "track order", "status of my order", "tracking details", "order eppo kittum", "order eppo varum", "order vannilla"])
 
         # Case A: User explicitly asks to track
         if is_tracking_intent:
@@ -990,11 +990,13 @@ def handle_message(payload):
                  status_msg = get_order_status(potential_id)
                  send_whatsapp_message(sender_phone.replace("+", ""), status_msg, "text")
                  # Reset state (Pivot back to AIVA implicitly)
-                 update_session_flags(sender_phone, is_tracking=False)
+                 update_session_flags(sender_phone, is_tracking=False, is_flow_complete=True)
+                 cancel_timers(sender_phone)
                  return
             else:
                  # Ask for details
-                 update_session_flags(sender_phone, is_tracking=True)
+                 update_session_flags(sender_phone, is_tracking=True, is_flow_complete=True)
+                 cancel_timers(sender_phone)
                  send_whatsapp_message(sender_phone.replace("+", ""), "Please enter the *Mobile Number* used for the order or your *Order Number*.", "text")
                  return
 
