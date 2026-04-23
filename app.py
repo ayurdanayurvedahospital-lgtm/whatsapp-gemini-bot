@@ -876,7 +876,13 @@ def handle_message(payload):
     Main Logic Handler (Background Thread).
     """
     try:
-        logging.info(f"STEP 1: Received Payload: {payload}")
+        # SECURITY FIX: Extract safe fields instead of logging raw payload
+        safe_log = {
+            "messageId": payload.get("messageId") or payload.get("eventId"),
+            "sender": payload.get("platformSenderId"),
+            "type": payload.get("type")
+        }
+        logging.info(f"STEP 1: Received message: {safe_log}")
 
         # Extract Basics
         message_id = payload.get("messageId") or payload.get("eventId")
@@ -1178,7 +1184,3 @@ def bot():
         logging.error(f"Webhook Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-if __name__ == '__main__':
-    # Render provides the PORT dynamically. Default to 10000 if running locally.
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
