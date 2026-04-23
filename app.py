@@ -1135,7 +1135,7 @@ def handle_message(payload):
                 send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
 
             # FIX 62.4: MULTI-LINGUAL GRACEFUL EXIT (TIMER KILL-SWITCH)
-            terminal_phrases = ['ശുഭദിനം നേരുന്നു! 🌿', 'ശുഭദിനം!', 'have a good day', 'have a great day', 'shubhadinam']
+            terminal_phrases = ['ശുഭദിനം', 'ആശംസിക്കുന്നു', 'have a good day', 'have a great day', 'സമയത്തിന് നന്ദി', 'shubhadinam']
             if any(phrase in response_text.lower() for phrase in [p.lower() for p in terminal_phrases]):
                 update_session_flags(sender_phone, is_flow_complete=True)
                 logging.info(f"Flow complete for {sender_phone}. Timers disabled.")
