@@ -21,6 +21,8 @@ PRODUCT_IMAGES = {
     "kanya tone": "[https://ayuralpha.in/cdn/shop/files/Kanya_Tone_7.png?v=1727072110&width=823](https://ayuralpha.in/cdn/shop/files/Kanya_Tone_7.png?v=1727072110&width=823)"
 }
 
+GPAY_NUMBER = "9544414479"
+
 LINKS = {
     "website": "https://ayuralpha.in/",
     "flipkart": "https://www.flipkart.com/search?q=Alpha+Ayurveda",
