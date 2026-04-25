@@ -4,6 +4,12 @@ AGENTS = [
     {"name": "Savitha", "role": "Support Agent", "phone": "+91 99463 88900"}
 ]
 
+# --- ENTITY DEFINITIONS ---
+ENTITIES = {
+    "Health Experts": "This is a 100% FREE customer care and sales support line. Phone: +91 9072727201. NEVER associate a fee with this number.",
+    "Doctors": "This is a PAID online medical consultation. Fees start at ₹300."
+}
+
 PRODUCT_IMAGES = {
     "staamigen malt": "[https://ayuralpha.in/cdn/shop/files/Staamigen_1.jpg?v=1747049320&width=600](https://ayuralpha.in/cdn/shop/files/Staamigen_1.jpg?v=1747049320&width=600)",
     "sakhitone": "[https://m.media-amazon.com/images/I/812mK8ADM2L._SX679_.jpg](https://m.media-amazon.com/images/I/812mK8ADM2L._SX679_.jpg)",
