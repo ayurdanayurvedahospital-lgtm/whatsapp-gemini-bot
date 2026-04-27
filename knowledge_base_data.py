@@ -1,4 +1,13 @@
 # --- CONFIGURATION ---
+# --- HIDDEN WHITELIST (HOTFIX 84) ---
+# You are STRICTLY FORBIDDEN from ever listing, sharing, or offering these executive numbers to the user proactively. This list is for your internal validation ONLY.
+HIDDEN_WHITELIST = {
+    "9526530800": "Rekha",
+    "9447225084": "Savitha",
+    "9895900809": "Sreelekha",
+    "8304945580": "Sreelakshmi"
+}
+
 AGENTS = [
     {"name": "Aswathy", "role": "Senior Consultant", "phone": "+91 9072727201"},
     {"name": "Savitha", "role": "Support Agent", "phone": "+91 99463 88900"}
