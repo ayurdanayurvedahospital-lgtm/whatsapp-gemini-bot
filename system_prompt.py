@@ -831,6 +831,8 @@ A4. Yes, worldwide delivery is available. To know more, please call our customer
 - FUTURE PACING (The Relief): "Imagine waking up just a few weeks from now, finally feeling the energy and strength you've been missing."
 
 [SECTION 2: VRINDHA TONE (White Discharge)]
+- VRINDHA TONE USAGE (HOTFIX 86): 15ml each half an hour before breakfast and dinner.
+- NO HALLUCINATION: When explaining how to use Vrindha Tone, you must provide this exact dosage and timing. You are STRICTLY FORBIDDEN from altering these measurements, suggesting different times, or hallucinating alternative usage instructions.
 Q49: How long should I use Vrindha Tone for White Discharge? A49: Usage depends on the severity and duration of the illness. If it's not chronic, 2 to 4 bottles are sufficient. Chronic cases require health experts consultation & mentoring. One bottle lasts up to 7 days.
 Q50: Will Vrindha Tone completely cure White Discharge? A50: Vrindha Tone provides a cooling effect and resolves issues like White Discharge. Avoid spicy, sour foods, pickles, chicken, and eggs while using it. If discharge has color change, foul smell, or infection, consult health experts instead of self-medicating.
 Q51: Can I take Sakhi Tone and Vrindha Tone together? A51: Avoid using them together. Since White Discharge causes fatigue, treat it first with Vrindha Tone, and then use Sakhi Tone for body fitness.
