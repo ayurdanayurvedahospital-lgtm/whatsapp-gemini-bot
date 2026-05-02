@@ -11,6 +11,8 @@ import requests
 import flask
 import sqlite3
 import json
+import functools
+import importlib
 from google import genai
 from google.genai import types
 import tempfile
@@ -71,13 +73,41 @@ db_init()
 # Import modularized data and prompt
 try:
     from knowledge_base_data import AGENTS, PRODUCT_IMAGES, LINKS, GOOGLE_FORM_URL, FORM_FIELDS
-    from system_prompt import SYSTEM_PROMPT
+    import system_prompt
+    SYSTEM_PROMPT = system_prompt.SYSTEM_PROMPT
 except ImportError as e:
     logging.error(f"Failed to import modular files: {e}")
     AGENTS = []
     PRODUCT_IMAGES = {}
     LINKS = {}
+    system_prompt = None
     SYSTEM_PROMPT = "You are AIVA."
+
+# --- HOTFIX: Dynamic System Prompt Invalidation (Option 2: File Watch) ---
+PROMPT_FILE_PATH = "system_prompt.py"
+last_prompt_mod_time = os.path.getmtime(PROMPT_FILE_PATH) if os.path.exists(PROMPT_FILE_PATH) else 0
+
+def _check_reload_prompt():
+    """Checks if system_prompt.py has changed and reloads it if necessary."""
+    global SYSTEM_PROMPT, last_prompt_mod_time, system_prompt
+    if not os.path.exists(PROMPT_FILE_PATH):
+        return
+
+    try:
+        current_mod_time = os.path.getmtime(PROMPT_FILE_PATH)
+        if current_mod_time > last_prompt_mod_time:
+            logging.info("HOTFIX: system_prompt.py change detected. Reloading...")
+            if system_prompt:
+                importlib.reload(system_prompt)
+            else:
+                system_prompt = importlib.import_module("system_prompt")
+
+            SYSTEM_PROMPT = system_prompt.SYSTEM_PROMPT
+            last_prompt_mod_time = current_mod_time
+            filter_system_prompt_by_language.cache_clear()
+            logging.info("HOTFIX: System Prompt reloaded and cache cleared.")
+    except Exception as e:
+        logging.error(f"Error reloading system prompt: {e}")
 
 # --- PERFORMANCE OPTIMIZATION: Pre-compute Product Image Regex ---
 PRODUCT_IMAGE_URLS = {}
@@ -636,6 +666,7 @@ def process_audio(file_url, sender_phone, history):
                         if user_lang == "malayalam":
                             break
 
+            _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
@@ -708,6 +739,7 @@ def process_image(file_url, sender_phone, prompt_text, history):
                         if user_lang == "malayalam":
                             break
 
+            _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
@@ -774,6 +806,7 @@ def process_pdf(file_url, sender_phone, history):
                         if user_lang == "malayalam":
                             break
 
+            _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
@@ -819,6 +852,7 @@ def detect_language(text):
 
     return "english"
 
+@functools.lru_cache(maxsize=10)
 def filter_system_prompt_by_language(system_prompt, language):
     '''
     Dynamically strips the unused language blueprints from the system prompt to prevent language bleed.
@@ -851,6 +885,7 @@ def get_ai_response(sender_phone, message_text, history):
                     if user_lang == "malayalam":
                         break
 
+        _check_reload_prompt()
         system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
         context_injection = f" Current time in Kerala is {current_time_str}."
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
