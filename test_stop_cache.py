@@ -1,3 +1,4 @@
+import mock_imports
 import unittest
 from unittest.mock import patch, MagicMock
 import app

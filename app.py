@@ -961,9 +961,11 @@ def handle_message(payload):
 
         # --- STEP 1: RESUME COMMAND (Priority) ---
         if text_body and text_body.strip().upper() == "START BOT":
-            if session["is_muted"]:
-                update_session_flags(sender_phone, is_muted=False)
-                logging.info(f"Bot resumed for {sender_phone} via 'START BOT' command.")
+            if session["is_muted"] or session.get("is_dnd_active"):
+                update_session_flags(sender_phone, is_muted=False, is_dnd_active=False)
+                if sender_phone in stop_bot_cache:
+                    del stop_bot_cache[sender_phone]
+                logging.info(f"Bot resumed for {sender_phone} via 'START BOT' command. DND cleared.")
                 send_whatsapp_message(sender_phone.replace("+", ""), "Bot resumed. How can I help?", "text")
             else:
                 send_whatsapp_message(sender_phone.replace("+", ""), "Bot is already active. How can I help?", "text")
@@ -982,7 +984,7 @@ def handle_message(payload):
             logging.info(f"Bot Stopped for {sender_phone} (Tag Check)")
             return
 
-        if text_body and text_body.strip().upper() == "STOP BOT":
+        if text_body and any(cmd == text_body.strip().upper() for cmd in ["STOP BOT", "STOP", "UNSUBSCRIBE"]):
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             update_session_flags(sender_phone, is_muted=True)
             cancel_timers(sender_phone)
@@ -990,7 +992,14 @@ def handle_message(payload):
             return
 
         # DND Protocol (Fix 62.1)
-        dnd_keywords = ["don't message me", "dont message me", "leave me alone", "do not disturb", "ശല്യം ചെയ്യരുത്", "message nirthu", "ini ayakkanda"]
+        dnd_keywords = [
+            "don't message me", "dont message me", "leave me alone", "do not disturb",
+            "ശല്യം ചെയ്യരുത്", "message nirthu", "ini ayakkanda",
+            "stop messaging", "no more messages", "remove me",
+            "stop sending", "stop please", "please stop",
+            "have a good day", "have a great day",
+            "ശുഭദിനം", "നല്ലൊരു ദിവസം", "സമയത്തിന് നന്ദി"
+        ]
         if text_body and any(k in text_body.lower() for k in dnd_keywords):
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             update_session_flags(sender_phone, is_muted=True, is_dnd_active=True)
