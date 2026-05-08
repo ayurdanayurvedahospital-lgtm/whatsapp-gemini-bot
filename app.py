@@ -665,12 +665,20 @@ def process_audio(file_url, sender_phone, history):
             current_time_str = get_current_time_str()
 
             # Construct conversation with history
-            user_lang = "malayalam" # default for audio/image if unknown, or maybe english
+            message_text = ""
             if history:
                 for h in reversed(history):
                     if h["role"] == "user":
-                        user_lang = detect_language(h["parts"][0])
-                        if user_lang == "malayalam":
+                        message_text = h["parts"][0]
+                        break
+            user_lang = detect_language(message_text) if message_text else "malayalam"
+
+            if user_lang == "english" and len(message_text.split()) < 4 and history:
+                for h in reversed(history):
+                    if h["role"] == "user":
+                        past_lang = detect_language(h["parts"][0])
+                        if past_lang == "malayalam":
+                            user_lang = "malayalam"
                             break
 
             _check_reload_prompt()
@@ -738,12 +746,20 @@ def process_image(file_url, sender_phone, prompt_text, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
-            user_lang = "malayalam" # default for audio/image if unknown, or maybe english
-            if history:
+            message_text = prompt_text if prompt_text else ""
+            if not message_text and history:
                 for h in reversed(history):
                     if h["role"] == "user":
-                        user_lang = detect_language(h["parts"][0])
-                        if user_lang == "malayalam":
+                        message_text = h["parts"][0]
+                        break
+            user_lang = detect_language(message_text) if message_text else "malayalam"
+
+            if user_lang == "english" and len(message_text.split()) < 4 and history:
+                for h in reversed(history):
+                    if h["role"] == "user":
+                        past_lang = detect_language(h["parts"][0])
+                        if past_lang == "malayalam":
+                            user_lang = "malayalam"
                             break
 
             _check_reload_prompt()
@@ -805,12 +821,20 @@ def process_pdf(file_url, sender_phone, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
-            user_lang = "malayalam" # default for audio/image if unknown, or maybe english
+            message_text = ""
             if history:
                 for h in reversed(history):
                     if h["role"] == "user":
-                        user_lang = detect_language(h["parts"][0])
-                        if user_lang == "malayalam":
+                        message_text = h["parts"][0]
+                        break
+            user_lang = detect_language(message_text) if message_text else "malayalam"
+
+            if user_lang == "english" and len(message_text.split()) < 4 and history:
+                for h in reversed(history):
+                    if h["role"] == "user":
+                        past_lang = detect_language(h["parts"][0])
+                        if past_lang == "malayalam":
+                            user_lang = "malayalam"
                             break
 
             _check_reload_prompt()
@@ -884,17 +908,18 @@ def get_ai_response(sender_phone, message_text, history):
         current_time_str = get_current_time_str()
 
         user_lang = detect_language(message_text)
-        if user_lang == "english" and history:
-            # check history for language to be safe if current message is short
+        # Only inherit past language if the current message is a short filler response
+        if user_lang == "english" and len(message_text.split()) < 4 and history:
             for h in reversed(history):
                 if h["role"] == "user":
-                    user_lang = detect_language(h["parts"][0])
-                    if user_lang == "malayalam":
+                    past_lang = detect_language(h["parts"][0])
+                    if past_lang == "malayalam":
+                        user_lang = "malayalam"
                         break
 
         _check_reload_prompt()
         system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
-        context_injection = f" Current time in Kerala is {current_time_str}."
+        context_injection = f" Current time in Kerala is {current_time_str}. The user is currently communicating in {user_lang.upper()}. You MUST reply entirely in {user_lang.upper()} and mirror their exact language."
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
         contents = [
