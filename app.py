@@ -348,8 +348,15 @@ def get_order_status(identifier):
             order_name = order.get('name', '')
             fulfillments = order.get('fulfillments', [])
 
-            # Debug Log
-            logging.info(f"DEBUG: Order {order_name} fulfillments data: {fulfillments}")
+            # Debug Log: Extract safe fields from fulfillments to avoid PII leakage
+            safe_fulfillments = []
+            for f in fulfillments:
+                safe_fulfillments.append({
+                    "tracking_company": f.get("tracking_company"),
+                    "tracking_number": f.get("tracking_number"),
+                    "status": f.get("status")
+                })
+            logging.info(f"DEBUG: Order {order_name} fulfillments data: {safe_fulfillments}")
 
             contact_info = "\n\nPlease contact this number 919526530900 (9:30 am to 5 pm) if you have any queries in tracking details."
 
@@ -910,17 +917,26 @@ def handle_message(payload):
     """
     Main Logic Handler (Background Thread).
     """
+    if not isinstance(payload, dict):
+        logging.error(f"Payload is not a dictionary: {type(payload)}")
+        return
+
     try:
         # SECURITY FIX: Extract safe fields instead of logging raw payload
+        message_id = payload.get("messageId") or payload.get("eventId")
+        sender_phone = payload.get("platformSenderId")
+        if not sender_phone:
+            sender_phone = payload.get("customer", {}).get("platformSenderId")
+
         safe_log = {
-            "messageId": payload.get("messageId") or payload.get("eventId"),
-            "sender": payload.get("platformSenderId"),
-            "type": payload.get("type")
+            "messageId": message_id,
+            "sender": sender_phone,
+            "type": payload.get("type"),
+            "direction": payload.get("direction")
         }
         logging.info(f"STEP 1: Received message: {safe_log}")
 
         # Extract Basics
-        message_id = payload.get("messageId") or payload.get("eventId")
         if message_id:
             with processed_messages_lock:
                 if message_id in processed_messages:
@@ -929,11 +945,6 @@ def handle_message(payload):
                 processed_messages.add(message_id)
                 if len(processed_messages) > 5000: processed_messages.clear()
 
-        sender_phone = payload.get("platformSenderId")
-        if not sender_phone:
-            customer = payload.get("customer", {})
-            sender_phone = customer.get("platformSenderId")
-
         if not sender_phone:
             logging.error("No sender_phone found. Aborting.")
             return
@@ -941,13 +952,13 @@ def handle_message(payload):
         # CANCEL INACTIVITY TIMERS (User Replied)
         cancel_timers(sender_phone)
 
-        direction = payload.get("direction")
+        direction = safe_log.get("direction")
         if direction and direction != "incoming" and direction != "from_customer":
              if direction.lower() in ["outgoing", "from_business"]:
                  logging.info("Ignoring outgoing message.")
                  return
 
-        msg_type = payload.get("type", "text")
+        msg_type = safe_log.get("type") or "text"
         text_body = payload.get("text", "")
         file_url = payload.get("fileUrl")
 
