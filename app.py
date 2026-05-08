@@ -632,7 +632,7 @@ def process_audio(file_url, sender_phone, history):
     headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading Audio: {file_url}")
-        with requests.get(file_url, stream=True, headers=headers) as r:
+        with zoko_session.get(file_url, stream=True, headers=headers) as r:
             r.raise_for_status()
             with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
                 for chunk in r.iter_content(chunk_size=8192):
@@ -705,7 +705,7 @@ def process_image(file_url, sender_phone, prompt_text, history):
     headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading Image: {file_url}")
-        with requests.get(file_url, stream=True, headers=headers) as r:
+        with zoko_session.get(file_url, stream=True, headers=headers) as r:
             r.raise_for_status()
             ext = ".jpg"
             if "png" in file_url.lower(): ext = ".png"
@@ -775,7 +775,7 @@ def process_pdf(file_url, sender_phone, history):
     headers = {'apikey': ZOKO_API_KEY}
     try:
         logging.info(f"Downloading PDF: {file_url}")
-        with requests.get(file_url, stream=True, headers=headers) as r:
+        with zoko_session.get(file_url, stream=True, headers=headers) as r:
             r.raise_for_status()
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
                 for chunk in r.iter_content(chunk_size=8192):
