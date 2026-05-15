@@ -158,6 +158,7 @@ else:
 
 # --- GLOBAL STATE ---
 zoko_session = requests.Session()
+TERMINAL_PHRASES_LOWER = [p.lower() for p in ['ശുഭദിനം', 'ആശംസിക്കുന്നു', 'നല്ലൊരു ദിവസം ആശംസിക്കുന്നു! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു ! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു!', 'സമയത്തിന് നന്ദി', 'have a good day', 'have a great day', 'shubhadinam']]
 stop_bot_cache = {}
 CACHE_TTL = 300
 processed_messages = set()
@@ -985,6 +986,7 @@ def handle_message(payload):
 
         msg_type = safe_log.get("type") or "text"
         text_body = payload.get("text", "")
+        lower_body = text_body.lower() if text_body else ""
         file_url = payload.get("fileUrl")
 
         # Retrieve Session Data
@@ -1027,7 +1029,7 @@ def handle_message(payload):
 
         # DND Protocol (Fix 62.1)
         dnd_keywords = ["don't message me", "dont message me", "leave me alone", "do not disturb", "ശല്യം ചെയ്യരുത്", "message nirthu", "ini ayakkanda"]
-        if text_body and any(k in text_body.lower() for k in dnd_keywords):
+        if text_body and any(k in lower_body for k in dnd_keywords):
             stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
             update_session_flags(sender_phone, is_muted=True, is_dnd_active=True)
             cancel_timers(sender_phone)
@@ -1039,7 +1041,7 @@ def handle_message(payload):
         if text_body:
             # 1. HARASSMENT INTENT DETECTION
             harassment_keywords = ['sexy', 'kiss', 'flirt', 'send pic', 'send nude', 'kambi', 'pooru', 'myre', 'fck', 'fuck', 'bitch', 'asshole']
-            is_harassment = any(kw in text_body.lower() for kw in harassment_keywords)
+            is_harassment = any(kw in lower_body for kw in harassment_keywords)
 
             # 2. SPAM/LOOP DETECTION
             last_msgs = user_last_messages.get(sender_phone, [])
@@ -1057,7 +1059,7 @@ def handle_message(payload):
                 return
 
         # --- STEP 3: ORDER TRACKING PROTOCOL ---
-        is_tracking_intent = text_body and any(k in text_body.lower() for k in ["where is my order", "track my order", "order status", "track order", "status of my order", "tracking details", "order eppo kittum", "order eppo varum", "order vannilla"])
+        is_tracking_intent = text_body and any(k in lower_body for k in ["where is my order", "track my order", "order status", "track order", "status of my order", "tracking details", "order eppo kittum", "order eppo varum", "order vannilla"])
 
         # Case A: User explicitly asks to track
         if is_tracking_intent:
@@ -1081,7 +1083,7 @@ def handle_message(payload):
         if session["is_tracking"]:
             # Check if user is trying to pivot back to health (Health keyword check)
             # Simple heuristic: If it contains medical keywords or is long text
-            is_health_query = any(k in text_body.lower() for k in ["pain", "weight", "hair", "skin", "diabetes", "sugar", "gain", "loss", "sleep"])
+            is_health_query = any(k in lower_body for k in ["pain", "weight", "hair", "skin", "diabetes", "sugar", "gain", "loss", "sleep"])
 
             if is_health_query:
                 update_session_flags(sender_phone, is_tracking=False)
@@ -1108,7 +1110,6 @@ def handle_message(payload):
         is_triage_bypass = False
         detected_product = None
         if text_body:
-            lower_body = text_body.lower()
             for kw in triage_bypass_keywords:
                 if kw in lower_body or kw.replace(" ", "-") in lower_body or kw.replace(" ", "") in lower_body:
                     is_triage_bypass = True
@@ -1138,7 +1139,7 @@ def handle_message(payload):
         session = get_user_session(sender_phone)
         last_time = session["last_greeted"]
 
-        is_greeting_keyword = text_body and text_body.strip().lower() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
+        is_greeting_keyword = text_body and lower_body.strip() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
 
         if is_greeting_keyword and (current_time - last_time > 12 * 3600):
             time_greeting = get_ist_time_greeting()
@@ -1212,8 +1213,8 @@ def handle_message(payload):
                 send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
 
             # FIX 62.4: MULTI-LINGUAL GRACEFUL EXIT (TIMER KILL-SWITCH)
-            terminal_phrases = ['ശുഭദിനം', 'ആശംസിക്കുന്നു', 'നല്ലൊരു ദിവസം ആശംസിക്കുന്നു! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു ! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു!', 'സമയത്തിന് നന്ദി', 'have a good day', 'have a great day', 'shubhadinam']
-            if any(phrase in response_text.lower() for phrase in [p.lower() for p in terminal_phrases]):
+            lower_response = response_text.lower()
+            if any(phrase in lower_response for phrase in TERMINAL_PHRASES_LOWER):
                 update_session_flags(sender_phone, is_flow_complete=True)
                 logging.info(f"Flow complete for {sender_phone}. Timers disabled.")
 
