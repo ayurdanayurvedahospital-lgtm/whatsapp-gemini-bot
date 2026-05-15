@@ -948,11 +948,11 @@ def handle_message(payload):
         return
 
     try:
-        # SECURITY FIX: Extract safe fields instead of logging raw payload
+        # SECURITY: Extract safe fields instead of logging raw payload
         message_id = payload.get("messageId") or payload.get("eventId")
         sender_phone = payload.get("platformSenderId")
         if not sender_phone:
-            sender_phone = payload.get("customer", {}).get("platformSenderId")
+            sender_phone = (payload.get("customer") or {}).get("platformSenderId")
 
         safe_log = {
             "messageId": message_id,
