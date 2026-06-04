@@ -1043,6 +1043,11 @@ def handle_message(payload):
             harassment_keywords = ['sexy', 'kiss', 'flirt', 'send pic', 'send nude', 'kambi', 'pooru', 'myre', 'fck', 'fuck', 'bitch', 'asshole']
             is_harassment = any(kw in lower_body for kw in harassment_keywords)
 
+            # Clinical Exemption (Fix 71.1)
+            clinical_keywords = ['saphala', 'fertility', 'menstrual', 'sexual wellness']
+            if any(ck in lower_body for ck in clinical_keywords):
+                is_harassment = False
+
             # 2. SPAM/LOOP DETECTION
             last_msgs = user_last_messages.get(sender_phone, [])
             last_msgs.append(text_body)
@@ -1052,6 +1057,10 @@ def handle_message(payload):
 
             # 3. THE BLACKLIST FLAG & SILENT WALL PROTOCOL
             if is_harassment or is_spam_loop:
+                if is_harassment:
+                    refusal = "I am a virtual assistant for Alpha Ayurveda. I can only assist with professional inquiries related to our health products and services. I will not engage with this type of content."
+                    send_whatsapp_message(sender_phone.replace("+", ""), refusal, "text")
+
                 logging.warning(f"Sanity Filter triggered for {sender_phone}. Harassment: {is_harassment}, Spam: {is_spam_loop}. Ghosting activated.")
                 update_session_flags(sender_phone, is_blacklisted=True, is_dnd_active=True, is_muted=True)
                 cancel_timers(sender_phone)
@@ -1105,7 +1114,7 @@ def handle_message(payload):
         triage_bypass_keywords = [
             'staamigen malt', 'sakhitone', 'gainplus capsule', 'strength plus', 'staamigen powder',
             'junior staamigen malt', 'ayurdiabet powder', 'ayur-diabetics-powder', 'vrindatone',
-            'kanya tone', 'medigas syrup', 'saphala capsules', 'muktanjan pain relief oil'
+            'kanya tone', 'medigas syrup', 'muktanjan pain relief oil'
         ]
         is_triage_bypass = False
         detected_product = None
@@ -1209,6 +1218,12 @@ def handle_message(payload):
 
                 update_session_flags(sender_phone, is_muted=True)
                 logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
+            elif "I will not engage with this type of content" in response_text:
+                send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
+                update_session_flags(sender_phone, is_blacklisted=True, is_dnd_active=True, is_muted=True)
+                cancel_timers(sender_phone)
+                stop_bot_cache[sender_phone] = {"stopped": True, "timestamp": time.time()}
+                logging.warning(f"AI-detected Harassment for {sender_phone}. User blacklisted.")
             else:
                 send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
 
