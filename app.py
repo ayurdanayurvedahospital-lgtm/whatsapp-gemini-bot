@@ -1044,7 +1044,7 @@ def handle_message(payload):
             is_harassment = any(kw in lower_body for kw in harassment_keywords)
 
             # Clinical Exemption (Fix 71.1)
-            clinical_keywords = ['saphala', 'fertility', 'menstrual', 'sexual wellness']
+            clinical_keywords = ['saphala', 'fertility', 'menstrual', 'sexual wellness', 'ayuralpha.in', 'staamigen', 'weight-gainer', 'gainplus', 'sakhitone']
             if any(ck in lower_body for ck in clinical_keywords):
                 is_harassment = False
 
@@ -1218,7 +1218,9 @@ def handle_message(payload):
 
                 update_session_flags(sender_phone, is_muted=True)
                 logging.info(f"User {sender_phone} handed over to agent (Medical Red Flag).")
-            elif "I will not engage with this type of content" in response_text:
+            # Check for whitelisted URLs/Keywords to prevent false positives (Fix 71.2)
+            is_whitelisted_url = text_body and any(ck in text_body.lower() for ck in ['ayuralpha.in', 'staamigen', 'weight-gainer', 'gainplus', 'sakhitone'])
+            if "I will not engage with this type of content" in response_text and not is_whitelisted_url:
                 send_whatsapp_message(sender_phone.replace("+", ""), response_text, "text")
                 update_session_flags(sender_phone, is_blacklisted=True, is_dnd_active=True, is_muted=True)
                 cancel_timers(sender_phone)
