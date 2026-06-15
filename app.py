@@ -105,13 +105,6 @@ def _check_reload_prompt():
             SYSTEM_PROMPT = system_prompt.SYSTEM_PROMPT
             last_prompt_mod_time = current_mod_time
             filter_system_prompt_by_language.cache_clear()
-            # Invalidate Gemini caches on prompt reload
-            for lang in list(PROMPT_CACHES.keys()):
-                try:
-                    client.caches.delete(name=PROMPT_CACHES[lang].name)
-                except Exception as e:
-                    logging.error(f'Error deleting cache for {lang}: {e}')
-            PROMPT_CACHES.clear()
             logging.info("HOTFIX: System Prompt reloaded and cache cleared.")
     except Exception as e:
         logging.error(f"Error reloading system prompt: {e}")
@@ -155,7 +148,6 @@ if not all([SHOPIFY_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET]):
 
 # Initialize Gemini Client
 client = None
-PROMPT_CACHES = {}  # Store cache objects by language: {'english': cache_obj, 'malayalam': cache_obj}
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
@@ -206,7 +198,7 @@ def get_user_session(phone):
 def get_user_history(phone):
     """
     Retrieves history for a user, clearing it if inactive for >12 hours.
-    Returns a rolling window of the last 30 messages.
+    Returns a rolling window of the last 14 messages.
     """
     session = get_user_session(phone)
     now = time.time()
@@ -215,14 +207,14 @@ def get_user_history(phone):
     if now - session["last_active"] > 12 * 3600:
         return []
 
-    # Strict rolling window (last 30)
-    return session["history"][-30:]
+    # Strict rolling window (last 14)
+    return session["history"][-14:]
 
 def save_user_history(phone, history):
     """Updates user history and activity timestamp in SQLite."""
     try:
         now = time.time()
-        history_json = json.dumps(history[-30:])
+        history_json = json.dumps(history[-14:])
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute('''
@@ -578,44 +570,7 @@ def check_stop_bot(phone):
     stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
     return is_stopped
 
-def get_or_create_cache(language, system_instruction):
-    """
-    Creates or retrieves a Gemini Context Cache for a specific language and system prompt.
-    """
-    global PROMPT_CACHES
-    now = time.time()
-
-    # Check if we have a valid cache in memory
-    if language in PROMPT_CACHES:
-        cache = PROMPT_CACHES[language]
-        # Check if cache is still alive (Gemini TTL is 12h, let's refresh if < 1h left)
-        try:
-            # We can't easily check actual remaining TTL without a call, so we rely on our memory
-            # client.caches.get(name=cache.name) could work but adds latency
-            return cache.name
-        except Exception as e:
-            logging.warning(f"Cache {language} potentially expired/invalid: {e}")
-            PROMPT_CACHES.pop(language, None)
-
-    try:
-        logging.info(f"Creating new Gemini Context Cache for {language}...")
-        # Create cache with 12 hour TTL
-        ttl_seconds = 12 * 3600
-        cache = client.caches.create(
-            model='gemini-3-flash-preview',
-            config=types.CreateCachedContentConfig(
-                display_name=f"aiva_prompt_{language}_{int(time.time())}",
-                system_instruction=system_instruction,
-                ttl=f"{ttl_seconds}s"
-            )
-        )
-        PROMPT_CACHES[language] = cache
-        return cache.name
-    except Exception as e:
-        logging.error(f"Failed to create context cache for {language}: {e}")
-        return None
-
-def call_gemini_with_retry(contents, system_instruction, cached_content_name=None):
+def call_gemini_with_retry(contents):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
     Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Pro as Fallback.
@@ -642,15 +597,9 @@ def call_gemini_with_retry(contents, system_instruction, cached_content_name=Non
     raw_text = ""
     try:
         # 1. Attempt with Primary Model (Gemini 3 Flash)
-        # Add system instruction if no cache
-        flash_contents = contents
-        if not cached_content_name:
-            flash_contents = [types.Content(role='user', parts=[types.Part.from_text(text=system_instruction)])] + contents
-
         response = client.models.generate_content(
             model="gemini-3-flash-preview",
-            cached_content=cached_content_name,
-            contents=flash_contents,
+            contents=contents,
             config=flash_config
         )
         raw_text = response.text
@@ -661,10 +610,9 @@ def call_gemini_with_retry(contents, system_instruction, cached_content_name=Non
             print("FLASH QUOTA EXCEEDED (429). Falling back to Pro...")
             try:
                 # Nested fallback to Pro
-                pro_contents = [types.Content(role='user', parts=[types.Part.from_text(text=system_instruction)])] + contents
                 response = client.models.generate_content(
                     model="gemini-2.5-pro",
-                    contents=pro_contents,
+                    contents=contents,
                     config=pro_config
                 )
                 raw_text = response.text
@@ -972,26 +920,21 @@ def get_ai_response(sender_phone, message_text, history):
 
         _check_reload_prompt()
         system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
-
-        # Get or create Context Cache
-        cache_name = get_or_create_cache(user_lang, system_instruction)
-
         context_injection = f" Current time in Kerala is {current_time_str}. The user is currently communicating in {user_lang.upper()}. You MUST reply entirely in {user_lang.upper()} and mirror their exact language."
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
-        # Assemble non-static content
         contents = [
+            types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
             types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
         ]
 
-        # Strict sliding window of last 30 messages (15 turns)
-        for h in history[-30:]:
+        for h in history:
             role = "user" if h["role"] == "user" else "model"
             contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
 
         contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
 
-        return call_gemini_with_retry(contents, system_instruction, cached_content_name=cache_name)
+        return call_gemini_with_retry(contents)
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
