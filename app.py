@@ -624,20 +624,26 @@ def call_gemini_with_retry(contents, system_instruction, cached_content_name=Non
         return "I am currently undergoing maintenance. Please try again later."
 
     # Gemini 3 Flash Primary Config
+    # Gemini 3 Flash Primary Config
     flash_config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             thinking_level="minimal",
             include_thoughts=False
-        )
+        ),
+        cached_content=cached_content_name,
+        max_output_tokens=300
     )
+
 
     # Gemini 2.5 Pro Fallback Config
     pro_config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
             include_thoughts=False,
             thinking_budget=1024
-        )
+        ),
+        max_output_tokens=300
     )
+
 
     raw_text = ""
     try:
@@ -649,7 +655,6 @@ def call_gemini_with_retry(contents, system_instruction, cached_content_name=Non
 
         response = client.models.generate_content(
             model="gemini-3-flash-preview",
-            cached_content=cached_content_name,
             contents=flash_contents,
             config=flash_config
         )
