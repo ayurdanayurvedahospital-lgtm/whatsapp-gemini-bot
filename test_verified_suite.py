@@ -54,7 +54,7 @@ class TestExistingLogic(unittest.TestCase):
             app.save_user_history(phone, history)
 
         final_history = app.get_user_history(phone)
-        self.assertLessEqual(len(final_history), 30)
+        self.assertLessEqual(len(final_history), 14)
         self.assertEqual(final_history[-1]["parts"][0], "resp 19")
 
     @patch('app.requests.post')
