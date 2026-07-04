@@ -1,5 +1,16 @@
-import unittest
+import sys
 from unittest.mock import patch, MagicMock
+
+# Comprehensive Mocking
+sys.modules['flask'] = MagicMock()
+mock_genai = MagicMock()
+sys.modules['google'] = MagicMock()
+sys.modules['google.genai'] = mock_genai
+sys.modules['google.genai.types'] = MagicMock()
+sys.modules['pytz'] = MagicMock()
+sys.modules['PyPDF2'] = MagicMock()
+
+import unittest
 import app
 import time
 
@@ -12,7 +23,7 @@ class TestStopCache(unittest.TestCase):
     def tearDown(self):
         app.ZOKO_API_KEY = None
 
-    @patch('app.requests.get')
+    @patch('app.zoko_session.get')
     def test_cache_hit_and_miss(self, mock_get):
         # 1. API Call setup - STOPPED
         mock_resp = MagicMock()

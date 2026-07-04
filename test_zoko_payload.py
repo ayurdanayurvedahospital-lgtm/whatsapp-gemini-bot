@@ -1,33 +1,18 @@
-import sys
-from unittest.mock import MagicMock, patch
-
-# Global Mocking
-sys.modules["requests"] = MagicMock()
-sys.modules["flask"] = MagicMock()
-sys.modules["google"] = MagicMock()
-sys.modules["google.genai"] = MagicMock()
-sys.modules["google.genai.types"] = MagicMock()
-sys.modules["pytz"] = MagicMock()
-
 import unittest
+from unittest.mock import MagicMock, patch
 import app
 
 class TestZokoPayload(unittest.TestCase):
 
-    @patch('app.threading.Thread')
-    def test_webhook_triggers_thread(self, mock_thread):
-        # Mock request context
-        mock_flask = sys.modules["flask"]
-        mock_flask.request.json = {"messageId": "123", "platformSenderId": "9100"}
-
-        # Mock jsonify to return a tuple or just the mock itself
-        app.jsonify = MagicMock(side_effect=lambda x: x)
-
-        with patch('app.request', mock_flask.request):
-            result = app.bot()
-            self.assertIsInstance(result, tuple)
-            self.assertEqual(result[1], 200)
-            self.assertTrue(mock_thread.called)
+    def test_webhook_triggers_thread(self):
+        with app.app.test_request_context(json={"messageId": "123", "platformSenderId": "9100"}):
+            with patch('app.threading.Thread') as mock_thread:
+                # Mock handle_message if needed
+                with patch('app.handle_message') as mock_handle:
+                    response = app.bot()
+                    # response is a tuple (jsonify_data, status_code)
+                    self.assertEqual(response[1], 200)
+                    self.assertTrue(mock_thread.called)
 
     @patch('app.send_whatsapp_message')
     @patch('app.get_ai_response')
@@ -35,15 +20,16 @@ class TestZokoPayload(unittest.TestCase):
         mock_ai.return_value = "Hello Patient"
         payload = {
             "messageId": "msg_1",
-            "platformSenderId": "9100000000",
+            "customer": {"platformSenderId": "9100000000"},
             "type": "text",
             "text": "Help me",
             "direction": "incoming"
         }
 
-        app.handle_message(payload)
+        with patch('threading.Thread', side_effect=lambda target, args, **kwargs: target(*args, **kwargs)):
+            app.handle_message(payload)
+
         mock_send.assert_called()
-        # Verify it sent the AI response
         args, kwargs = mock_send.call_args
         self.assertEqual(args[1], "Hello Patient")
 
