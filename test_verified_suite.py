@@ -3,10 +3,12 @@ from unittest.mock import MagicMock, patch
 
 # Comprehensive Global Mocking
 sys.modules["requests"] = MagicMock()
+sys.modules["requests.adapters"] = MagicMock()
 sys.modules["flask"] = MagicMock()
 sys.modules["google"] = MagicMock()
 sys.modules["google.genai"] = MagicMock()
 sys.modules["google.genai.types"] = MagicMock()
+sys.modules["urllib3.util.retry"] = MagicMock()
 sys.modules["pytz"] = MagicMock()
 
 import unittest
