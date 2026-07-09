@@ -8,6 +8,8 @@ import time
 import re
 import traceback
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import flask
 import sqlite3
 import json
@@ -158,6 +160,15 @@ else:
 
 # --- GLOBAL STATE ---
 zoko_session = requests.Session()
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS", "POST"]
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+zoko_session.mount("https://", adapter)
+zoko_session.mount("http://", adapter)
 TERMINAL_PHRASES_LOWER = [p.lower() for p in ['ശുഭദിനം', 'ആശംസിക്കുന്നു', 'നല്ലൊരു ദിവസം ആശംസിക്കുന്നു! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു ! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു!', 'സമയത്തിന് നന്ദി', 'have a good day', 'have a great day', 'shubhadinam']]
 stop_bot_cache = {}
 CACHE_TTL = 300
@@ -305,7 +316,7 @@ def get_shopify_token():
                 "client_secret": SHOPIFY_CLIENT_SECRET,
                 "grant_type": "client_credentials"
             }
-            resp = requests.post(url, json=payload, timeout=10)
+            resp = zoko_session.post(url, json=payload, timeout=10)
             resp.raise_for_status()
             data = resp.json()
 
@@ -344,7 +355,7 @@ def get_order_status(identifier):
              search_term = f"#{identifier}"
 
         url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/orders.json?name={search_term}&status=any"
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = zoko_session.get(url, headers=headers, timeout=10)
         def format_order_response(order):
             order_name = order.get('name', '')
             fulfillments = order.get('fulfillments', [])
@@ -380,7 +391,7 @@ def get_order_status(identifier):
         # Search Customer by Phone
         phone_query = identifier.replace(" ", "")
         cust_url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/customers/search.json?query=phone:{phone_query}"
-        cust_resp = requests.get(cust_url, headers=headers, timeout=10)
+        cust_resp = zoko_session.get(cust_url, headers=headers, timeout=10)
 
         if cust_resp.status_code == 200:
             customers = cust_resp.json().get("customers", [])
@@ -388,7 +399,7 @@ def get_order_status(identifier):
                 cust_id = customers[0]['id']
                 # Get Last Order for this customer
                 order_url = f"https://{SHOPIFY_DOMAIN}/admin/api/2023-10/customers/{cust_id}/orders.json?status=any&limit=1"
-                order_resp = requests.get(order_url, headers=headers, timeout=10)
+                order_resp = zoko_session.get(order_url, headers=headers, timeout=10)
                 if order_resp.status_code == 200:
                     orders = order_resp.json().get("orders", [])
                     if orders:
