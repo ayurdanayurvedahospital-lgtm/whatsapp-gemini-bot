@@ -8,6 +8,7 @@ import time
 import re
 import traceback
 import requests
+
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import flask
@@ -480,6 +481,9 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
         if response.status_code >= 400:
              logging.error(f"Zoko API Error: {response.text}")
         return response.json()
+    except (requests.exceptions.RetryError, requests.exceptions.ConnectionError) as ce:
+        logging.error(f"Zoko API unreachable - max retries exceeded: {ce}")
+        return None
     except Exception as e:
         logging.error(f"Failed to send message: {e}")
         return None
