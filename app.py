@@ -161,13 +161,13 @@ else:
 
 # --- GLOBAL STATE ---
 zoko_session = requests.Session()
-retry_strategy = Retry(
-    total=3,
+retries = Retry(
+    total=4,
     backoff_factor=1,
     status_forcelist=[429, 500, 502, 503, 504],
     allowed_methods=["HEAD", "GET", "OPTIONS", "POST"]
 )
-adapter = HTTPAdapter(max_retries=retry_strategy)
+adapter = HTTPAdapter(max_retries=retries)
 zoko_session.mount("https://", adapter)
 zoko_session.mount("http://", adapter)
 TERMINAL_PHRASES_LOWER = [p.lower() for p in ['ശുഭദിനം', 'ആശംസിക്കുന്നു', 'നല്ലൊരു ദിവസം ആശംസിക്കുന്നു! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു ! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു!', 'സമയത്തിന് നന്ദി', 'have a good day', 'have a great day', 'shubhadinam']]
@@ -476,13 +476,13 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
             }
 
     try:
-        response = zoko_session.post(url, json=payload, headers=headers)
+        response = zoko_session.post(url, json=payload, headers=headers, timeout=15)
         logging.info(f"Sent {message_type}: {response.status_code}")
         if response.status_code >= 400:
              logging.error(f"Zoko API Error: {response.text}")
         return response.json()
-    except (requests.exceptions.RetryError, requests.exceptions.ConnectionError) as ce:
-        logging.error(f"Zoko API unreachable - max retries exceeded: {ce}")
+    except requests.exceptions.RequestException as re:
+        logging.error(f"Zoko API unreachable - permanent failure: {re}")
         return None
     except Exception as e:
         logging.error(f"Failed to send message: {e}")
