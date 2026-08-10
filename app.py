@@ -610,18 +610,45 @@ def call_gemini_with_retry(contents):
     )
 
     raw_text = ""
-    try:
-        # 1. Attempt with Primary Model (Gemini 3 Flash)
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=contents,
-            config=flash_config
-        )
-        raw_text = response.text
-    except Exception as e:
-        err_str = str(e).lower()
+    last_err_str = ""
+    last_exception = None
+
+    # 1. Attempt with Primary Model (Gemini 3 Flash) with Exponential Backoff for 500/503
+    # 1 initial attempt + 3 retries = 4 total attempts
+    max_attempts = 4
+    for attempt in range(max_attempts):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=contents,
+                config=flash_config
+            )
+            raw_text = response.text
+            break  # Success, exit the retry loop
+        except Exception as e:
+            last_exception = e
+            last_err_str = str(e).lower()
+
+            # Check for overload errors
+            if "500" in last_err_str or "503" in last_err_str:
+                if attempt < max_attempts - 1:
+                    wait_time = 2 ** attempt  # 1s, 2s, 4s
+                    print(f"Gemini API Overloaded (500/503). Retrying in {wait_time}s... (Retry {attempt + 1}/{max_attempts - 1})")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    # Max retries exhausted
+                    print(f"CRITICAL SDK ERROR (Max Retries Reached): {str(e)}")
+                    logging.error(f"Gemini Error (Max Retries): {e}")
+                    return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+            else:
+                # Not a 500/503 error, break out of the retry loop to handle it below (e.g., 429)
+                break
+
+    # If raw_text is empty, we hit an error that wasn't resolved by retries (like 429 or other)
+    if not raw_text and last_exception:
         # 2. Handle Quota/Rate Limit (429) via Fallback to Pro
-        if "429" in err_str or "quota" in err_str:
+        if "429" in last_err_str or "quota" in last_err_str:
             print("FLASH QUOTA EXCEEDED (429). Falling back to Pro...")
             try:
                 # Nested fallback to Pro
@@ -636,8 +663,8 @@ def call_gemini_with_retry(contents):
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
         else:
             # 3. Handle Other Errors immediately
-            print(f"CRITICAL SDK ERROR: {str(e)}")
-            logging.error(f"Gemini Error: {e}")
+            print(f"CRITICAL SDK ERROR: {str(last_exception)}")
+            logging.error(f"Gemini Error: {last_exception}")
             return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
 
     # Global Anti-Leak Filter (HTML Comments + Structural Labels)
