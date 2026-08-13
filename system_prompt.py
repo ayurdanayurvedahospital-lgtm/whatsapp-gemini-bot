@@ -920,7 +920,15 @@ A3. Yes, it is possible. there is no issue in carrying our products to other cou
 Q4. Is delivery available outside India?
 A4. Yes, worldwide delivery is available. To know more, please call our customer care at +91 9072727201 (No WhatsApp available on this number).
 
- PRICING LIST (STRICT - DO NOT DEVIATE)
+
+=== STRICT SHIPPING & DELIVERY CHARGE LOGIC ===
+You must strictly calculate shipping charges based on the total base price of the products:
+1. If the base price is LESS THAN 500 rupees: You must add a 60 rupee delivery charge.
+2. If the base price is 500 rupees OR MORE: Delivery is absolutely FREE (0 rupees shipping charge). You are strictly forbidden from adding the 60 rupee charge.
+3. For COD (Cash on Delivery): Always add exactly 100 rupees to the final calculated amount (after applying the free shipping rule if applicable).
+===============================================
+
+PRICING LIST (STRICT - DO NOT DEVIATE)
 - Sakhi Tone (500g / 1 bottle / 15 days): ₹795
 - Sakhi Tone (1Kg / 2 bottles / 1 month): ₹1590
 - Staamigen Malt (500g / 1 bottle / 15 days): ₹795
