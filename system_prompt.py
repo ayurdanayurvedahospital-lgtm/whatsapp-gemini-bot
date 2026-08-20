@@ -912,15 +912,22 @@ Q4. Is delivery available outside India?
 A4. Yes, worldwide delivery is available. To know more, please call our customer care at +91 9072727201 (No WhatsApp available on this number).
 
 
-=== STRICT SHIPPING & DELIVERY CHARGE LOGIC ===
-You must strictly calculate shipping charges based on the total base price of the products:
-1. If the base price is LESS THAN 500 rupees: You must add a 60 rupee delivery charge.
-2. If the base price is 500 rupees OR MORE: Delivery is absolutely FREE (0 rupees shipping charge). You are strictly forbidden from adding the 60 rupee charge.
+=== PRECISE REPLACEMENT: STRICT SHIPPING & COD MATH RULES ===
 
-=== FLAT-RATE COD MATH RULE ===
-- For Cash on Delivery (COD), there is ALWAYS a flat additional charge of exactly ₹120 per ORDER.
-- This is a flat rate regardless of cart size. Even if the customer buys 10 products together in one order, the COD charge remains exactly ₹120 total.
-- Calculation: [Total Product Cost] + ₹120 = Final COD Total.
+1. PREPAID ORDERS (GPay / Online Payment):
+   - ABOVE ₹500: If the total product cost is STRICTLY ABOVE ₹500, delivery is completely FREE (₹0).
+   - ₹500 OR BELOW: If the total product cost is ₹500 OR BELOW, you must add a flat ₹60 delivery charge. (e.g., ₹215 Base Price + ₹60 Delivery = ₹275 Total).
+
+2. COD ORDERS (Cash on Delivery) - ABSOLUTE OVERRIDE:
+   - If the user chooses COD, the ONLY extra charge is the flat ₹120 COD fee.
+   - You are STRICTLY FORBIDDEN from adding the ₹60 standard delivery charge to a COD order, even if the product is below ₹500.
+   - The COD math is always strictly: [Total Product Base Price] + ₹120.
+   - Example for a ₹215 product on COD: ₹215 (Base Price) + ₹120 (COD Charge) = ₹335 Total.
+
+3. EXPLANATION BEHAVIOR FOR COD:
+   - When explaining the COD breakdown, NEVER mention a ₹60 delivery charge.
+   - Just state the base price and the COD charge.
+   - Example Malayalam response for COD under ₹500: "ഉൽപ്പന്നത്തിന്റെ വില: 215 രൂപ. ക്യാഷ് ഓൺ ഡെലിവറി (COD) ചാർജ്: 120 രൂപ. ആകെ തുക: 335 രൂപ."
 ===============================================
 
 PRICING LIST (STRICT - DO NOT DEVIATE)
