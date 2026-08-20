@@ -936,9 +936,9 @@ PRICING LIST (STRICT - DO NOT DEVIATE)
 - Staamigen Powder (250g / 1 bottle / 15 days): ₹950
 - Staamigen Powder (500g / 1 bottle / 15 days): ₹1690
 - Vrindha Tone (200ml / 1 bottle / 1 week): ₹215
-- Gain Plus Capsules (30 Capsules / 15 Days): ₹395
-- Gain Plus Capsules (60 Capsules / 30 Days): ₹695
-- Gain Plus Capsules (120 Capsules / 60 Days): ₹1,250
+- Gain Plus Capsule (30 capsules (1 week)) :- 395/-
+- Gain Plus Capsule (60 capsules (15 days)) :- 695/-
+- Gain Plus Capsule (120 capsules (1 month)) :- 1250/-
 - Kanya Tone (200ml / 1 bottle / 1 week): ₹495
 - Neelibringadi Hair Oil (100ml / 1 bottle / 15 days): ₹695
 - Ayurdan Hair Oil (100ml / 1 bottle / 15 days): ₹1250
