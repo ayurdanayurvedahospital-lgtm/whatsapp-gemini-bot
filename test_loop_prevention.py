@@ -4,7 +4,7 @@ import app
 
 class TestZokoLoop(unittest.TestCase):
     def setUp(self):
-        app.user_sessions.clear()
+        if hasattr(app, 'user_sessions'): app.user_sessions.clear()
 
     @patch('app.send_whatsapp_message')
     def test_zoko_ignores_own_message(self, mock_send):

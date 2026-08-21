@@ -172,6 +172,7 @@ zoko_session.mount("https://", adapter)
 zoko_session.mount("http://", adapter)
 TERMINAL_PHRASES_LOWER = [p.lower() for p in ['ശുഭദിനം', 'ആശംസിക്കുന്നു', 'നല്ലൊരു ദിവസം ആശംസിക്കുന്നു! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു ! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു!', 'സമയത്തിന് നന്ദി', 'have a good day', 'have a great day', 'shubhadinam']]
 stop_bot_cache = {}
+user_sessions = {}
 CACHE_TTL = 300
 processed_messages = set()
 processed_messages_lock = threading.Lock()
@@ -965,18 +966,35 @@ def get_ai_response(sender_phone, message_text, history):
         context_injection = f" Current time in Kerala is {current_time_str}. The user is currently communicating in {user_lang.upper()}. You MUST reply entirely in {user_lang.upper()} and mirror their exact language."
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
-        contents = [
-            types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
-            types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
-        ]
+        if sender_phone in user_sessions and not user_sessions[sender_phone].get('chat'):
+            user_sessions[sender_phone]['chat'] = [
+                types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
+                types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
+            ]
 
-        for h in history:
-            role = "user" if h["role"] == "user" else "model"
-            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+        # Use the persistent chat history if available, else fallback
+        if sender_phone in user_sessions:
+            contents = user_sessions[sender_phone]['chat'].copy()
+        else:
+            contents = [
+                types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
+                types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
+            ]
 
         contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
 
-        return call_gemini_with_retry(contents)
+        if sender_phone in user_sessions:
+            user_sessions[sender_phone]['chat'].append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
+
+        response_text = call_gemini_with_retry(contents)
+
+        if sender_phone in user_sessions and response_text:
+            user_sessions[sender_phone]['chat'].append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
+            # Optional: rolling window limit to prevent context length explosion
+            if len(user_sessions[sender_phone]['chat']) > 30:
+                user_sessions[sender_phone]['chat'] = user_sessions[sender_phone]['chat'][:2] + user_sessions[sender_phone]['chat'][-28:]
+
+        return response_text
     except Exception as e:
         logging.error(f"Gemini Error: {e}")
         return "I am currently experiencing high traffic. Please try again later."
@@ -995,6 +1013,14 @@ def handle_message(payload):
         sender_phone = payload.get("platformSenderId")
         if not sender_phone:
             sender_phone = (payload.get("customer") or {}).get("platformSenderId")
+
+        # 48-hour session memory logic
+        now = datetime.now()
+        if sender_phone in user_sessions:
+            if now - user_sessions[sender_phone]['last_active'] > timedelta(hours=48):
+                user_sessions[sender_phone] = {'chat': [], 'last_active': now}
+        else:
+            user_sessions[sender_phone] = {'chat': [], 'last_active': now}
 
         safe_log = {
             "messageId": message_id,
@@ -1281,6 +1307,10 @@ def handle_message(payload):
             session = get_user_session(sender_phone)
             if not session["is_muted"] and not session.get("is_flow_complete"):
                 start_inactivity_timer(sender_phone)
+
+        # Update in-memory session last active
+        if sender_phone in user_sessions:
+            user_sessions[sender_phone]['last_active'] = datetime.now()
 
     except Exception as e:
         logging.error(f"CRITICAL ERROR in handle_message: {e}")
