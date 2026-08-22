@@ -946,6 +946,46 @@ def filter_system_prompt_by_language(system_prompt, language):
 
     return '\n'.join(filtered_lines)
 
+
+def get_active_events_instruction():
+    """Reads events.json and injects ALL events where the window's end date is GREATER THAN OR EQUAL TO today's date."""
+    try:
+        import os
+        import json
+        from datetime import datetime
+        import pytz
+
+        if not os.path.exists('events.json'):
+            return ""
+
+        with open('events.json', 'r', encoding='utf-8') as f:
+            events = json.load(f)
+
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.now(ist).strftime("%Y-%m-%d")
+
+        active_instructions = []
+
+        for event in events:
+            # Check Greeting Window
+            gw = event.get("greeting_window")
+            if gw and gw.get("end") >= today:
+                active_instructions.append(f'- [GREETING EVENT] Start: {gw.get("start")}, End: {gw.get("end")} - If active today, include this festive greeting naturally in your INITIAL welcome message: "{gw.get("message")}"')
+
+            # Check Delivery Window
+            dw = event.get("delivery_announcement_window")
+            if dw and dw.get("end") >= today:
+                active_instructions.append(f'- [DELIVERY EVENT] Start: {dw.get("start")}, End: {dw.get("end")} - Announcement: "{dw.get("message")}"')
+
+        if active_instructions:
+            return "\n\n[UPCOMING AND ACTIVE EVENTS]\n" + "\n".join(active_instructions)
+
+        return ""
+    except Exception as e:
+        import logging
+        logging.error(f"Error reading events.json: {e}")
+        return ""
+
 def get_ai_response(sender_phone, message_text, history):
     try:
         greeting = get_ist_time_greeting()
@@ -963,7 +1003,13 @@ def get_ai_response(sender_phone, message_text, history):
 
         _check_reload_prompt()
         system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
+
+        event_instruction = get_active_events_instruction()
+        if event_instruction:
+            system_instruction += event_instruction
+
         context_injection = f" Current time in Kerala is {current_time_str}. The user is currently communicating in {user_lang.upper()}. You MUST reply entirely in {user_lang.upper()} and mirror their exact language."
+
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
         if sender_phone in user_sessions and not user_sessions[sender_phone].get('chat'):
