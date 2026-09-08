@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 # Mock dependencies before importing app
 mock_requests = MagicMock()
 sys.modules["requests"] = mock_requests
+import requests
 sys.modules["flask"] = MagicMock()
 sys.modules["google"] = MagicMock()
 sys.modules["google.genai"] = MagicMock()
@@ -24,6 +25,7 @@ class TestShopifyCacheLogic(unittest.TestCase):
         app.SHOPIFY_CLIENT_ID = "cid"
         app.SHOPIFY_CLIENT_SECRET = "sec"
         mock_requests.post.reset_mock()
+        app.zoko_session.post = mock_requests.post
         mock_requests.post.side_effect = None # Clear side effects
 
     def test_token_is_cached(self):

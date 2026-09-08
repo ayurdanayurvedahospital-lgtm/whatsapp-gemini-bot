@@ -9,8 +9,8 @@ class TestBackgroundLogic(unittest.TestCase):
         app.stop_bot_cache.clear()
         app.processed_messages.clear()
         app.user_last_messages.clear()
-        app.muted_users.clear()
-        app.last_greeted.clear()
+        pass
+        pass
         for phone in list(app.followup_timers.keys()):
             app.cancel_timers(phone)
         app.followup_timers.clear()
@@ -40,11 +40,11 @@ class TestBackgroundLogic(unittest.TestCase):
         phone = '+919999999999'
         data = {'platformSenderId': phone, 'direction': 'incoming', 'type': 'audio', 'fileUrl': 'http://good.url/audio.ogg', 'messageId': '2'}
 
-        with patch('requests.get') as mock_get:
+        with patch('app.zoko_session.get') as mock_get:
             mock_get.return_value.iter_content.return_value = [b'data']
             with patch('google.generativeai.upload_file') as mock_upload:
                 mock_upload.return_value.state.name = "ACTIVE"
-                with patch('app.model.start_chat') as mock_chat:
+                with patch('app.client') as mock_chat:
                     mock_chat.return_value.send_message.return_value.text = "Audio Answer"
                     with patch('os.remove') as mock_remove:
                         with patch('os.path.exists', return_value=True):
