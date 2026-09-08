@@ -15,7 +15,7 @@ import app
 
 class TestShopifyLogic(unittest.TestCase):
 
-    @patch('app.requests.post')
+    @patch('app.zoko_session.post')
     def test_get_shopify_token_success(self, mock_post):
         app.shopify_token_cache = {"access_token": None, "expires_at": 0}
         app.SHOPIFY_DOMAIN = "test.myshopify.com"
@@ -40,7 +40,7 @@ class TestShopifyLogic(unittest.TestCase):
         )
 
     @patch('app.get_shopify_token')
-    @patch('app.requests.get')
+    @patch('app.zoko_session.get')
     def test_check_order_by_id(self, mock_get, mock_token):
         mock_token.return_value = "fake_token"
         app.SHOPIFY_DOMAIN = "test.myshopify.com"
@@ -63,7 +63,7 @@ class TestShopifyLogic(unittest.TestCase):
         self.assertIn("Tracking: http://track.me", status)
 
     @patch('app.get_shopify_token')
-    @patch('app.requests.get')
+    @patch('app.zoko_session.get')
     def test_check_order_by_phone(self, mock_get, mock_token):
         mock_token.return_value = "fake_token"
         app.SHOPIFY_DOMAIN = "test.myshopify.com"

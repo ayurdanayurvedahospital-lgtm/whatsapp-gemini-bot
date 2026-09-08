@@ -432,6 +432,18 @@ def get_ist_time_greeting():
         logging.error(f"Time Error: {e}")
         return "Hello"
 
+
+def get_system_time_note():
+    """Returns the formatted system note with the current date and time in IST"""
+    try:
+        ist = pytz.timezone('Asia/Kolkata')
+        now = datetime.now(ist)
+        # Format like: [SYSTEM NOTE: The current Date and Time in IST is: YYYY-MM-DD HH:MM AM/PM]
+        return f"[SYSTEM NOTE: The current Date and Time in IST is: {now.strftime('%Y-%m-%d %I:%M %p')}]"
+    except Exception as e:
+        logging.error(f"Time Note Error: {e}")
+        return ""
+
 def get_current_time_str():
     """Returns formatted current time string in IST (e.g. '10:30 PM')"""
     try:
@@ -739,7 +751,9 @@ def process_audio(file_url, sender_phone, history):
 
             # Add final audio part and prompt
             audio_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='audio/ogg')
-            text_part = types.Part.from_text(text=f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant.")
+            system_note = get_system_time_note()
+            prompt = f"Listen to this audio. You are AIVA. Current time in Kerala is {current_time_str}. Answer as a consultant.\n\n{system_note}"
+            text_part = types.Part.from_text(text=prompt)
             contents.append(types.Content(role="user", parts=[audio_part, text_part]))
 
             return call_gemini_with_retry(contents)
@@ -819,7 +833,9 @@ def process_image(file_url, sender_phone, prompt_text, history):
 
             user_prompt = prompt_text if prompt_text else "Please analyze this image regarding my health."
             image_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='image/jpeg') # mime_type is optional/auto
-            text_part = types.Part.from_text(text=f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert.")
+            system_note = get_system_time_note()
+            prompt = f"Look at this image. Current time in Kerala is {current_time_str}. User says: {user_prompt}. Apply the Universal Language Protocol and answer as an expert.\n\n{system_note}"
+            text_part = types.Part.from_text(text=prompt)
             contents.append(types.Content(role="user", parts=[image_part, text_part]))
 
             return call_gemini_with_retry(contents)
@@ -893,7 +909,9 @@ def process_pdf(file_url, sender_phone, history):
                 contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
 
             pdf_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='application/pdf')
-            text_part = types.Part.from_text(text=f"The user uploaded a medical document. Current time in Kerala is {current_time_str}. Please analyze the findings and respond as an expert.")
+            system_note = get_system_time_note()
+            prompt = f"The user uploaded a medical document. Current time in Kerala is {current_time_str}. Please analyze the findings and respond as an expert.\n\n{system_note}"
+            text_part = types.Part.from_text(text=prompt)
             contents.append(types.Content(role="user", parts=[pdf_part, text_part]))
 
             return call_gemini_with_retry(contents)
@@ -1027,7 +1045,9 @@ def get_ai_response(sender_phone, message_text, history):
                 types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
             ]
 
-        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
+        system_note = get_system_time_note()
+        message_with_note = f"{message_text}\n\n{system_note}" if system_note else message_text
+        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_with_note)]))
 
         if sender_phone in user_sessions:
             user_sessions[sender_phone]['chat'].append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
@@ -1061,7 +1081,8 @@ def handle_message(payload):
             sender_phone = (payload.get("customer") or {}).get("platformSenderId")
 
         # 48-hour session memory logic
-        now = datetime.now()
+        ist = pytz.timezone('Asia/Kolkata')
+        now = datetime.now(ist)
         if sender_phone in user_sessions:
             if now - user_sessions[sender_phone]['last_active'] > timedelta(hours=48):
                 user_sessions[sender_phone] = {'chat': [], 'last_active': now}
@@ -1356,7 +1377,8 @@ def handle_message(payload):
 
         # Update in-memory session last active
         if sender_phone in user_sessions:
-            user_sessions[sender_phone]['last_active'] = datetime.now()
+            ist = pytz.timezone('Asia/Kolkata')
+            user_sessions[sender_phone]['last_active'] = datetime.now(ist)
 
     except Exception as e:
         logging.error(f"CRITICAL ERROR in handle_message: {e}")
