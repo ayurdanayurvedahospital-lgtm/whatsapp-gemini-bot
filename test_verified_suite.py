@@ -59,7 +59,7 @@ class TestExistingLogic(unittest.TestCase):
         self.assertLessEqual(len(final_history), 14)
         self.assertEqual(final_history[-1]["parts"][0], "resp 19")
 
-    @patch('app.requests.post')
+    @patch('app.zoko_session.post')
     def test_shopify_token_caching(self, mock_post):
         app.shopify_token_cache = {"access_token": None, "expires_at": 0}
         mock_resp = MagicMock()
