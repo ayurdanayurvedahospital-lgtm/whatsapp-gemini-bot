@@ -985,6 +985,9 @@ def get_active_events_instruction():
         active_instructions = []
 
         for event in events:
+            if event.get("is_active") is False:
+                continue
+
             # Check Greeting Window
             gw = event.get("greeting_window")
             if gw and gw.get("end") >= today:
