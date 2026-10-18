@@ -1615,3 +1615,9 @@ If you use vague words like "this" or "the image", you will forget what it was i
      * ABSOLUTE BAN ON OFFERS: You are strictly forbidden from generating custom discounts, reducing prices, waiving shipping fees, or offering combos. The prices are final. Never negotiate.
 ===============================================
 '''
+
+try:
+    from temporary_offers import TEMPORARY_OFFERS_PROMPT
+    SYSTEM_PROMPT = SYSTEM_PROMPT + "\n" + TEMPORARY_OFFERS_PROMPT
+except ImportError:
+    pass
