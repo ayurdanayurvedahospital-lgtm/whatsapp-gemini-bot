@@ -598,6 +598,127 @@ def check_stop_bot(phone):
     stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
     return is_stopped
 
+def create_thinking_config():
+    """
+    Creates ThinkingConfig with budget=0 and include_thoughts=False to zero out
+    thinking billing and prevent internal reasoning overhead.
+    Degrades gracefully if SDK fields differ.
+    """
+    try:
+        return types.ThinkingConfig(thinking_budget=0, include_thoughts=False)
+    except Exception:
+        try:
+            return types.ThinkingConfig(thinking_budget=0)
+        except Exception:
+            return None
+
+def extract_raw_text(response):
+    """
+    Extracts response text while explicitly filtering out candidate parts where
+    getattr(part, "thought", False) is True, and stripping <thought>...</thought> tags.
+    """
+    if not response:
+        return ""
+
+    text_parts = []
+    if hasattr(response, "candidates") and response.candidates:
+        for candidate in response.candidates:
+            c_content = getattr(candidate, "content", None)
+            if c_content and hasattr(c_content, "parts") and c_content.parts:
+                for part in c_content.parts:
+                    if getattr(part, "thought", False) is True:
+                        continue
+                    ptext = getattr(part, "text", "") or ""
+                    if ptext:
+                        text_parts.append(ptext)
+
+    if text_parts:
+        raw_text = "".join(text_parts)
+    else:
+        raw_text = getattr(response, "text", "") or ""
+
+    if raw_text:
+        raw_text = re.sub(r"<thought>.*?</thought>", "", raw_text, flags=re.DOTALL | re.IGNORECASE)
+        raw_text = re.sub(r"</?thought>", "", raw_text, flags=re.IGNORECASE)
+
+    return raw_text
+
+def strip_past_media(contents):
+    """
+    Strips raw image/audio binary parts from past history turns,
+    keeping media parts ONLY on the active incoming turn being processed (contents[-1]).
+    """
+    if not contents or len(contents) <= 1:
+        return contents
+
+    past_contents = contents[:-1]
+    active_turn = contents[-1]
+
+    cleaned_past = []
+    for content in past_contents:
+        if isinstance(content, types.Content) and hasattr(content, "parts") and content.parts:
+            text_parts = []
+            for part in content.parts:
+                has_inline = bool(getattr(part, "inline_data", None))
+                has_file = bool(getattr(part, "file_data", None))
+                has_uri = bool(getattr(part, "uri", None)) or (hasattr(part, "file_data") and part.file_data and bool(getattr(part.file_data, "file_uri", None)))
+                text_val = getattr(part, "text", None)
+
+                if text_val is not None and not has_inline and not has_file and not has_uri:
+                    text_parts.append(part)
+
+            if not text_parts:
+                text_parts = [types.Part.from_text(text="[Media]")]
+
+            cleaned_past.append(types.Content(role=content.role, parts=text_parts))
+        else:
+            cleaned_past.append(content)
+
+    return cleaned_past + [active_turn]
+
+def is_payment_latched_msg(content):
+    """
+    Checks if an assistant/model message contains payment confirmation or screenshot verification phrases.
+    """
+    role = getattr(content, "role", "") if not isinstance(content, dict) else content.get("role", "")
+    if role not in ("model", "assistant"):
+        return False
+
+    if isinstance(content, types.Content) and hasattr(content, "parts") and content.parts:
+        parts_text = [getattr(p, "text", "") or "" for p in content.parts if getattr(p, "text", None)]
+        text_content = " ".join(parts_text).lower()
+    elif isinstance(content, dict):
+        text_content = " ".join(content.get("parts", [])).lower()
+    else:
+        text_content = str(content).lower()
+
+    latch_keywords = [
+        "screenshot verified successfully",
+        "പേയ്മെന്റ് ലഭിച്ചു",
+        "order confirmed",
+        "ഓർഡർ സ്ഥിരീകരിച്ചു",
+        "payment received"
+    ]
+    return any(kw in text_content for kw in latch_keywords)
+
+def trim_history_with_latch(contents):
+    """
+    If contents exceeds 16 messages, trims payload sent to API to:
+    a) First 2 messages of the session (initial context),
+    b) Any historical assistant message containing payment/order/screenshot verification,
+    c) Most recent 14 messages.
+    """
+    if not contents or len(contents) <= 16:
+        return contents
+
+    first_2 = contents[:2]
+    recent_14 = contents[-14:]
+    middle = contents[2:-14]
+
+    latched = [msg for msg in middle if is_payment_latched_msg(msg)]
+
+    return first_2 + latched + recent_14
+
 def call_gemini_with_retry(contents):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
@@ -606,20 +727,20 @@ def call_gemini_with_retry(contents):
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
+    # Optimize contents payload: strip past media and apply smart history window with screenshot latch
+    contents = strip_past_media(contents)
+    contents = trim_history_with_latch(contents)
+
+    thinking_cfg = create_thinking_config()
+
     # Gemini 3 Flash Primary Config
     flash_config = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(
-            thinking_level="minimal",
-            include_thoughts=False
-        )
+        thinking_config=thinking_cfg
     )
 
     # Gemini 2.5 Pro Fallback Config
     pro_config = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(
-            include_thoughts=False,
-            thinking_budget=1024
-        )
+        thinking_config=thinking_cfg
     )
 
     raw_text = ""
@@ -636,7 +757,7 @@ def call_gemini_with_retry(contents):
                 contents=contents,
                 config=flash_config
             )
-            raw_text = response.text
+            raw_text = extract_raw_text(response)
             break  # Success, exit the retry loop
         except Exception as e:
             last_exception = e
@@ -670,7 +791,7 @@ def call_gemini_with_retry(contents):
                     contents=contents,
                     config=pro_config
                 )
-                raw_text = response.text
+                raw_text = extract_raw_text(response)
             except Exception as pro_e:
                 print(f"CRITICAL SDK ERROR (Pro Fallback Failed): {str(pro_e)}")
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
@@ -739,6 +860,9 @@ def process_audio(file_url, sender_phone, history):
 
             _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
+            event_instruction = get_active_events_instruction()
+            if event_instruction:
+                system_instruction += event_instruction
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
@@ -822,6 +946,9 @@ def process_image(file_url, sender_phone, prompt_text, history):
 
             _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
+            event_instruction = get_active_events_instruction()
+            if event_instruction:
+                system_instruction += event_instruction
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
@@ -899,6 +1026,9 @@ def process_pdf(file_url, sender_phone, history):
 
             _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
+            event_instruction = get_active_events_instruction()
+            if event_instruction:
+                system_instruction += event_instruction
             contents = [
                 types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
