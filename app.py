@@ -2,6 +2,7 @@
 # Bot Architecture & Logic Created By: Balamurali V,  for Ayurdan Ayurveda Hospital
 # ==========================================
 import os
+import hashlib
 import logging
 import threading
 import time
@@ -174,7 +175,7 @@ TERMINAL_PHRASES_LOWER = [p.lower() for p in ['ശുഭദിനം', 'ആശ�
 stop_bot_cache = {}
 user_sessions = {}
 CACHE_TTL = 300
-processed_messages = set()
+processed_messages = {}
 processed_messages_lock = threading.Lock()
 user_last_messages = {}
 followup_timers = {} # phone -> {'t1': Timer, 't2': Timer}
@@ -680,17 +681,20 @@ def is_payment_latched_msg(content):
     """
     Checks if an assistant/model message contains payment confirmation or screenshot verification phrases.
     """
-    role = getattr(content, "role", "") if not isinstance(content, dict) else content.get("role", "")
-    if role not in ("model", "assistant"):
-        return False
-
-    if isinstance(content, types.Content) and hasattr(content, "parts") and content.parts:
-        parts_text = [getattr(p, "text", "") or "" for p in content.parts if getattr(p, "text", None)]
-        text_content = " ".join(parts_text).lower()
-    elif isinstance(content, dict):
-        text_content = " ".join(content.get("parts", [])).lower()
+    if isinstance(content, str):
+        text_content = content.lower()
     else:
-        text_content = str(content).lower()
+        role = getattr(content, "role", "") if not isinstance(content, dict) else content.get("role", "")
+        if role and role not in ("model", "assistant"):
+            return False
+
+        if isinstance(content, types.Content) and hasattr(content, "parts") and content.parts:
+            parts_text = [getattr(p, "text", "") or "" for p in content.parts if getattr(p, "text", None)]
+            text_content = " ".join(parts_text).lower()
+        elif isinstance(content, dict):
+            text_content = " ".join(content.get("parts", [])).lower()
+        else:
+            text_content = str(content).lower()
 
     latch_keywords = [
         "screenshot verified successfully",
@@ -703,26 +707,40 @@ def is_payment_latched_msg(content):
 
 def trim_history_with_latch(contents):
     """
-    If contents exceeds 16 messages, trims payload sent to API to:
-    a) First 2 messages of the session (initial context),
+    If contents exceeds 14 turns/messages, trims payload sent to API to:
+    a) First 2 messages/turns of the session (initial context),
     b) Any historical assistant message containing payment/order/screenshot verification,
-    c) Most recent 14 messages.
+    c) Most recent 12 messages/turns.
     """
-    if not contents or len(contents) <= 16:
+    if not contents:
         return contents
 
-    first_2 = contents[:2]
-    recent_14 = contents[-14:]
-    middle = contents[2:-14]
+    if isinstance(contents, str):
+        pattern = r'(?=(?:^|\n)(?:User|Assistant|AIVA|Model|System|Human|AI):)'
+        turns = [t for t in re.split(pattern, contents, flags=re.IGNORECASE) if t.strip()]
+        if len(turns) <= 14:
+            return contents
+        first_2 = turns[:2]
+        recent_12 = turns[-12:]
+        middle = turns[2:-12]
+        latched = [t for t in middle if is_payment_latched_msg(t)]
+        return "".join(first_2 + latched + recent_12)
 
-    latched = [msg for msg in middle if is_payment_latched_msg(msg)]
+    if isinstance(contents, list):
+        if len(contents) <= 14:
+            return contents
+        first_2 = contents[:2]
+        recent_12 = contents[-12:]
+        middle = contents[2:-12]
+        latched = [msg for msg in middle if is_payment_latched_msg(msg)]
+        return first_2 + latched + recent_12
 
-    return first_2 + latched + recent_14
+    return contents
 
 def call_gemini_with_retry(contents):
     """
     Helper to call Gemini with automatic fallback on quota exhaustion.
-    Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Pro as Fallback.
+    Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Flash as Fallback.
     """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
@@ -738,9 +756,9 @@ def call_gemini_with_retry(contents):
         thinking_config=thinking_cfg
     )
 
-    # Gemini 2.5 Pro Fallback Config
-    pro_config = types.GenerateContentConfig(
-        thinking_config=thinking_cfg
+    # Gemini 2.5 Flash Fallback Config
+    fallback_config = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False)
     )
 
     raw_text = ""
@@ -748,7 +766,6 @@ def call_gemini_with_retry(contents):
     last_exception = None
 
     # 1. Attempt with Primary Model (Gemini 3 Flash) with Exponential Backoff for 500/503
-    # 1 initial attempt + 3 retries = 4 total attempts
     max_attempts = 4
     for attempt in range(max_attempts):
         try:
@@ -763,8 +780,38 @@ def call_gemini_with_retry(contents):
             last_exception = e
             last_err_str = str(e).lower()
 
+            # Catch 400/InvalidArgument errors related to thinking_config on gemini-3-flash-preview
+            if "400" in last_err_str or "invalidargument" in last_err_str or "thinking" in last_err_str or "budget" in last_err_str:
+                logging.warning("gemini-3-flash-preview rejected thinking_config (400/InvalidArgument). Retrying gemini-3-flash-preview with thinking_level='LOW'...")
+                try:
+                    alt_config = types.GenerateContentConfig(
+                        thinking_config=types.ThinkingConfig(thinking_level="LOW")
+                    )
+                    response = client.models.generate_content(
+                        model="gemini-3-flash-preview",
+                        contents=contents,
+                        config=alt_config
+                    )
+                    raw_text = extract_raw_text(response)
+                    if raw_text:
+                        break
+                except Exception as alt_e:
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-3-flash-preview",
+                            contents=contents,
+                            config=types.GenerateContentConfig()
+                        )
+                        raw_text = extract_raw_text(response)
+                        if raw_text:
+                            break
+                    except Exception as alt_e2:
+                        last_exception = alt_e2
+                        last_err_str = str(alt_e2).lower()
+                        break
+
             # Check for overload errors
-            if "500" in last_err_str or "503" in last_err_str:
+            elif "500" in last_err_str or "503" in last_err_str:
                 if attempt < max_attempts - 1:
                     wait_time = 2 ** attempt  # 1s, 2s, 4s
                     print(f"Gemini API Overloaded (500/503). Retrying in {wait_time}s... (Retry {attempt + 1}/{max_attempts - 1})")
@@ -781,19 +828,19 @@ def call_gemini_with_retry(contents):
 
     # If raw_text is empty, we hit an error that wasn't resolved by retries (like 429 or other)
     if not raw_text and last_exception:
-        # 2. Handle Quota/Rate Limit (429) via Fallback to Pro
+        # 2. Handle Quota/Rate Limit (429) via Fallback to gemini-2.5-flash
         if "429" in last_err_str or "quota" in last_err_str:
-            print("FLASH QUOTA EXCEEDED (429). Falling back to Pro...")
+            print("FLASH QUOTA EXCEEDED (429). Falling back to gemini-2.5-flash...")
             try:
-                # Nested fallback to Pro
+                # Nested fallback to gemini-2.5-flash
                 response = client.models.generate_content(
-                    model="gemini-2.5-pro",
+                    model="gemini-2.5-flash",
                     contents=contents,
-                    config=pro_config
+                    config=fallback_config
                 )
                 raw_text = extract_raw_text(response)
-            except Exception as pro_e:
-                print(f"CRITICAL SDK ERROR (Pro Fallback Failed): {str(pro_e)}")
+            except Exception as fallback_e:
+                print(f"CRITICAL SDK ERROR (2.5 Flash Fallback Failed): {str(fallback_e)}")
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
         else:
             # 3. Handle Other Errors immediately
@@ -807,6 +854,7 @@ def call_gemini_with_retry(contents):
     # WhatsApp Formatting Fix (Double Asterisks -> Single Asterisks)
     final_output = filtered_text.replace('**', '*')
     return final_output
+
 
 def process_audio(file_url, sender_phone, history):
     """
@@ -1230,14 +1278,34 @@ def handle_message(payload):
         }
         logging.info(f"STEP 1: Received message: {safe_log}")
 
-        # Extract Basics
+        # Extract Basics and 60-second Deduplication
+        now_ts = time.time()
+        dedup_keys = []
         if message_id:
+            dedup_keys.append(f"msg:{message_id}")
+
+        raw_text_body = payload.get("text") or payload.get("url") or payload.get("fileUrl") or payload.get("mediaUrl") or (payload.get("payload") or {}).get("text") or ""
+        raw_msg_type = payload.get("type") or "text"
+        if sender_phone or raw_text_body:
+            payload_sig = hashlib.md5(f"{sender_phone}:{raw_msg_type}:{raw_text_body}".encode('utf-8')).hexdigest()
+            dedup_keys.append(f"sig:{payload_sig}")
+
+        if dedup_keys:
             with processed_messages_lock:
-                if message_id in processed_messages:
-                    logging.info(f"Duplicate Message ID {message_id}. Skipping.")
+                if not isinstance(processed_messages, dict):
+                    globals()['processed_messages'] = {}
+
+                expired = [k for k, ts in processed_messages.items() if now_ts - ts > 60]
+                for k in expired:
+                    del processed_messages[k]
+
+                is_dup = any(k in processed_messages and (now_ts - processed_messages[k] <= 60) for k in dedup_keys)
+                if is_dup:
+                    logging.info(f"Duplicate Message ID / Payload {dedup_keys} within 60s. Skipping.")
                     return
-                processed_messages.add(message_id)
-                if len(processed_messages) > 5000: processed_messages.clear()
+
+                for k in dedup_keys:
+                    processed_messages[k] = now_ts
 
         if not sender_phone:
             logging.error("No sender_phone found. Aborting.")
