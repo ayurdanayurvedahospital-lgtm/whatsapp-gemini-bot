@@ -811,11 +811,45 @@ def trim_history_with_latch(contents):
         return trim_multi_turn_string(contents)
 
     if isinstance(contents, list):
-        new_contents = []
-        for item in contents:
+        if not contents:
+            return contents
+
+        if len(contents) == 1:
+            item = contents[0]
             if isinstance(item, str):
-                new_contents.append(trim_multi_turn_string(item))
+                return [trim_multi_turn_string(item)]
             elif isinstance(item, types.Content) and hasattr(item, "parts") and item.parts:
+                new_parts = []
+                for p in item.parts:
+                    txt = getattr(p, "text", None)
+                    if txt and isinstance(txt, str) and len(txt) > 100:
+                        if hasattr(types.Part, "from_text"):
+                            new_parts.append(types.Part.from_text(text=trim_multi_turn_string(txt)))
+                        else:
+                            new_parts.append(p)
+                    else:
+                        new_parts.append(p)
+                return [types.Content(role=item.role, parts=new_parts)]
+
+        active_turn = contents[-1]
+        history_items = contents[:-1]
+
+        new_history = []
+        for item in history_items:
+            if isinstance(item, str):
+                new_history.append(trim_multi_turn_string(item))
+            elif isinstance(item, types.Content) and hasattr(item, "parts") and item.parts:
+                has_media = any(
+                    bool(getattr(p, "inline_data", None)) or
+                    bool(getattr(p, "file_data", None)) or
+                    bool(getattr(p, "uri", None)) or
+                    (hasattr(p, "file_data") and p.file_data and bool(getattr(p.file_data, "file_uri", None)))
+                    for p in item.parts
+                )
+                if has_media:
+                    new_history.append(item)
+                    continue
+
                 new_parts = []
                 for p in item.parts:
                     txt = getattr(p, "text", None)
@@ -827,7 +861,7 @@ def trim_history_with_latch(contents):
                             new_parts.append(p)
                     else:
                         new_parts.append(p)
-                new_contents.append(types.Content(role=item.role, parts=new_parts))
+                new_history.append(types.Content(role=item.role, parts=new_parts))
             elif isinstance(item, dict):
                 parts = item.get("parts", [])
                 new_parts = []
@@ -842,16 +876,14 @@ def trim_history_with_latch(contents):
                         new_parts.append(p)
                 item_copy = dict(item)
                 item_copy["parts"] = new_parts
-                new_contents.append(item_copy)
+                new_history.append(item_copy)
             else:
-                new_contents.append(item)
-
-        contents = new_contents
+                new_history.append(item)
 
         prefix_items = []
         turn_items = []
 
-        for idx, item in enumerate(contents):
+        for idx, item in enumerate(new_history):
             if idx < 2 and is_system_prompt_content(item):
                 prefix_items.append(item)
             elif idx < 2 and (getattr(item, "role", "") == "model" or (isinstance(item, dict) and item.get("role") == "model")) and len(prefix_items) == 1:
@@ -861,14 +893,14 @@ def trim_history_with_latch(contents):
                     turn_items.append(item)
 
         if len(turn_items) <= 12:
-            return prefix_items + turn_items
+            return prefix_items + turn_items + [active_turn]
 
         first_2 = turn_items[:2]
         recent_10 = turn_items[-10:]
         middle = turn_items[2:-10]
         latched = [msg for msg in middle if is_payment_latched_msg(msg)]
 
-        return prefix_items + first_2 + latched + recent_10
+        return prefix_items + first_2 + latched + recent_10 + [active_turn]
 
     return contents
 

@@ -131,5 +131,32 @@ class TestExistingLogic(unittest.TestCase):
         mock_ai.assert_not_called()
         mock_send.assert_not_called()
 
+
+
+    def test_active_turn_media_preserved(self):
+        # Create real Part objects using google.genai types
+        image_part = app.types.Part.from_uri(file_uri="https://example.com/photo.jpg", mime_type="image/jpeg")
+        text_part = app.types.Part.from_text(text="Look at this product photo")
+
+        active_content = app.types.Content(role="user", parts=[image_part, text_part])
+
+        past_part1 = app.types.Part.from_text(text="system prompt")
+        past_part2 = app.types.Part.from_text(text="ack")
+        past_part3 = app.types.Part.from_text(text="past user msg")
+
+        contents = [
+            app.types.Content(role="user", parts=[past_part1]),
+            app.types.Content(role="model", parts=[past_part2]),
+            app.types.Content(role="user", parts=[past_part3]),
+            active_content
+        ]
+
+        cleaned = app.strip_past_media(contents)
+        trimmed = app.trim_history_with_latch(cleaned)
+
+        # The last element MUST be the exact active_content with image_part untouched
+        self.assertEqual(trimmed[-1], active_content)
+        self.assertEqual(trimmed[-1].parts[0].file_data.file_uri, "https://example.com/photo.jpg")
+
 if __name__ == '__main__':
     unittest.main()
