@@ -74,5 +74,62 @@ class TestExistingLogic(unittest.TestCase):
         # Should only call API once
         self.assertEqual(mock_post.call_count, 1)
 
+
+    def test_trim_history_with_latch_multi_turn_string(self):
+        # 1-element list containing a multi-turn conversation string (previously bypassed len <= 16 check)
+        multi_turn_text = "Master Grounding Directive: You are AIVA.\n"
+        for i in range(30):
+            multi_turn_text += f"User: message {i}\nAssistant: response {i}\n"
+
+        contents = [multi_turn_text]
+        trimmed = app.trim_history_with_latch(contents)
+
+        # Verify it trimmed the multi-turn string despite len(contents) == 1
+        self.assertIn("message 0", trimmed[0])
+        self.assertIn("response 29", trimmed[0])
+        self.assertNotIn("message 10", trimmed[0])
+
+    def test_user_sessions_ram_trimming_and_no_system_prompt(self):
+        phone = "919999988888"
+        app.user_sessions[phone] = {"chat": [], "last_active": 0}
+
+        with patch("app.call_gemini_with_retry", return_value="AI Reply"):
+            app.get_ai_response(phone, "Hello AIVA", [])
+
+        chat = app.user_sessions[phone]["chat"]
+        # Verify SYSTEM_PROMPT is NOT in chat
+        for msg in chat:
+            self.assertFalse(app.is_system_prompt_content(msg))
+
+        self.assertEqual(len(chat), 2) # user msg + model reply
+
+    @patch("app.client")
+    def test_in_flight_request_deduplication(self, mock_client):
+        app.in_flight_requests.clear()
+        contents = ["test_in_flight_payload"]
+
+        # Simulate in-flight payload
+        payload_hash = app.hashlib.md5(str(contents).encode("utf-8")).hexdigest()
+        app.in_flight_requests.add(payload_hash)
+
+        res = app.call_gemini_with_retry(contents)
+        self.assertIn("double-checking your details", res)
+
+        app.in_flight_requests.clear()
+
+    @patch("app.send_whatsapp_message")
+    @patch("app.get_ai_response")
+    def test_status_updates_ignored_early(self, mock_ai, mock_send):
+        payload = {
+            "messageId": "msg_status_1",
+            "platformSenderId": "9100000000",
+            "type": "READ",
+            "status": "DELIVERED",
+            "direction": "incoming"
+        }
+        app.handle_message(payload)
+        mock_ai.assert_not_called()
+        mock_send.assert_not_called()
+
 if __name__ == '__main__':
     unittest.main()

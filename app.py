@@ -174,6 +174,8 @@ zoko_session.mount("http://", adapter)
 TERMINAL_PHRASES_LOWER = [p.lower() for p in ['ശുഭദിനം', 'ആശംസിക്കുന്നു', 'നല്ലൊരു ദിവസം ആശംസിക്കുന്നു! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു ! 🌿', 'നല്ലൊരു ദിവസം നേരുന്നു!', 'സമയത്തിന് നന്ദി', 'have a good day', 'have a great day', 'shubhadinam']]
 stop_bot_cache = {}
 user_sessions = {}
+in_flight_requests = set()
+in_flight_lock = threading.Lock()
 CACHE_TTL = 300
 processed_messages = {}
 processed_messages_lock = threading.Lock()
@@ -677,6 +679,101 @@ def strip_past_media(contents):
 
     return cleaned_past + [active_turn]
 
+
+def is_system_prompt_text(text):
+    if not isinstance(text, str):
+        return False
+    markers = [
+        "master grounding directive",
+        "you are aiva",
+        "absolute 48-hour context",
+        "universal language protocol",
+        "ayurdan ayurveda hospital",
+        "ആയൂർദാൻ ആയുർവേദ ആശുപത്രി",
+        "zero hallucination"
+    ]
+    lower = text.lower()
+    return len(text) > 200 and any(m in lower for m in markers)
+
+def is_system_prompt_content(content):
+    if isinstance(content, str):
+        return is_system_prompt_text(content)
+    if isinstance(content, types.Content) and hasattr(content, "parts") and content.parts:
+        parts_text = [getattr(p, "text", "") or "" for p in content.parts if getattr(p, "text", None)]
+        return is_system_prompt_text(" ".join(parts_text))
+    if isinstance(content, dict):
+        parts = content.get("parts", [])
+        txt_parts = []
+        for p in parts:
+            if isinstance(p, str):
+                txt_parts.append(p)
+            elif isinstance(p, dict) and "text" in p:
+                txt_parts.append(p.get("text", ""))
+        return is_system_prompt_text(" ".join(txt_parts))
+    return False
+
+def trim_multi_turn_string(text_content):
+    if not isinstance(text_content, str) or not text_content:
+        return text_content
+
+    pattern = r"(?=(?:^|\n)(?:User|Assistant|AIVA|Model|System|Human|AI):)"
+    blocks = [b for b in re.split(pattern, text_content, flags=re.IGNORECASE) if b.strip()]
+
+    if len(blocks) <= 1:
+        return text_content
+
+    prefix = ""
+    turns = []
+
+    first_block = blocks[0]
+    if is_system_prompt_text(first_block) or not re.match(r"^(User|Assistant|AIVA|Model|Human|AI):", first_block.strip(), re.IGNORECASE):
+        prefix = first_block
+        turns = blocks[1:]
+    else:
+        turns = blocks
+
+    if not turns:
+        return prefix
+
+    turns = [t for t in turns if not is_system_prompt_text(t)]
+
+    if len(turns) <= 12:
+        return prefix + ("\n" if prefix and not prefix.endswith("\n") else "") + "".join(turns)
+
+    first_2 = turns[:2]
+    recent_10 = turns[-10:]
+    middle = turns[2:-10]
+    latched = [t for t in middle if is_payment_latched_msg(t)]
+
+    return prefix + ("\n" if prefix and not prefix.endswith("\n") else "") + "".join(first_2 + latched + recent_10)
+
+def estimate_contents_chars(contents):
+    if not contents:
+        return 0
+    if isinstance(contents, str):
+        return len(contents)
+    total = 0
+    if isinstance(contents, list):
+        for item in contents:
+            if isinstance(item, str):
+                total += len(item)
+            elif isinstance(item, dict):
+                parts = item.get("parts", [])
+                for p in parts:
+                    if isinstance(p, str):
+                        total += len(p)
+                    elif isinstance(p, dict):
+                        total += len(p.get("text", ""))
+            elif isinstance(item, types.Content):
+                if hasattr(item, "parts") and item.parts:
+                    for p in item.parts:
+                        txt = getattr(p, "text", None)
+                        if txt:
+                            total += len(txt)
+            elif hasattr(item, "text") and item.text:
+                total += len(item.text)
+    return total
+
 def is_payment_latched_msg(content):
     """
     Checks if an assistant/model message contains payment confirmation or screenshot verification phrases.
@@ -698,6 +795,7 @@ def is_payment_latched_msg(content):
 
     latch_keywords = [
         "screenshot verified successfully",
+        "സ്ക്രീൻഷോട്ട്",
         "പേയ്മെന്റ് ലഭിച്ചു",
         "order confirmed",
         "ഓർഡർ സ്ഥിരീകരിച്ചു",
@@ -706,155 +804,197 @@ def is_payment_latched_msg(content):
     return any(kw in text_content for kw in latch_keywords)
 
 def trim_history_with_latch(contents):
-    """
-    If contents exceeds 14 turns/messages, trims payload sent to API to:
-    a) First 2 messages/turns of the session (initial context),
-    b) Any historical assistant message containing payment/order/screenshot verification,
-    c) Most recent 12 messages/turns.
-    """
     if not contents:
         return contents
 
     if isinstance(contents, str):
-        pattern = r'(?=(?:^|\n)(?:User|Assistant|AIVA|Model|System|Human|AI):)'
-        turns = [t for t in re.split(pattern, contents, flags=re.IGNORECASE) if t.strip()]
-        if len(turns) <= 14:
-            return contents
-        first_2 = turns[:2]
-        recent_12 = turns[-12:]
-        middle = turns[2:-12]
-        latched = [t for t in middle if is_payment_latched_msg(t)]
-        return "".join(first_2 + latched + recent_12)
+        return trim_multi_turn_string(contents)
 
     if isinstance(contents, list):
-        if len(contents) <= 14:
-            return contents
-        first_2 = contents[:2]
-        recent_12 = contents[-12:]
-        middle = contents[2:-12]
+        new_contents = []
+        for item in contents:
+            if isinstance(item, str):
+                new_contents.append(trim_multi_turn_string(item))
+            elif isinstance(item, types.Content) and hasattr(item, "parts") and item.parts:
+                new_parts = []
+                for p in item.parts:
+                    txt = getattr(p, "text", None)
+                    if txt and isinstance(txt, str) and len(txt) > 100:
+                        trimmed_txt = trim_multi_turn_string(txt)
+                        if hasattr(types.Part, "from_text"):
+                            new_parts.append(types.Part.from_text(text=trimmed_txt))
+                        else:
+                            new_parts.append(p)
+                    else:
+                        new_parts.append(p)
+                new_contents.append(types.Content(role=item.role, parts=new_parts))
+            elif isinstance(item, dict):
+                parts = item.get("parts", [])
+                new_parts = []
+                for p in parts:
+                    if isinstance(p, str) and len(p) > 100:
+                        new_parts.append(trim_multi_turn_string(p))
+                    elif isinstance(p, dict) and isinstance(p.get("text"), str) and len(p["text"]) > 100:
+                        p_copy = dict(p)
+                        p_copy["text"] = trim_multi_turn_string(p["text"])
+                        new_parts.append(p_copy)
+                    else:
+                        new_parts.append(p)
+                item_copy = dict(item)
+                item_copy["parts"] = new_parts
+                new_contents.append(item_copy)
+            else:
+                new_contents.append(item)
+
+        contents = new_contents
+
+        prefix_items = []
+        turn_items = []
+
+        for idx, item in enumerate(contents):
+            if idx < 2 and is_system_prompt_content(item):
+                prefix_items.append(item)
+            elif idx < 2 and (getattr(item, "role", "") == "model" or (isinstance(item, dict) and item.get("role") == "model")) and len(prefix_items) == 1:
+                prefix_items.append(item)
+            else:
+                if not is_system_prompt_content(item):
+                    turn_items.append(item)
+
+        if len(turn_items) <= 12:
+            return prefix_items + turn_items
+
+        first_2 = turn_items[:2]
+        recent_10 = turn_items[-10:]
+        middle = turn_items[2:-10]
         latched = [msg for msg in middle if is_payment_latched_msg(msg)]
-        return first_2 + latched + recent_12
+
+        return prefix_items + first_2 + latched + recent_10
 
     return contents
 
 def call_gemini_with_retry(contents):
-    """
-    Helper to call Gemini with automatic fallback on quota exhaustion.
-    Inverted Architecture: Gemini 3 Flash as Primary, 2.5 Flash as Fallback.
-    """
     if not client:
         return "I am currently undergoing maintenance. Please try again later."
 
-    # Optimize contents payload: strip past media and apply smart history window with screenshot latch
     contents = strip_past_media(contents)
     contents = trim_history_with_latch(contents)
 
-    thinking_cfg = create_thinking_config()
+    payload_repr = str(contents)
+    payload_hash = hashlib.md5(payload_repr.encode("utf-8")).hexdigest()
 
-    # Gemini 3 Flash Primary Config
-    flash_config = types.GenerateContentConfig(
-        thinking_config=thinking_cfg
-    )
+    with in_flight_lock:
+        if payload_hash in in_flight_requests:
+            logging.warning(f"Request with payload hash {payload_hash} is already in flight. Skipping duplicate call.")
+            return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
+        in_flight_requests.add(payload_hash)
 
-    # Gemini 2.5 Flash Fallback Config
-    fallback_config = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False)
-    )
+    try:
+        thinking_cfg = create_thinking_config()
 
-    raw_text = ""
-    last_err_str = ""
-    last_exception = None
+        flash_config = types.GenerateContentConfig(
+            thinking_config=thinking_cfg
+        )
 
-    # 1. Attempt with Primary Model (Gemini 3 Flash) with Exponential Backoff for 500/503
-    max_attempts = 4
-    for attempt in range(max_attempts):
-        try:
-            response = client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=contents,
-                config=flash_config
-            )
-            raw_text = extract_raw_text(response)
-            break  # Success, exit the retry loop
-        except Exception as e:
-            last_exception = e
-            last_err_str = str(e).lower()
+        fallback_config = types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False)
+        )
 
-            # Catch 400/InvalidArgument errors related to thinking_config on gemini-3-flash-preview
-            if "400" in last_err_str or "invalidargument" in last_err_str or "thinking" in last_err_str or "budget" in last_err_str:
-                logging.warning("gemini-3-flash-preview rejected thinking_config (400/InvalidArgument). Retrying gemini-3-flash-preview with thinking_level='LOW'...")
-                try:
-                    alt_config = types.GenerateContentConfig(
-                        thinking_config=types.ThinkingConfig(thinking_level="LOW")
-                    )
-                    response = client.models.generate_content(
-                        model="gemini-3-flash-preview",
-                        contents=contents,
-                        config=alt_config
-                    )
-                    raw_text = extract_raw_text(response)
-                    if raw_text:
-                        break
-                except Exception as alt_e:
+        raw_text = ""
+        last_err_str = ""
+        last_exception = None
+
+        total_chars = estimate_contents_chars(contents)
+
+        max_attempts = 4
+        for attempt in range(max_attempts):
+            try:
+                model_name = "gemini-3-flash-preview"
+                logging.info(f"[TOKEN AUDIT] model={model_name} approx_chars={total_chars} approx_tokens={total_chars // 4}")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=flash_config
+                )
+                raw_text = extract_raw_text(response)
+                break
+            except Exception as e:
+                last_exception = e
+                last_err_str = str(e).lower()
+
+                if "400" in last_err_str or "invalidargument" in last_err_str or "thinking" in last_err_str or "budget" in last_err_str:
+                    logging.warning("gemini-3-flash-preview rejected thinking_config (400/InvalidArgument). Retrying gemini-3-flash-preview with thinking_level='LOW'...")
                     try:
+                        alt_config = types.GenerateContentConfig(
+                            thinking_config=types.ThinkingConfig(thinking_level='LOW')
+                        )
+                        model_name = "gemini-3-flash-preview"
+                        logging.info(f"[TOKEN AUDIT] model={model_name} approx_chars={total_chars} approx_tokens={total_chars // 4}")
                         response = client.models.generate_content(
-                            model="gemini-3-flash-preview",
+                            model=model_name,
                             contents=contents,
-                            config=types.GenerateContentConfig()
+                            config=alt_config
                         )
                         raw_text = extract_raw_text(response)
                         if raw_text:
                             break
-                    except Exception as alt_e2:
-                        last_exception = alt_e2
-                        last_err_str = str(alt_e2).lower()
-                        break
+                    except Exception as alt_e:
+                        try:
+                            model_name = "gemini-3-flash-preview"
+                            logging.info(f"[TOKEN AUDIT] model={model_name} approx_chars={total_chars} approx_tokens={total_chars // 4}")
+                            response = client.models.generate_content(
+                                model=model_name,
+                                contents=contents,
+                                config=types.GenerateContentConfig()
+                            )
+                            raw_text = extract_raw_text(response)
+                            if raw_text:
+                                break
+                        except Exception as alt_e2:
+                            last_exception = alt_e2
+                            last_err_str = str(alt_e2).lower()
+                            break
 
-            # Check for overload errors
-            elif "500" in last_err_str or "503" in last_err_str:
-                if attempt < max_attempts - 1:
-                    wait_time = 2 ** attempt  # 1s, 2s, 4s
-                    print(f"Gemini API Overloaded (500/503). Retrying in {wait_time}s... (Retry {attempt + 1}/{max_attempts - 1})")
-                    time.sleep(wait_time)
-                    continue
+                elif "500" in last_err_str or "503" in last_err_str:
+                    if attempt < max_attempts - 1:
+                        wait_time = 2 ** attempt
+                        print(f"Gemini API Overloaded (500/503). Retrying in {wait_time}s... (Retry {attempt + 1}/{max_attempts - 1})")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"CRITICAL SDK ERROR (Max Retries Reached): {str(e)}")
+                        logging.error(f"Gemini Error (Max Retries): {e}")
+                        return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
                 else:
-                    # Max retries exhausted
-                    print(f"CRITICAL SDK ERROR (Max Retries Reached): {str(e)}")
-                    logging.error(f"Gemini Error (Max Retries): {e}")
+                    break
+
+        if not raw_text and last_exception:
+            if "429" in last_err_str or "quota" in last_err_str:
+                print("FLASH QUOTA EXCEEDED (429). Falling back to gemini-2.5-flash...")
+                try:
+                    model_name = "gemini-2.5-flash"
+                    logging.info(f"[TOKEN AUDIT] model={model_name} approx_chars={total_chars} approx_tokens={total_chars // 4}")
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=fallback_config
+                    )
+                    raw_text = extract_raw_text(response)
+                except Exception as fallback_e:
+                    print(f"CRITICAL SDK ERROR (2.5 Flash Fallback Failed): {str(fallback_e)}")
                     return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
             else:
-                # Not a 500/503 error, break out of the retry loop to handle it below (e.g., 429)
-                break
-
-    # If raw_text is empty, we hit an error that wasn't resolved by retries (like 429 or other)
-    if not raw_text and last_exception:
-        # 2. Handle Quota/Rate Limit (429) via Fallback to gemini-2.5-flash
-        if "429" in last_err_str or "quota" in last_err_str:
-            print("FLASH QUOTA EXCEEDED (429). Falling back to gemini-2.5-flash...")
-            try:
-                # Nested fallback to gemini-2.5-flash
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=contents,
-                    config=fallback_config
-                )
-                raw_text = extract_raw_text(response)
-            except Exception as fallback_e:
-                print(f"CRITICAL SDK ERROR (2.5 Flash Fallback Failed): {str(fallback_e)}")
+                print(f"CRITICAL SDK ERROR: {str(last_exception)}")
+                logging.error(f"Gemini Error: {last_exception}")
                 return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
-        else:
-            # 3. Handle Other Errors immediately
-            print(f"CRITICAL SDK ERROR: {str(last_exception)}")
-            logging.error(f"Gemini Error: {last_exception}")
-            return "I am just double-checking your details with our senior experts. Give me just a moment, and I will get right back to you!"
 
-    # Global Anti-Leak Filter (HTML Comments + Structural Labels)
-    clean_text = re.sub(r'<!--.*?-->', '', raw_text, flags=re.DOTALL)
-    filtered_text = re.sub(r'(?i)\*?(AEAC|Awareness|Education|Authority|Closing|അവബോധം|വിദ്യാഭ്യാസം|അധികാരം|ക്ലോസിംഗ്|Thought)\*?:?\s*', '', clean_text).strip()
-    # WhatsApp Formatting Fix (Double Asterisks -> Single Asterisks)
-    final_output = filtered_text.replace('**', '*')
-    return final_output
+        clean_text = re.sub(r"<!--.*?-->", "", raw_text, flags=re.DOTALL)
+        filtered_text = re.sub(r"(?i)\*?(AEAC|Awareness|Education|Authority|Closing|അവബോധം|വിദ്യാഭ്യാസം|അധികാരം|ക്ലോസിംഗ്|Thought)\*?:?\s*", "", clean_text).strip()
+        final_output = filtered_text.replace("**", "*")
+        return final_output
 
+    finally:
+        with in_flight_lock:
+            in_flight_requests.discard(payload_hash)
 
 def process_audio(file_url, sender_phone, history):
     """
@@ -1191,7 +1331,6 @@ def get_ai_response(sender_phone, message_text, history):
         current_time_str = get_current_time_str()
 
         user_lang = detect_language(message_text)
-        # Only inherit past language if the current message is a short filler response
         if user_lang == "english" and len(message_text.split()) < 4 and history:
             for h in reversed(history):
                 if h["role"] == "user":
@@ -1211,35 +1350,36 @@ def get_ai_response(sender_phone, message_text, history):
 
         model_ack = f"Understood. I am AIVA. Current Time Greeting is: {greeting}.{context_injection} I am actively monitoring the user's language and will instantly mirror their language and script as per the Universal Language Protocol."
 
-        if sender_phone in user_sessions and not user_sessions[sender_phone].get('chat'):
-            user_sessions[sender_phone]['chat'] = [
-                types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
-                types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
-            ]
-
-        # Use the persistent chat history if available, else fallback
-        if sender_phone in user_sessions:
-            contents = user_sessions[sender_phone]['chat'].copy()
-        else:
-            contents = [
-                types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)]),
-                types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
-            ]
+        system_content = types.Content(role="user", parts=[types.Part.from_text(text=system_instruction)])
+        ack_content = types.Content(role="model", parts=[types.Part.from_text(text=model_ack)])
 
         system_note = get_system_time_note()
         message_with_note = f"{message_text}\n\n{system_note}" if system_note else message_text
-        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message_with_note)]))
 
+        chat = []
         if sender_phone in user_sessions:
-            user_sessions[sender_phone]['chat'].append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
+            chat = user_sessions[sender_phone].get("chat", [])
+
+        chat = [c for c in chat if not is_system_prompt_content(c)]
+        chat.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
+
+        contents = [system_content, ack_content] + chat[:-1] + [types.Content(role="user", parts=[types.Part.from_text(text=message_with_note)])]
 
         response_text = call_gemini_with_retry(contents)
 
-        if sender_phone in user_sessions and response_text:
-            user_sessions[sender_phone]['chat'].append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
-            # Optional: rolling window limit to prevent context length explosion
-            if len(user_sessions[sender_phone]['chat']) > 30:
-                user_sessions[sender_phone]['chat'] = user_sessions[sender_phone]['chat'][:2] + user_sessions[sender_phone]['chat'][-28:]
+        if response_text:
+            chat.append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
+
+        chat = strip_past_media(chat)
+        if len(chat) > 12:
+            first_2 = chat[:2]
+            recent_10 = chat[-10:]
+            middle = chat[2:-10]
+            latched = [m for m in middle if is_payment_latched_msg(m)]
+            chat = first_2 + latched + recent_10
+
+        if sender_phone in user_sessions:
+            user_sessions[sender_phone]["chat"] = chat
 
         return response_text
     except Exception as e:
@@ -1277,6 +1417,21 @@ def handle_message(payload):
             "direction": payload.get("direction")
         }
         logging.info(f"STEP 1: Received message: {safe_log}")
+
+        # Early filter for outbound messages and status updates
+        direction = str(payload.get("direction") or safe_log.get("direction") or "").lower()
+        if direction in ["outgoing", "from_business", "sent"]:
+            logging.info("Ignoring outgoing message.")
+            return
+
+        msg_type_str = str(payload.get("type") or safe_log.get("type") or "").lower()
+        event_type = str(payload.get("event") or "").lower()
+        status_val = str(payload.get("status") or "").lower()
+        if msg_type_str in ["sent", "delivered", "read", "failed", "status", "status_update", "message_status"] or \
+           event_type in ["sent", "delivered", "read", "failed", "status", "status_update", "message_status"] or \
+           status_val in ["sent", "delivered", "read", "failed"]:
+            logging.info("Ignoring status update event.")
+            return
 
         # Extract Basics and 60-second Deduplication
         now_ts = time.time()
@@ -1542,6 +1697,20 @@ def handle_message(payload):
             history.append({"role": "model", "parts": [response_text]})
             save_user_history(sender_phone, history)
 
+            if msg_type in ["document", "image", "audio"] and sender_phone in user_sessions:
+                chat = user_sessions[sender_phone].get("chat", [])
+                chat = [c for c in chat if not is_system_prompt_content(c)]
+                chat.append(types.Content(role="user", parts=[types.Part.from_text(text=user_input_for_history)]))
+                chat.append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
+                chat = strip_past_media(chat)
+                if len(chat) > 12:
+                    first_2 = chat[:2]
+                    recent_10 = chat[-10:]
+                    middle = chat[2:-10]
+                    latched = [m for m in middle if is_payment_latched_msg(m)]
+                    chat = first_2 + latched + recent_10
+                user_sessions[sender_phone]["chat"] = chat
+
         logging.info("STEP 6: Sending AI Response")
 
         if response_text:
@@ -1604,6 +1773,20 @@ def bot():
         if not data:
             return jsonify({"status": "error", "message": "No JSON data"}), 400
 
+        direction = str(data.get("direction") or "").lower()
+        if direction in ["outgoing", "from_business", "sent"]:
+            return jsonify({"status": "ignored", "reason": "outbound message"}), 200
+
+        msg_type = str(data.get("type") or "").lower()
+        event_type = str(data.get("event") or "").lower()
+        status_val = str(data.get("status") or "").lower()
+        if msg_type in ["sent", "delivered", "read", "failed", "status", "status_update", "message_status"] or \
+           event_type in ["sent", "delivered", "read", "failed", "status", "status_update", "message_status"] or \
+           status_val in ["sent", "delivered", "read", "failed"]:
+            return jsonify({"status": "ignored", "reason": "status update"}), 200
+
+
+
         thread = threading.Thread(target=handle_message, args=(data,))
         thread.daemon = True
         thread.start()
@@ -1613,4 +1796,3 @@ def bot():
     except Exception as e:
         logging.error(f"Webhook Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
