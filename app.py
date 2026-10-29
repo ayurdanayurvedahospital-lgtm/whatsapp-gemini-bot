@@ -680,73 +680,6 @@ def strip_past_media(contents):
     return cleaned_past + [active_turn]
 
 
-def is_system_prompt_text(text):
-    if not isinstance(text, str):
-        return False
-    markers = [
-        "master grounding directive",
-        "you are aiva",
-        "absolute 48-hour context",
-        "universal language protocol",
-        "ayurdan ayurveda hospital",
-        "ആയൂർദാൻ ആയുർവേദ ആശുപത്രി",
-        "zero hallucination"
-    ]
-    lower = text.lower()
-    return len(text) > 200 and any(m in lower for m in markers)
-
-def is_system_prompt_content(content):
-    if isinstance(content, str):
-        return is_system_prompt_text(content)
-    if isinstance(content, types.Content) and hasattr(content, "parts") and content.parts:
-        parts_text = [getattr(p, "text", "") or "" for p in content.parts if getattr(p, "text", None)]
-        return is_system_prompt_text(" ".join(parts_text))
-    if isinstance(content, dict):
-        parts = content.get("parts", [])
-        txt_parts = []
-        for p in parts:
-            if isinstance(p, str):
-                txt_parts.append(p)
-            elif isinstance(p, dict) and "text" in p:
-                txt_parts.append(p.get("text", ""))
-        return is_system_prompt_text(" ".join(txt_parts))
-    return False
-
-def trim_multi_turn_string(text_content):
-    if not isinstance(text_content, str) or not text_content:
-        return text_content
-
-    pattern = r"(?=(?:^|\n)(?:User|Assistant|AIVA|Model|System|Human|AI):)"
-    blocks = [b for b in re.split(pattern, text_content, flags=re.IGNORECASE) if b.strip()]
-
-    if len(blocks) <= 1:
-        return text_content
-
-    prefix = ""
-    turns = []
-
-    first_block = blocks[0]
-    if is_system_prompt_text(first_block) or not re.match(r"^(User|Assistant|AIVA|Model|Human|AI):", first_block.strip(), re.IGNORECASE):
-        prefix = first_block
-        turns = blocks[1:]
-    else:
-        turns = blocks
-
-    if not turns:
-        return prefix
-
-    turns = [t for t in turns if not is_system_prompt_text(t)]
-
-    if len(turns) <= 12:
-        return prefix + ("\n" if prefix and not prefix.endswith("\n") else "") + "".join(turns)
-
-    first_2 = turns[:2]
-    recent_10 = turns[-10:]
-    middle = turns[2:-10]
-    latched = [t for t in middle if is_payment_latched_msg(t)]
-
-    return prefix + ("\n" if prefix and not prefix.endswith("\n") else "") + "".join(first_2 + latched + recent_10)
-
 def estimate_contents_chars(contents):
     if not contents:
         return 0
@@ -804,105 +737,31 @@ def is_payment_latched_msg(content):
     return any(kw in text_content for kw in latch_keywords)
 
 def trim_history_with_latch(contents):
-    if not contents:
+    """
+    Trims history list when len(contents) > 20, preserving:
+    - initial turns (first 2)
+    - payment/screenshot verification turns (latched)
+    - recent turns (last 10)
+    - active turn (contents[-1])
+    """
+    if not contents or not isinstance(contents, list):
         return contents
 
-    if isinstance(contents, str):
-        return trim_multi_turn_string(contents)
+    if len(contents) <= 20:
+        return contents
 
-    if isinstance(contents, list):
-        if not contents:
-            return contents
+    active_turn = contents[-1]
+    history_items = contents[:-1]
 
-        if len(contents) == 1:
-            item = contents[0]
-            if isinstance(item, str):
-                return [trim_multi_turn_string(item)]
-            elif isinstance(item, types.Content) and hasattr(item, "parts") and item.parts:
-                new_parts = []
-                for p in item.parts:
-                    txt = getattr(p, "text", None)
-                    if txt and isinstance(txt, str) and len(txt) > 100:
-                        if hasattr(types.Part, "from_text"):
-                            new_parts.append(types.Part.from_text(text=trim_multi_turn_string(txt)))
-                        else:
-                            new_parts.append(p)
-                    else:
-                        new_parts.append(p)
-                return [types.Content(role=item.role, parts=new_parts)]
+    if len(history_items) <= 12:
+        return contents
 
-        active_turn = contents[-1]
-        history_items = contents[:-1]
+    first_2 = history_items[:2]
+    recent_10 = history_items[-10:]
+    middle = history_items[2:-10]
+    latched = [msg for msg in middle if is_payment_latched_msg(msg)]
 
-        new_history = []
-        for item in history_items:
-            if isinstance(item, str):
-                new_history.append(trim_multi_turn_string(item))
-            elif isinstance(item, types.Content) and hasattr(item, "parts") and item.parts:
-                has_media = any(
-                    bool(getattr(p, "inline_data", None)) or
-                    bool(getattr(p, "file_data", None)) or
-                    bool(getattr(p, "uri", None)) or
-                    (hasattr(p, "file_data") and p.file_data and bool(getattr(p.file_data, "file_uri", None)))
-                    for p in item.parts
-                )
-                if has_media:
-                    new_history.append(item)
-                    continue
-
-                new_parts = []
-                for p in item.parts:
-                    txt = getattr(p, "text", None)
-                    if txt and isinstance(txt, str) and len(txt) > 100:
-                        trimmed_txt = trim_multi_turn_string(txt)
-                        if hasattr(types.Part, "from_text"):
-                            new_parts.append(types.Part.from_text(text=trimmed_txt))
-                        else:
-                            new_parts.append(p)
-                    else:
-                        new_parts.append(p)
-                new_history.append(types.Content(role=item.role, parts=new_parts))
-            elif isinstance(item, dict):
-                parts = item.get("parts", [])
-                new_parts = []
-                for p in parts:
-                    if isinstance(p, str) and len(p) > 100:
-                        new_parts.append(trim_multi_turn_string(p))
-                    elif isinstance(p, dict) and isinstance(p.get("text"), str) and len(p["text"]) > 100:
-                        p_copy = dict(p)
-                        p_copy["text"] = trim_multi_turn_string(p["text"])
-                        new_parts.append(p_copy)
-                    else:
-                        new_parts.append(p)
-                item_copy = dict(item)
-                item_copy["parts"] = new_parts
-                new_history.append(item_copy)
-            else:
-                new_history.append(item)
-
-        prefix_items = []
-        turn_items = []
-
-        for idx, item in enumerate(new_history):
-            if idx < 2 and is_system_prompt_content(item):
-                prefix_items.append(item)
-            elif idx < 2 and (getattr(item, "role", "") == "model" or (isinstance(item, dict) and item.get("role") == "model")) and len(prefix_items) == 1:
-                prefix_items.append(item)
-            else:
-                if not is_system_prompt_content(item):
-                    turn_items.append(item)
-
-        if len(turn_items) <= 12:
-            return prefix_items + turn_items + [active_turn]
-
-        first_2 = turn_items[:2]
-        recent_10 = turn_items[-10:]
-        middle = turn_items[2:-10]
-        latched = [msg for msg in middle if is_payment_latched_msg(msg)]
-
-        return prefix_items + first_2 + latched + recent_10 + [active_turn]
-
-    return contents
+    return first_2 + latched + recent_10 + [active_turn]
 
 def call_gemini_with_retry(contents):
     if not client:
@@ -1392,7 +1251,6 @@ def get_ai_response(sender_phone, message_text, history):
         if sender_phone in user_sessions:
             chat = user_sessions[sender_phone].get("chat", [])
 
-        chat = [c for c in chat if not is_system_prompt_content(c)]
         chat.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
 
         contents = [system_content, ack_content] + chat[:-1] + [types.Content(role="user", parts=[types.Part.from_text(text=message_with_note)])]
@@ -1403,7 +1261,7 @@ def get_ai_response(sender_phone, message_text, history):
             chat.append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
 
         chat = strip_past_media(chat)
-        if len(chat) > 12:
+        if len(chat) > 20:
             first_2 = chat[:2]
             recent_10 = chat[-10:]
             middle = chat[2:-10]
@@ -1465,19 +1323,9 @@ def handle_message(payload):
             logging.info("Ignoring status update event.")
             return
 
-        # Extract Basics and 60-second Deduplication
+        # Extract Basics and 60-second Deduplication (Strictly by explicit provider message_id)
         now_ts = time.time()
-        dedup_keys = []
         if message_id:
-            dedup_keys.append(f"msg:{message_id}")
-
-        raw_text_body = payload.get("text") or payload.get("url") or payload.get("fileUrl") or payload.get("mediaUrl") or (payload.get("payload") or {}).get("text") or ""
-        raw_msg_type = payload.get("type") or "text"
-        if sender_phone or raw_text_body:
-            payload_sig = hashlib.md5(f"{sender_phone}:{raw_msg_type}:{raw_text_body}".encode('utf-8')).hexdigest()
-            dedup_keys.append(f"sig:{payload_sig}")
-
-        if dedup_keys:
             with processed_messages_lock:
                 if not isinstance(processed_messages, dict):
                     globals()['processed_messages'] = {}
@@ -1486,13 +1334,11 @@ def handle_message(payload):
                 for k in expired:
                     del processed_messages[k]
 
-                is_dup = any(k in processed_messages and (now_ts - processed_messages[k] <= 60) for k in dedup_keys)
-                if is_dup:
-                    logging.info(f"Duplicate Message ID / Payload {dedup_keys} within 60s. Skipping.")
+                if message_id in processed_messages and (now_ts - processed_messages[message_id] <= 60):
+                    logging.info(f"Duplicate Message ID {message_id} within 60s. Skipping.")
                     return
 
-                for k in dedup_keys:
-                    processed_messages[k] = now_ts
+                processed_messages[message_id] = now_ts
 
         if not sender_phone:
             logging.error("No sender_phone found. Aborting.")
@@ -1731,11 +1577,10 @@ def handle_message(payload):
 
             if msg_type in ["document", "image", "audio"] and sender_phone in user_sessions:
                 chat = user_sessions[sender_phone].get("chat", [])
-                chat = [c for c in chat if not is_system_prompt_content(c)]
                 chat.append(types.Content(role="user", parts=[types.Part.from_text(text=user_input_for_history)]))
                 chat.append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
                 chat = strip_past_media(chat)
-                if len(chat) > 12:
+                if len(chat) > 20:
                     first_2 = chat[:2]
                     recent_10 = chat[-10:]
                     middle = chat[2:-10]

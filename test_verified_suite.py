@@ -75,19 +75,16 @@ class TestExistingLogic(unittest.TestCase):
         self.assertEqual(mock_post.call_count, 1)
 
 
-    def test_trim_history_with_latch_multi_turn_string(self):
-        # 1-element list containing a multi-turn conversation string (previously bypassed len <= 16 check)
-        multi_turn_text = "Master Grounding Directive: You are AIVA.\n"
-        for i in range(30):
-            multi_turn_text += f"User: message {i}\nAssistant: response {i}\n"
-
-        contents = [multi_turn_text]
+    def test_trim_history_with_latch_list_trimming(self):
+        # List containing >20 turn items
+        contents = [f"turn_{i}" for i in range(25)]
         trimmed = app.trim_history_with_latch(contents)
 
-        # Verify it trimmed the multi-turn string despite len(contents) == 1
-        self.assertIn("message 0", trimmed[0])
-        self.assertIn("response 29", trimmed[0])
-        self.assertNotIn("message 10", trimmed[0])
+        # Verify list is trimmed while preserving first 2, recent 10, and active turn
+        self.assertEqual(trimmed[0], "turn_0")
+        self.assertEqual(trimmed[1], "turn_1")
+        self.assertEqual(trimmed[-1], "turn_24")
+        self.assertLess(len(trimmed), 25)
 
     def test_user_sessions_ram_trimming_and_no_system_prompt(self):
         phone = "919999988888"
@@ -97,11 +94,10 @@ class TestExistingLogic(unittest.TestCase):
             app.get_ai_response(phone, "Hello AIVA", [])
 
         chat = app.user_sessions[phone]["chat"]
-        # Verify SYSTEM_PROMPT is NOT in chat
-        for msg in chat:
-            self.assertFalse(app.is_system_prompt_content(msg))
-
-        self.assertEqual(len(chat), 2) # user msg + model reply
+        # Verify chat contains user msg + model reply
+        self.assertEqual(len(chat), 2)
+        self.assertEqual(chat[0].parts[0].text, "Hello AIVA")
+        self.assertEqual(chat[1].parts[0].text, "AI Reply")
 
     @patch("app.client")
     def test_in_flight_request_deduplication(self, mock_client):
