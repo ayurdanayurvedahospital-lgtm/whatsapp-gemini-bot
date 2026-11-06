@@ -806,9 +806,6 @@ def call_gemini_with_retry(contents):
                     contents=contents,
                     config=flash_config
                 )
-                active_model = model_name
-                usage = getattr(response, "usage_metadata", None)
-                logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                 raw_text = extract_raw_text(response)
                 break
             except Exception as e:
@@ -828,9 +825,6 @@ def call_gemini_with_retry(contents):
                             contents=contents,
                             config=alt_config
                         )
-                        active_model = model_name
-                        usage = getattr(response, "usage_metadata", None)
-                        logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                         raw_text = extract_raw_text(response)
                         if raw_text:
                             break
@@ -843,9 +837,6 @@ def call_gemini_with_retry(contents):
                                 contents=contents,
                                 config=types.GenerateContentConfig()
                             )
-                            active_model = model_name
-                            usage = getattr(response, "usage_metadata", None)
-                            logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                             raw_text = extract_raw_text(response)
                             if raw_text:
                                 break
@@ -878,9 +869,6 @@ def call_gemini_with_retry(contents):
                         contents=contents,
                         config=fallback_config
                     )
-                    active_model = model_name
-                    usage = getattr(response, "usage_metadata", None)
-                    logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                     raw_text = extract_raw_text(response)
                 except Exception as fallback_e:
                     print(f"CRITICAL SDK ERROR (2.5 Flash Fallback Failed): {str(fallback_e)}")
