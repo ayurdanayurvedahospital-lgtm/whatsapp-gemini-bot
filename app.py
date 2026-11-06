@@ -940,13 +940,16 @@ def call_gemini_with_retry(contents):
         max_attempts = 4
         for attempt in range(max_attempts):
             try:
-                model_name = "gemini-3-flash-preview"
+                model_name = "gemini-2.5-flash"
                 logging.info(f"[TOKEN AUDIT] model={model_name} approx_chars={total_chars} approx_tokens={total_chars // 4}")
                 response = client.models.generate_content(
                     model=model_name,
                     contents=contents,
                     config=flash_config
                 )
+                active_model = model_name
+                usage = getattr(response, "usage_metadata", None)
+                logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                 raw_text = extract_raw_text(response)
                 break
             except Exception as e:
@@ -954,30 +957,36 @@ def call_gemini_with_retry(contents):
                 last_err_str = str(e).lower()
 
                 if "400" in last_err_str or "invalidargument" in last_err_str or "thinking" in last_err_str or "budget" in last_err_str:
-                    logging.warning("gemini-3-flash-preview rejected thinking_config (400/InvalidArgument). Retrying gemini-3-flash-preview with thinking_level='LOW'...")
+                    logging.warning("gemini-2.5-flash rejected thinking_config (400/InvalidArgument). Retrying gemini-2.5-flash with thinking_level='LOW'...")
                     try:
                         alt_config = types.GenerateContentConfig(
                             thinking_config=types.ThinkingConfig(thinking_level='LOW')
                         )
-                        model_name = "gemini-3-flash-preview"
+                        model_name = "gemini-2.5-flash"
                         logging.info(f"[TOKEN AUDIT] model={model_name} approx_chars={total_chars} approx_tokens={total_chars // 4}")
                         response = client.models.generate_content(
                             model=model_name,
                             contents=contents,
                             config=alt_config
                         )
+                        active_model = model_name
+                        usage = getattr(response, "usage_metadata", None)
+                        logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                         raw_text = extract_raw_text(response)
                         if raw_text:
                             break
                     except Exception as alt_e:
                         try:
-                            model_name = "gemini-3-flash-preview"
+                            model_name = "gemini-2.5-flash"
                             logging.info(f"[TOKEN AUDIT] model={model_name} approx_chars={total_chars} approx_tokens={total_chars // 4}")
                             response = client.models.generate_content(
                                 model=model_name,
                                 contents=contents,
                                 config=types.GenerateContentConfig()
                             )
+                            active_model = model_name
+                            usage = getattr(response, "usage_metadata", None)
+                            logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                             raw_text = extract_raw_text(response)
                             if raw_text:
                                 break
@@ -1010,6 +1019,9 @@ def call_gemini_with_retry(contents):
                         contents=contents,
                         config=fallback_config
                     )
+                    active_model = model_name
+                    usage = getattr(response, "usage_metadata", None)
+                    logging.info(f"[USAGE AUDIT] model={active_model} prompt_tokens={getattr(usage, 'prompt_token_count', 0)} cached_tokens={getattr(usage, 'cached_content_token_count', 0)} output_tokens={getattr(usage, 'candidates_token_count', 0)}")
                     raw_text = extract_raw_text(response)
                 except Exception as fallback_e:
                     print(f"CRITICAL SDK ERROR (2.5 Flash Fallback Failed): {str(fallback_e)}")
