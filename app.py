@@ -188,8 +188,30 @@ shopify_token_lock = threading.Lock()
 
 # --- HELPER FUNCTIONS ---
 
+def normalize_phone(phone):
+    """Strips whitespace and non-digit characters from a phone number / sender ID."""
+    if not phone:
+        return ""
+    digits = re.sub(r"\D", "", str(phone))
+    return digits if digits else str(phone).strip()
+
+def trim_sqlite_history(history):
+    """
+    Trims SQLite history when len(history) > 14, strictly pinning the first 6 intake
+    messages, preserving any payment-latched messages in the middle, and keeping the
+    most recent 8 messages.
+    """
+    if not history or not isinstance(history, list) or len(history) <= 14:
+        return list(history) if isinstance(history, list) else []
+    first_6 = history[:6]
+    recent_8 = history[-8:]
+    middle = history[6:-8]
+    latched = [m for m in middle if is_payment_latched_msg(m)]
+    return first_6 + latched + recent_8
+
 def get_user_session(phone):
     """Retrieves the full session data for a user."""
+    phone = normalize_phone(phone)
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -213,24 +235,25 @@ def get_user_session(phone):
 
 def get_user_history(phone):
     """
-    Retrieves history for a user, clearing it if inactive for >12 hours.
-    Returns a rolling window of the last 14 messages.
+    Retrieves history for a user, clearing it if inactive for >48 hours.
+    Pins the first 6 intake messages alongside latched and recent turns.
     """
+    phone = normalize_phone(phone)
     session = get_user_session(phone)
     now = time.time()
 
-    # 12-hour inactivity clearing
-    if now - session["last_active"] > 12 * 3600:
+    # 48-hour inactivity clearing
+    if now - session["last_active"] > 48 * 3600:
         return []
 
-    # Strict rolling window (last 14)
-    return session["history"][-14:]
+    return trim_sqlite_history(session["history"])
 
 def save_user_history(phone, history):
     """Updates user history and activity timestamp in SQLite."""
+    phone = normalize_phone(phone)
     try:
         now = time.time()
-        history_json = json.dumps(history[-14:])
+        history_json = json.dumps(trim_sqlite_history(history))
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute('''
@@ -247,6 +270,7 @@ def save_user_history(phone, history):
 
 def update_last_greeted(phone, timestamp):
     """Updates the last_greeted timestamp in SQLite."""
+    phone = normalize_phone(phone)
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -263,6 +287,7 @@ def update_last_greeted(phone, timestamp):
 
 def update_session_flags(phone, is_muted=None, is_tracking=None, is_dnd_active=None, is_blacklisted=None, is_flow_complete=None):
     """Updates boolean flags in the session table."""
+    phone = normalize_phone(phone)
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -506,19 +531,22 @@ def send_whatsapp_message(to_number, message_text, message_type="text", image_ur
 
 def cancel_timers(phone):
     """Cancels any pending inactivity timers for a user."""
-    if phone in followup_timers:
-        if followup_timers[phone].get('t1'):
-            try:
-                followup_timers[phone]['t1'].cancel()
-            except Exception: pass
-        if followup_timers[phone].get('t2'):
-            try:
-                followup_timers[phone]['t2'].cancel()
-            except Exception: pass
-        del followup_timers[phone]
+    norm_phone = normalize_phone(phone)
+    for key in {phone, norm_phone}:
+        if key in followup_timers:
+            if followup_timers[key].get('t1'):
+                try:
+                    followup_timers[key]['t1'].cancel()
+                except Exception: pass
+            if followup_timers[key].get('t2'):
+                try:
+                    followup_timers[key]['t2'].cancel()
+                except Exception: pass
+            del followup_timers[key]
 
 def send_followup_1(phone):
     """First followup after 2 minutes."""
+    phone = normalize_phone(phone)
     session = get_user_session(phone)
     if session.get("is_dnd_active") == True or session.get("is_flow_complete") == True or session["is_muted"] or check_stop_bot(phone):
         return
@@ -535,6 +563,7 @@ def send_followup_1(phone):
 
 def send_followup_2(phone):
     """Second followup after 30 minutes."""
+    phone = normalize_phone(phone)
     session = get_user_session(phone)
     if session.get("is_dnd_active") == True or session.get("is_flow_complete") == True or session["is_muted"] or check_stop_bot(phone):
         return
@@ -548,6 +577,7 @@ def send_followup_2(phone):
 
 def start_inactivity_timer(phone):
     """Starts the first inactivity timer."""
+    phone = normalize_phone(phone)
     # Cancel old ones first to be safe
     cancel_timers(phone)
 
@@ -561,18 +591,19 @@ def check_stop_bot(phone):
     """
     Check if bot is stopped via Zoko tags (STOP_BOT) or cache.
     """
+    raw_phone = str(phone or "")
+    norm_phone = normalize_phone(phone)
     now = time.time()
-    if phone in stop_bot_cache:
-        cached = stop_bot_cache[phone]
-        if now - cached["timestamp"] < CACHE_TTL:
-            return cached["stopped"]
+    cached = stop_bot_cache.get(norm_phone) or stop_bot_cache.get(raw_phone)
+    if cached and (now - cached["timestamp"] < CACHE_TTL):
+        return cached["stopped"]
 
     if not ZOKO_API_KEY:
         return False
 
     is_stopped = False
     try:
-        url = f"https://chat.zoko.io/v2/chats?phone={phone}"
+        url = f"https://chat.zoko.io/v2/chats?phone={norm_phone or raw_phone}"
         headers = {'apikey': ZOKO_API_KEY}
         resp = zoko_session.get(url, headers=headers, timeout=5)
         if resp.status_code == 200:
@@ -598,7 +629,11 @@ def check_stop_bot(phone):
     except Exception as e:
         logging.error(f"Check Stop Bot Error: {e}")
 
-    stop_bot_cache[phone] = {"stopped": is_stopped, "timestamp": now}
+    entry = {"stopped": is_stopped, "timestamp": now}
+    if norm_phone:
+        stop_bot_cache[norm_phone] = entry
+    if raw_phone:
+        stop_bot_cache[raw_phone] = entry
     return is_stopped
 
 def create_thinking_config():
@@ -736,32 +771,136 @@ def is_payment_latched_msg(content):
     ]
     return any(kw in text_content for kw in latch_keywords)
 
+def _extract_item_text(item):
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        parts = item.get("parts", [])
+        return " ".join(str(p.get("text", p) if isinstance(p, dict) else p) for p in parts) or str(item.get("text", ""))
+    if hasattr(item, "parts") and item.parts:
+        texts = []
+        for p in item.parts:
+            t = getattr(p, "text", None)
+            if isinstance(t, str):
+                texts.append(t)
+        if texts:
+            return " ".join(texts)
+    t = getattr(item, "text", None)
+    return t if isinstance(t, str) else ""
+
+def _has_system_prefix(contents):
+    if not contents or len(contents) < 3:
+        return False
+    t0 = _extract_item_text(contents[0]).lower()
+    t1 = _extract_item_text(contents[1]).lower()
+    if (
+        "understood. i am aiva" in t1
+        or t1.strip() == "ack"
+        or "ack_content" in t1
+        or "system_content" in t0
+        or "system prompt" in t0
+        or "system_prompt" in t0
+        or "you are aiva" in t0
+        or (SYSTEM_PROMPT and len(t0) > 100 and SYSTEM_PROMPT[:40].lower() in t0)
+    ):
+        return True
+    return False
+
+def trim_chat_history(chat):
+    """
+    Trims an in-memory chat list when len(chat) > 20, preserving:
+    - initial intake turns (first 6 messages: chat[:6])
+    - payment/screenshot verification turns (latched)
+    - recent turns (last 12 messages: chat[-12:])
+    """
+    if not chat or not isinstance(chat, list) or len(chat) <= 20:
+        return chat
+    first_6 = chat[:6]
+    recent_12 = chat[-12:]
+    middle = chat[6:-12]
+    latched = [m for m in middle if is_payment_latched_msg(m)]
+    return first_6 + latched + recent_12
+
+def _history_dicts_to_contents(history_list):
+    """Converts SQLite [{'role': ..., 'parts': [...]}] dicts into types.Content objects."""
+    contents_list = []
+    if not history_list:
+        return contents_list
+    for h in history_list:
+        if isinstance(h, dict):
+            role = "user" if h.get("role") == "user" else "model"
+            parts = h.get("parts") or [""]
+            text_val = parts[0] if parts else ""
+            contents_list.append(types.Content(role=role, parts=[types.Part.from_text(text=str(text_val))]))
+        elif hasattr(h, "role") and hasattr(h, "parts"):
+            contents_list.append(h)
+    return contents_list
+
+def _get_unified_chat_contents(sender_phone, fallback_history=None):
+    """Returns the 48-hour session chat Content list from user_sessions, hydrating from SQLite if empty."""
+    norm_phone = normalize_phone(sender_phone)
+    chat = []
+    if norm_phone in user_sessions:
+        chat = list(user_sessions[norm_phone].get("chat", []))
+    elif sender_phone in user_sessions:
+        chat = list(user_sessions[sender_phone].get("chat", []))
+    if not chat:
+        hist = fallback_history if fallback_history else get_user_history(norm_phone)
+        chat = _history_dicts_to_contents(hist)
+        if chat and norm_phone in user_sessions:
+            user_sessions[norm_phone]["chat"] = list(chat)
+    return chat
+
+def _get_past_user_texts(sender_phone, fallback_history=None):
+    """Returns past user message texts from unified 48-hour user_sessions chat (with SQLite fallback)."""
+    chat = _get_unified_chat_contents(sender_phone, fallback_history)
+    texts = []
+    for item in chat:
+        role = getattr(item, "role", "") if not isinstance(item, dict) else item.get("role", "")
+        if role == "user":
+            txt = _extract_item_text(item)
+            if txt:
+                texts.append(txt)
+    if texts:
+        return texts
+    for h in (fallback_history or []):
+        if isinstance(h, dict) and h.get("role") == "user":
+            parts = h.get("parts") or []
+            if parts and parts[0]:
+                texts.append(str(parts[0]))
+    return texts
+
 def trim_history_with_latch(contents):
     """
-    Trims history list when len(contents) > 20, preserving:
-    - initial turns (first 2)
+    Separates optional 2-item [system_content, ack_content] prefix and active_turn (contents[-1]),
+    and trims chat_history when len(chat_history) > 20, preserving:
+    - prefix (contents[:2] when system prompt pair is present)
+    - initial intake turns (first 6 chat messages: chat_history[:6])
     - payment/screenshot verification turns (latched)
-    - recent turns (last 10)
+    - recent turns (last 12 chat messages: chat_history[-12:])
     - active turn (contents[-1])
     """
     if not contents or not isinstance(contents, list):
         return contents
 
-    if len(contents) <= 20:
+    if _has_system_prefix(contents):
+        prefix = contents[:2]
+        chat_history = contents[2:-1]
+        active_turn = contents[-1]
+    else:
+        prefix = []
+        chat_history = contents[:-1]
+        active_turn = contents[-1]
+
+    if len(chat_history) <= 20:
         return contents
 
-    active_turn = contents[-1]
-    history_items = contents[:-1]
-
-    if len(history_items) <= 12:
-        return contents
-
-    first_2 = history_items[:2]
-    recent_10 = history_items[-10:]
-    middle = history_items[2:-10]
+    first_6 = chat_history[:6]
+    recent_12 = chat_history[-12:]
+    middle = chat_history[6:-12]
     latched = [msg for msg in middle if is_payment_latched_msg(msg)]
 
-    return first_2 + latched + recent_10 + [active_turn]
+    return prefix + first_6 + latched + recent_12 + [active_turn]
 
 def call_gemini_with_retry(contents):
     if not client:
@@ -920,22 +1059,17 @@ def process_audio(file_url, sender_phone, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
-            # Construct conversation with history
-            message_text = ""
-            if history:
-                for h in reversed(history):
-                    if h["role"] == "user":
-                        message_text = h["parts"][0]
-                        break
+            # Construct conversation with unified 48-hour history
+            sender_phone = normalize_phone(sender_phone)
+            past_user_texts = _get_past_user_texts(sender_phone, history)
+            message_text = past_user_texts[-1] if past_user_texts else ""
             user_lang = detect_language(message_text) if message_text else "malayalam"
 
-            if user_lang == "english" and len(message_text.split()) < 4 and history:
-                for h in reversed(history):
-                    if h["role"] == "user":
-                        past_lang = detect_language(h["parts"][0])
-                        if past_lang == "malayalam":
-                            user_lang = "malayalam"
-                            break
+            if user_lang == "english" and len(message_text.split()) < 4 and past_user_texts:
+                for past_text in reversed(past_user_texts):
+                    if detect_language(past_text) == "malayalam":
+                        user_lang = "malayalam"
+                        break
 
             _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
@@ -947,10 +1081,8 @@ def process_audio(file_url, sender_phone, history):
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
-            # Map history to types.Content
-            for h in history:
-                role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+            # Map unified 48-hour history to types.Content
+            contents.extend(_get_unified_chat_contents(sender_phone, history))
 
             # Add final audio part and prompt
             audio_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='audio/ogg')
@@ -1007,21 +1139,16 @@ def process_image(file_url, sender_phone, prompt_text, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
-            message_text = prompt_text if prompt_text else ""
-            if not message_text and history:
-                for h in reversed(history):
-                    if h["role"] == "user":
-                        message_text = h["parts"][0]
-                        break
+            sender_phone = normalize_phone(sender_phone)
+            past_user_texts = _get_past_user_texts(sender_phone, history)
+            message_text = prompt_text if prompt_text else (past_user_texts[-1] if past_user_texts else "")
             user_lang = detect_language(message_text) if message_text else "malayalam"
 
-            if user_lang == "english" and len(message_text.split()) < 4 and history:
-                for h in reversed(history):
-                    if h["role"] == "user":
-                        past_lang = detect_language(h["parts"][0])
-                        if past_lang == "malayalam":
-                            user_lang = "malayalam"
-                            break
+            if user_lang == "english" and len(message_text.split()) < 4 and past_user_texts:
+                for past_text in reversed(past_user_texts):
+                    if detect_language(past_text) == "malayalam":
+                        user_lang = "malayalam"
+                        break
 
             _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
@@ -1033,9 +1160,7 @@ def process_image(file_url, sender_phone, prompt_text, history):
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
-            for h in history:
-                role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+            contents.extend(_get_unified_chat_contents(sender_phone, history))
 
             user_prompt = prompt_text if prompt_text else "Please analyze this image regarding my health."
             image_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='image/jpeg') # mime_type is optional/auto
@@ -1087,21 +1212,16 @@ def process_pdf(file_url, sender_phone, history):
             greeting = get_ist_time_greeting()
             current_time_str = get_current_time_str()
 
-            message_text = ""
-            if history:
-                for h in reversed(history):
-                    if h["role"] == "user":
-                        message_text = h["parts"][0]
-                        break
+            sender_phone = normalize_phone(sender_phone)
+            past_user_texts = _get_past_user_texts(sender_phone, history)
+            message_text = past_user_texts[-1] if past_user_texts else ""
             user_lang = detect_language(message_text) if message_text else "malayalam"
 
-            if user_lang == "english" and len(message_text.split()) < 4 and history:
-                for h in reversed(history):
-                    if h["role"] == "user":
-                        past_lang = detect_language(h["parts"][0])
-                        if past_lang == "malayalam":
-                            user_lang = "malayalam"
-                            break
+            if user_lang == "english" and len(message_text.split()) < 4 and past_user_texts:
+                for past_text in reversed(past_user_texts):
+                    if detect_language(past_text) == "malayalam":
+                        user_lang = "malayalam"
+                        break
 
             _check_reload_prompt()
             system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
@@ -1113,9 +1233,7 @@ def process_pdf(file_url, sender_phone, history):
                 types.Content(role="model", parts=[types.Part.from_text(text=f"Understood. I am AIVA. Current Time Greeting is: {greeting}.")]),
             ]
 
-            for h in history:
-                role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=h["parts"][0])]))
+            contents.extend(_get_unified_chat_contents(sender_phone, history))
 
             pdf_part = types.Part.from_uri(file_uri=myfile.uri, mime_type='application/pdf')
             system_note = get_system_time_note()
@@ -1218,17 +1336,21 @@ def get_active_events_instruction():
 
 def get_ai_response(sender_phone, message_text, history):
     try:
+        raw_phone = sender_phone
+        sender_phone = normalize_phone(sender_phone)
+        if sender_phone and sender_phone not in user_sessions and raw_phone in user_sessions:
+            user_sessions[sender_phone] = user_sessions[raw_phone]
+
         greeting = get_ist_time_greeting()
         current_time_str = get_current_time_str()
 
         user_lang = detect_language(message_text)
-        if user_lang == "english" and len(message_text.split()) < 4 and history:
-            for h in reversed(history):
-                if h["role"] == "user":
-                    past_lang = detect_language(h["parts"][0])
-                    if past_lang == "malayalam":
-                        user_lang = "malayalam"
-                        break
+        if user_lang == "english" and len(message_text.split()) < 4:
+            past_user_texts = _get_past_user_texts(sender_phone, history)
+            for past_text in reversed(past_user_texts):
+                if detect_language(past_text) == "malayalam":
+                    user_lang = "malayalam"
+                    break
 
         _check_reload_prompt()
         system_instruction = filter_system_prompt_by_language(SYSTEM_PROMPT, user_lang)
@@ -1247,29 +1369,40 @@ def get_ai_response(sender_phone, message_text, history):
         system_note = get_system_time_note()
         message_with_note = f"{message_text}\n\n{system_note}" if system_note else message_text
 
-        chat = []
-        if sender_phone in user_sessions:
-            chat = user_sessions[sender_phone].get("chat", [])
+        chat = _get_unified_chat_contents(sender_phone, history)
+        active_user_turn = types.Content(role="user", parts=[types.Part.from_text(text=message_with_note)])
 
-        chat.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
-
-        contents = [system_content, ack_content] + chat[:-1] + [types.Content(role="user", parts=[types.Part.from_text(text=message_with_note)])]
+        contents = [system_content, ack_content] + list(chat) + [active_user_turn]
 
         response_text = call_gemini_with_retry(contents)
 
         if response_text:
+            chat.append(types.Content(role="user", parts=[types.Part.from_text(text=message_text)]))
             chat.append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
 
         chat = strip_past_media(chat)
-        if len(chat) > 20:
-            first_2 = chat[:2]
-            recent_10 = chat[-10:]
-            middle = chat[2:-10]
-            latched = [m for m in middle if is_payment_latched_msg(m)]
-            chat = first_2 + latched + recent_10
+        chat = trim_chat_history(chat)
 
-        if sender_phone in user_sessions:
+        if sender_phone not in user_sessions:
+            ist = pytz.timezone('Asia/Kolkata')
+            user_sessions[sender_phone] = {"chat": chat, "last_active": datetime.now(ist)}
+        else:
             user_sessions[sender_phone]["chat"] = chat
+
+        age_hrs = 0.0
+        try:
+            ist = pytz.timezone('Asia/Kolkata')
+            now_ist = datetime.now(ist)
+            last_act = user_sessions.get(sender_phone, {}).get("last_active")
+            if isinstance(last_act, (int, float)) and last_act > 0:
+                age_hrs = max(0.0, (time.time() - last_act) / 3600.0)
+            elif last_act:
+                diff = now_ist - last_act
+                if isinstance(diff, timedelta):
+                    age_hrs = max(0.0, diff.total_seconds() / 3600.0)
+        except Exception:
+            age_hrs = 0.0
+        logging.info(f"[MEMORY] phone={sender_phone} turns={len(user_sessions[sender_phone]['chat'])} age_hrs={age_hrs:.1f}")
 
         return response_text
     except Exception as e:
@@ -1287,18 +1420,30 @@ def handle_message(payload):
     try:
         # SECURITY: Extract safe fields instead of logging raw payload
         message_id = payload.get("messageId") or payload.get("eventId")
-        sender_phone = payload.get("platformSenderId")
-        if not sender_phone:
-            sender_phone = (payload.get("customer") or {}).get("platformSenderId")
+        raw_sender_phone = payload.get("platformSenderId")
+        if not raw_sender_phone:
+            raw_sender_phone = (payload.get("customer") or {}).get("platformSenderId")
+        sender_phone = normalize_phone(raw_sender_phone)
 
         # 48-hour session memory logic
         ist = pytz.timezone('Asia/Kolkata')
         now = datetime.now(ist)
-        if sender_phone in user_sessions:
-            if now - user_sessions[sender_phone]['last_active'] > timedelta(hours=48):
-                user_sessions[sender_phone] = {'chat': [], 'last_active': now}
-        else:
-            user_sessions[sender_phone] = {'chat': [], 'last_active': now}
+        if sender_phone:
+            if sender_phone in user_sessions:
+                last_act = user_sessions[sender_phone].get('last_active')
+                try:
+                    is_expired = (now - last_act) > timedelta(hours=48)
+                except Exception:
+                    is_expired = False
+                if is_expired:
+                    user_sessions[sender_phone] = {'chat': [], 'last_active': now}
+                elif not user_sessions[sender_phone].get('chat'):
+                    db_hist = get_user_history(sender_phone)
+                    if db_hist:
+                        user_sessions[sender_phone]['chat'] = _history_dicts_to_contents(db_hist)
+            else:
+                db_hist = get_user_history(sender_phone)
+                user_sessions[sender_phone] = {'chat': _history_dicts_to_contents(db_hist), 'last_active': now}
 
         safe_log = {
             "messageId": message_id,
@@ -1494,8 +1639,9 @@ def handle_message(payload):
                     detected_product = kw
                     break
 
-        session = get_user_session(sender_phone)
-        if is_triage_bypass and not session["history"]:
+        active_chat = user_sessions.get(sender_phone, {}).get("chat", [])
+        active_history = get_user_history(sender_phone)
+        if is_triage_bypass and not active_chat and not active_history:
             # Hard short-circuit: Ask ONLY for age and gender (Fix 59 pacing)
             bypass_msg = f"I see your enquiry about {detected_product.title()}. To recommend the best Ayurvedic treatment for you, please let me know your age and whether you are male or female."
             user_lang = detect_language(text_body)
@@ -1505,21 +1651,28 @@ def handle_message(payload):
             send_whatsapp_message(sender_phone.replace("+", ""), bypass_msg, "text")
             update_last_greeted(sender_phone, time.time())
 
-            # Save history so next time it won't trigger this bypass
+            # Save history in both SQLite and in-memory user_sessions so Turn 2 retains Turn 1
             history = [{"role": "user", "parts": [text_body]}, {"role": "model", "parts": [bypass_msg]}]
             save_user_history(sender_phone, history)
+            if sender_phone not in user_sessions:
+                user_sessions[sender_phone] = {'chat': [], 'last_active': now}
+            user_sessions[sender_phone]['chat'].extend([
+                types.Content(role="user", parts=[types.Part.from_text(text=text_body)]),
+                types.Content(role="model", parts=[types.Part.from_text(text=bypass_msg)])
+            ])
+            user_sessions[sender_phone]['last_active'] = now
             start_inactivity_timer(sender_phone)
             logging.info(f"Triage Bypass triggered for {sender_phone} on product {detected_product}")
             return
 
-        # --- STEP 4: SMART GREETING LOGIC (12 HOUR RULE) ---
+        # --- STEP 4: SMART GREETING LOGIC (48 HOUR RULE) ---
         current_time = time.time()
         session = get_user_session(sender_phone)
         last_time = session["last_greeted"]
 
         is_greeting_keyword = text_body and lower_body.strip() in ["hi", "hello", "start", "good morning", "good afternoon", "good evening"]
 
-        if is_greeting_keyword and (current_time - last_time > 12 * 3600):
+        if is_greeting_keyword and (current_time - last_time > 48 * 3600):
             time_greeting = get_ist_time_greeting()
             greeting_msg = (
                 f"{time_greeting}! I’m AIVA, Ayurvedic Expert at Ayurdan Ayurveda Hospital.\n"
@@ -1528,7 +1681,7 @@ def handle_message(payload):
             )
             send_whatsapp_message(sender_phone.replace("+", ""), greeting_msg, "text")
             update_last_greeted(sender_phone, current_time)
-            logging.info(f"Sent 12h greeting to {sender_phone}")
+            logging.info(f"Sent 48h greeting to {sender_phone}")
 
             # Start timer after greeting
             start_inactivity_timer(sender_phone)
@@ -1580,12 +1733,7 @@ def handle_message(payload):
                 chat.append(types.Content(role="user", parts=[types.Part.from_text(text=user_input_for_history)]))
                 chat.append(types.Content(role="model", parts=[types.Part.from_text(text=response_text)]))
                 chat = strip_past_media(chat)
-                if len(chat) > 20:
-                    first_2 = chat[:2]
-                    recent_10 = chat[-10:]
-                    middle = chat[2:-10]
-                    latched = [m for m in middle if is_payment_latched_msg(m)]
-                    chat = first_2 + latched + recent_10
+                chat = trim_chat_history(chat)
                 user_sessions[sender_phone]["chat"] = chat
 
         logging.info("STEP 6: Sending AI Response")
