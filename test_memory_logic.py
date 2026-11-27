@@ -116,12 +116,12 @@ class TestMemoryLogic(unittest.TestCase):
     def test_triage_bypass_populates_user_sessions_for_turn_2(self, mock_gemini, mock_timer, mock_send):
         mock_gemini.return_value = "Thank you for sharing your age and gender. Let us check your weight."
 
-        # Turn 1: User enquires about Staamigen Malt with "+91 9876543210"
+        # Turn 1: User sends bare product name "Staamigen Malt" with "+91 9876543210"
         turn_1_payload = {
             "messageId": "triage_msg_1",
             "platformSenderId": "+91 9876543210",
             "type": "text",
-            "text": "I want details about Staamigen Malt",
+            "text": "Staamigen Malt",
             "direction": "incoming"
         }
         app.handle_message(turn_1_payload)
@@ -149,6 +149,36 @@ class TestMemoryLogic(unittest.TestCase):
         self.assertEqual(len(sent_contents), 5)
         self.assertIn("Staamigen Malt", app._extract_item_text(sent_contents[2]))
         self.assertEqual(len(app.user_sessions[norm_key]["chat"]), 4)
+
+    @patch('app.send_whatsapp_message')
+    @patch('app.start_inactivity_timer')
+    @patch('app.get_ai_response')
+    def test_triage_bypass_does_not_intercept_order_or_usage_sentences_any_language(self, mock_ai, mock_timer, mock_send):
+        mock_ai.return_value = "AI Routed Response"
+
+        non_bare_messages = [
+            ("msg_order_repeat_en", "919000000001", "I want sakhitone once again"),
+            ("msg_order_en", "919000000002", "I want sakhitone"),
+            ("msg_usage_en", "919000000003", "How to eat sakhitone?"),
+            ("msg_order_ml", "919000000004", "എനിക്ക് sakhitone വീണ്ടും വേണം"),
+            ("msg_usage_hi", "919000000005", "sakhitone कैसे खाना है?"),
+            ("msg_order_ta", "919000000006", "எனக்கு sakhitone வேண்டும்"),
+        ]
+
+        for msg_id, phone, text in non_bare_messages:
+            mock_ai.reset_mock()
+            payload = {
+                "messageId": msg_id,
+                "platformSenderId": phone,
+                "type": "text",
+                "text": text,
+                "direction": "incoming"
+            }
+            app.handle_message(payload)
+            self.assertTrue(
+                mock_ai.called,
+                f"Expected '{text}' to bypass hardcoded triage and reach Gemini (get_ai_response)"
+            )
 
 
 if __name__ == '__main__':

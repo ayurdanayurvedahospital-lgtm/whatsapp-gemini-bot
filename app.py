@@ -1624,17 +1624,20 @@ def handle_message(payload):
                 return
 
 
-        # --- CRITICAL HOTFIX 61.1: HARD-CODED TRIAGE BYPASS ---
+        # --- CRITICAL HOTFIX 61.1: HARD-CODED TRIAGE BYPASS (BARE PRODUCT NAME ONLY) ---
         triage_bypass_keywords = [
-            'staamigen malt', 'sakhitone', 'gainplus capsule', 'strength plus', 'staamigen powder',
-            'junior staamigen malt', 'ayurdiabet powder', 'ayur-diabetics-powder', 'vrindatone',
+            'staamigen malt', 'sakhitone', 'sakhi tone', 'gainplus capsule', 'gain plus capsule',
+            'gain plus capsules', 'gainplus capsules', 'gain plus', 'gainplus',
+            'strength plus', 'staamigen powder', 'junior staamigen malt', 'junior staamigen',
+            'ayurdiabet powder', 'ayur-diabetics-powder', 'vrindatone', 'vrindha tone',
             'kanya tone', 'medigas syrup', 'muktanjan pain relief oil'
         ]
         is_triage_bypass = False
         detected_product = None
         if text_body:
+            cleaned_body = re.sub(r'\s+', ' ', re.sub(r'[!"#$%&\'()*+,./:;<=>?@\[\\\]^_`{|}~]', '', lower_body)).strip()
             for kw in triage_bypass_keywords:
-                if kw in lower_body or kw.replace(" ", "-") in lower_body or kw.replace(" ", "") in lower_body:
+                if cleaned_body in (kw, kw.replace(" ", "-"), kw.replace(" ", "")):
                     is_triage_bypass = True
                     detected_product = kw
                     break
